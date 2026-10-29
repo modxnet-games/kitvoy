@@ -21,8 +21,12 @@ const POSES = [
   { rotY: -0.35, rotX: 0.08, scale: 1.1, y: -0.1 },
 ] as const;
 
-/** Below this CSS width the copy stacks under the model (matches Tailwind `lg`). */
-export const STACKED_BELOW_PX = 1024;
+/**
+ * Same media query as Tailwind `lg`, so the scene and the CSS agree on when the
+ * copy sits beside the model. (The canvas is narrower than the viewport by the
+ * scrollbar, so comparing canvas width would disagree near 1024px.)
+ */
+const SIDE_BY_SIDE_QUERY = "(min-width: 1024px)";
 
 /** Approximate model bounds (body + hose) in model units, for fitting to the stage. */
 const MODEL_H = 2.9;
@@ -163,9 +167,10 @@ export function InflatorModel({ progress, reducedMotion = false }: InflatorModel
   const band = useRef<THREE.MeshStandardMaterial>(null);
   const glow = useRef<THREE.PointLight>(null);
   const lcd = useLcdScreen();
-  const { viewport, pointer, size } = useThree();
+  // useThree() re-renders this component on resize, so the media query stays current
+  const { viewport, pointer } = useThree();
 
-  const stacked = size.width < STACKED_BELOW_PX;
+  const stacked = !window.matchMedia(SIDE_BY_SIDE_QUERY).matches;
   // Fit the model to the visible stage: ~62% of its height beside the copy,
   // ~48% when the copy stacks underneath.
   const fit = stacked

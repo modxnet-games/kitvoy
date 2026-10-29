@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
@@ -13,6 +13,12 @@ const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
 });
+
+export const viewport: Viewport = {
+  // Lets fixed bars pad for the iPhone home indicator via env(safe-area-inset-bottom)
+  viewportFit: "cover",
+  themeColor: "#E6D5BD",
+};
 
 export const metadata: Metadata = {
   title: {

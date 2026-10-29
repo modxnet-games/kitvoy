@@ -5,10 +5,12 @@ import dynamic from "next/dynamic";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import { AnimatePresence, motion } from "motion/react";
 import { ArrowDown, Check, ShieldCheck, Star, Truck } from "lucide-react";
 
 import { landingConfig } from "@/config/landing";
 import { Price } from "@/components/storefront";
+import { cn } from "@/lib/utils";
 import type { ProductDisplay } from "@/types/product";
 import type { ProgressRef } from "./scene/inflator-model";
 import { CountdownTimer } from "./countdown-timer";
@@ -45,6 +47,12 @@ function hasWebGL(): boolean {
 }
 const noopSubscribe = () => () => {};
 
+/** Story beats are equal scroll lengths: hero, then 3 steps. Matches readoutAt() in the model. */
+const STEPS_START = 1 / 6;
+const STEP_SPAN = (1 - STEPS_START) / 3;
+const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+const stepAt = (p: number) => (p < 0.5 ? 0 : p < 5 / 6 ? 1 : 2);
+
 interface ProductStoryProps {
   product: ProductDisplay | null;
 }
@@ -64,6 +72,9 @@ export function ProductStory({ product }: ProductStoryProps) {
   // null on the server, so SSR markup matches the first client render
   const webgl = useSyncExternalStore<boolean | null>(noopSubscribe, hasWebGL, () => null);
   const [active, setActive] = useState(true);
+  const [step, setStep] = useState(0);
+  const stepsPanel = useRef<HTMLDivElement>(null);
+  const trackFill = useRef<HTMLSpanElement>(null);
 
   const price = product?.price ?? fallback.price;
   const compareAt = product ? product.compareAtPrice : fallback.compareAtPrice;
@@ -101,7 +112,23 @@ export function ProductStory({ product }: ProductStoryProps) {
         end: "bottom bottom",
         scrub: true,
         onUpdate: (self) => {
-          progress.current = self.progress;
+          const p = self.progress;
+          progress.current = p;
+          setStep(stepAt(p));
+
+          // Steps panel fades in as the hero copy leaves; progress fills the track
+          const panel = stepsPanel.current;
+          if (panel) {
+            const shown = clamp01((p - STEPS_START + 0.06) / 0.08);
+            panel.style.opacity = String(shown);
+            panel.style.visibility = shown > 0 ? "visible" : "hidden";
+            const fill = clamp01((p - STEPS_START) / (1 - STEPS_START));
+            if (trackFill.current) trackFill.current.style.transform = "scaleY(" + fill + ")";
+            panel.querySelectorAll<HTMLElement>("[data-seg]").forEach((seg, i) => {
+              const segFill = clamp01((p - STEPS_START - i * STEP_SPAN) / STEP_SPAN);
+              seg.style.transform = "scaleX(" + segFill + ")";
+            });
+          }
         },
       });
 
@@ -123,25 +150,6 @@ export function ProductStory({ product }: ProductStoryProps) {
         scrollTrigger: { trigger: "[data-beat='0']", start: "center center", end: "bottom top", scrub: true },
       });
 
-      gsap.utils.toArray<HTMLElement>("[data-step-card]").forEach((card) => {
-        gsap.fromTo(
-          card,
-          { y: 80, opacity: 0, filter: "blur(8px)" },
-          {
-            y: 0,
-            opacity: 1,
-            filter: "blur(0px)",
-            ease: "power2.out",
-            scrollTrigger: { trigger: card, start: "top 85%", end: "center 55%", scrub: true },
-          },
-        );
-        gsap.to(card, {
-          y: -60,
-          opacity: 0,
-          ease: "power1.in",
-          scrollTrigger: { trigger: card, start: "center 30%", end: "bottom top", scrub: true },
-        });
-      });
     },
     { scope: section, dependencies: [reducedMotion] },
   );
@@ -149,7 +157,7 @@ export function ProductStory({ product }: ProductStoryProps) {
   return (
     <section
       ref={section}
-      className="relative bg-[radial-gradient(ellipse_at_70%_40%,#1e293b_0%,#0b1220_55%,#05080f_100%)] text-white"
+      className="relative bg-[radial-gradient(ellipse_at_70%_40%,#3a2b1f_0%,var(--ink)_55%,var(--ink-deep)_100%)] text-white"
     >
       {/* Pinned 3D stage */}
       <div className="sticky top-[var(--header-h,0px)] h-[calc(100svh-var(--header-h,0px))] overflow-hidden">
@@ -167,19 +175,107 @@ export function ProductStory({ product }: ProductStoryProps) {
             <SceneFallback />
           )}
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-[#05080f] via-[#05080f]/80 to-transparent lg:hidden" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-ink-deep via-ink-deep/80 to-transparent lg:hidden" />
+
+        {/* How it works: fixed panel, driven by scroll progress */}
+        <div ref={stepsPanel} className="invisible absolute inset-0 opacity-0" aria-live="polite">
+          <div className="container mx-auto flex h-full items-end px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:items-center lg:pb-0">
+            <div className="w-full max-w-md lg:max-w-[26rem]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-brand">How it works</p>
+
+              {/* Desktop: vertical stepper */}
+              <ol className="relative mt-7 hidden lg:block">
+                <span className="absolute bottom-4 left-[17px] top-4 w-px bg-white/10" aria-hidden />
+                <span
+                  ref={trackFill}
+                  className="absolute bottom-4 left-[17px] top-4 w-px origin-top bg-gradient-to-b from-brand to-amber-300"
+                  style={{ transform: "scaleY(0)" }}
+                  aria-hidden
+                />
+                {story.map((st, i) => {
+                  const state = i < step ? "done" : i === step ? "active" : "next";
+                  return (
+                    <li key={st.title} className="relative flex gap-5 pb-9 last:pb-0" aria-current={state === "active" ? "step" : undefined}>
+                      <span
+                        className={cn(
+                          "relative z-10 flex size-[35px] shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-all duration-500",
+                          state === "active" && "border-brand bg-brand text-white shadow-[0_0_0_6px_rgba(249,115,22,0.15)]",
+                          state === "done" && "border-brand bg-ink text-brand",
+                          state === "next" && "border-white/15 bg-ink text-stone-500",
+                        )}
+                      >
+                        {state === "done" ? <Check className="size-4" /> : i + 1}
+                      </span>
+                      <div className="pt-1">
+                        <h3
+                          className={cn(
+                            "text-xl font-bold tracking-tight transition-colors duration-500",
+                            state === "active" ? "text-white" : "text-stone-500",
+                          )}
+                        >
+                          {st.title}
+                        </h3>
+                        <AnimatePresence initial={false}>
+                          {state === "active" && (
+                            <motion.p
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                              className="overflow-hidden text-[15px] leading-relaxed text-stone-300"
+                            >
+                              <span className="block pt-2">{st.text}</span>
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+
+              {/* Mobile: segmented progress + active step */}
+              <div className="lg:hidden">
+                <div className="mt-3 flex gap-1.5" aria-hidden>
+                  {story.map((st) => (
+                    <span key={st.title} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/15">
+                      <span data-seg className="block h-full origin-left rounded-full bg-brand" style={{ transform: "scaleX(0)" }} />
+                    </span>
+                  ))}
+                </div>
+                <div className="relative mt-4 min-h-[8.5rem]">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={step}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      <p className="text-xs font-semibold text-stone-400">
+                        Step {step + 1} of {story.length}
+                      </p>
+                      <h3 className="mt-1 text-[1.6rem] font-bold leading-tight tracking-tight">{story[step].title}</h3>
+                      <p className="mt-2 text-[15px] leading-relaxed text-stone-300">{story[step].text}</p>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Scrolling beats */}
       <div className="relative -mt-[calc(100svh-var(--header-h,0px))]">
         {/* Beat 0: hero */}
-        <div data-beat="0" className="container mx-auto flex min-h-[calc(100svh-var(--header-h,0px))] items-end px-4 pb-10 pt-[40svh] lg:items-center lg:py-16">
-          <div data-hero-copy className="max-w-xl space-y-5 lg:space-y-4 xl:space-y-5">
+        <div data-beat="0" className="container mx-auto flex min-h-[calc(100svh-var(--header-h,0px))] items-end px-4 pb-8 pt-[42svh] lg:items-center lg:py-16">
+          <div data-hero-copy className="max-w-xl space-y-4 sm:space-y-5 lg:space-y-4 xl:space-y-5">
             <p data-hero-item className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-brand backdrop-blur">
               <span className="size-1.5 rounded-full bg-brand" />
               {hero.eyebrow}
             </p>
-            <h1 data-hero-item className="text-balance text-4xl font-black leading-[1.02] tracking-tight sm:text-6xl lg:text-[3.6rem] xl:text-7xl">
+            <h1 data-hero-item className="text-balance text-[2.5rem] font-black leading-[1.02] tracking-tight sm:text-6xl lg:text-[3.6rem] xl:text-7xl">
               {hero.title.split(" ").map((word, i, words) =>
                 i >= words.length - 2 ? (
                   <span key={i} className="bg-gradient-to-r from-brand to-amber-300 bg-clip-text text-transparent">
@@ -190,7 +286,7 @@ export function ProductStory({ product }: ProductStoryProps) {
                 ),
               )}
             </h1>
-            <p data-hero-item className="max-w-md text-base text-slate-300 sm:text-lg">
+            <p data-hero-item className="max-w-md text-[15px] leading-relaxed text-stone-300 sm:text-lg">
               {hero.subtitle}
             </p>
 
@@ -202,7 +298,7 @@ export function ProductStory({ product }: ProductStoryProps) {
                   ))}
                 </span>
                 <span className="font-semibold">{product.rating.toFixed(1)}</span>
-                <span className="text-slate-400">({product.reviewCount} reviews)</span>
+                <span className="text-stone-400">({product.reviewCount} reviews)</span>
               </div>
             )}
 
@@ -210,7 +306,7 @@ export function ProductStory({ product }: ProductStoryProps) {
               <Price value={price} className="text-4xl font-black" />
               {compareAt != null && compareAt > price && (
                 <>
-                  <Price value={compareAt} className="text-lg text-slate-500 line-through" />
+                  <Price value={compareAt} className="text-lg text-stone-500 line-through" />
                   <span className="rounded-full bg-brand px-2.5 py-0.5 text-xs font-bold text-white">
                     Save {Math.round((1 - price / compareAt) * 100)}%
                   </span>
@@ -225,40 +321,28 @@ export function ProductStory({ product }: ProductStoryProps) {
               <CountdownTimer label={countdown.label} endsAt={countdown.endsAt} tone="dark" />
             </div>
 
-            <div data-hero-item className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
+            <div data-hero-item className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-stone-400">
               <span className="flex items-center gap-1.5"><Truck className="size-4 text-brand" />Free US shipping</span>
               <span className="flex items-center gap-1.5"><ShieldCheck className="size-4 text-brand" />Secure checkout</span>
               <span className="flex items-center gap-1.5"><Check className="size-4 text-brand" />30-day guarantee</span>
             </div>
 
-            <p data-hero-item className="hidden items-center gap-2 pt-4 text-xs uppercase tracking-[0.25em] text-slate-500 lg:flex">
+            <p data-hero-item className="hidden items-center gap-2 pt-4 text-xs uppercase tracking-[0.25em] text-stone-500 lg:flex">
               <ArrowDown className="size-4 animate-bounce" />
               {hero.scrollHint}
             </p>
           </div>
         </div>
 
-        {/* Beats 1–3: how it works */}
-        {story.map((step, i) => (
+        {/* Beats 1–3: scroll distance for the steps panel above */}
+        {story.map((st, i) => (
           <div
-            key={step.title}
+            key={st.title}
+            id={i === 0 ? "how" : undefined}
             data-beat={i + 1}
-            className="container mx-auto flex min-h-[calc(100svh-var(--header-h,0px))] items-end px-4 pb-16 lg:items-center lg:pb-0"
-          >
-            <div
-              data-step-card
-              className="max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-7 shadow-2xl backdrop-blur-xl"
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-full bg-brand text-sm font-black text-white">
-                  {i + 1}
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">{step.kicker}</span>
-              </div>
-              <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-4xl">{step.title}</h2>
-              <p className="mt-3 text-slate-300">{step.text}</p>
-            </div>
-          </div>
+            className="h-[calc(100svh-var(--header-h,0px))]"
+            aria-hidden
+          />
         ))}
       </div>
     </section>

@@ -1,25 +1,24 @@
 import { Play } from "lucide-react";
 
 import { landingConfig } from "@/config/landing";
+import { LandingHeading } from "./landing-heading";
 
 export function UgcVideoGrid() {
   const { ugc } = landingConfig;
 
   return (
-    <section className="container mx-auto px-4 py-20 md:py-28">
-      <div className="mx-auto max-w-2xl text-center">
-        <h2 data-reveal className="text-balance text-3xl font-black tracking-tight sm:text-5xl">
-          {ugc.title}
-        </h2>
-        <p data-reveal className="mt-4 text-muted-foreground">{ugc.subtitle}</p>
+    <section className="py-16 md:py-28">
+      <div className="container mx-auto px-4">
+        <LandingHeading eyebrow={ugc.eyebrow} title={ugc.title} subtitle={ugc.subtitle} />
       </div>
 
-      <div className="mt-14 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
+      {/* Mobile: swipeable row. md+: staggered grid */}
+      <div className="container mx-auto mt-10 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:mt-14 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden">
         {ugc.videos.map((video, i) => (
           <figure
             key={video.caption}
             data-reveal
-            className={`group relative aspect-[9/16] overflow-hidden rounded-3xl bg-gradient-to-b from-slate-800 to-slate-950 shadow-lg ring-1 ring-black/5 ${i % 3 === 1 ? "md:translate-y-10" : ""}`}
+            className={`group relative aspect-[9/16] w-[62vw] max-w-[260px] shrink-0 snap-center overflow-hidden rounded-3xl md:w-auto md:max-w-none bg-gradient-to-b from-stone-800 to-stone-950 shadow-lg ring-1 ring-black/5 ${i % 3 === 1 ? "md:translate-y-10" : ""}`}
           >
             {video.videoSrc ? (
               <video

@@ -172,12 +172,12 @@ export function InflatorModel({ progress, reducedMotion = false }: InflatorModel
 
   const stacked = !window.matchMedia(SIDE_BY_SIDE_QUERY).matches;
   // Fit the model to the visible stage: ~62% of its height beside the copy,
-  // ~48% when the copy stacks underneath.
+  // ~41% when the copy stacks underneath.
   const fit = stacked
-    ? Math.min((viewport.height * 0.48) / MODEL_H, (viewport.width * 0.8) / MODEL_W)
+    ? Math.min((viewport.height * 0.41) / MODEL_H, (viewport.width * 0.66) / MODEL_W)
     : Math.min((viewport.height * 0.62) / MODEL_H, (viewport.width * 0.42) / MODEL_W);
   const baseX = (stacked ? 0 : viewport.width * 0.23) - MODEL_CENTER.x * fit;
-  const baseY = (stacked ? viewport.height * 0.23 : 0) - MODEL_CENTER.y * fit;
+  const baseY = (stacked ? viewport.height * 0.25 : 0) - MODEL_CENTER.y * fit;
 
   useFrame((state, delta) => {
     const g = root.current;

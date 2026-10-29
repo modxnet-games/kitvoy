@@ -61,7 +61,7 @@ export function CountdownTimer({ label, endsAt, tone = "light", className }: Cou
       className={cn(
         "flex flex-wrap items-center justify-center gap-3 rounded-xl border px-4 py-3",
         tone === "dark"
-          ? "border-white/10 bg-white/5 text-slate-200 backdrop-blur"
+          ? "border-white/10 bg-white/5 text-stone-200 backdrop-blur"
           : "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
         className,
       )}

@@ -34,12 +34,12 @@ export function StickyBuyBar({ product }: { product: ProductDisplay | null }) {
           animate={{ y: 0 }}
           exit={{ y: "110%" }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b1220]/90 text-white backdrop-blur-xl"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink/90 text-white backdrop-blur-xl"
         >
-          <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
+          <div className="container mx-auto flex items-center justify-between gap-4 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{name}</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-stone-400">
                 <Price value={price} className="font-bold text-white" /> · Free US shipping
               </p>
             </div>

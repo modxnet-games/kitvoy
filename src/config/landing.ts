@@ -64,6 +64,7 @@ export const landingConfig = {
   ],
 
   benefits: {
+    eyebrow: "Why Kitvoy",
     title: "Why it earns a spot in the car",
     items: [
       {
@@ -86,12 +87,14 @@ export const landingConfig = {
   },
 
   bundle: {
+    eyebrow: "Bundle & save",
     title: "One for every car in the driveway",
     subtitle: "Buy 2 and save 15%. Buy 3 and save 25%. Every bundle ships free.",
     cta: "Claim My Bundle",
   },
 
   ugc: {
+    eyebrow: "On the road",
     title: "Kitvoy on the road",
     subtitle: "Post your clip and tag @kitvoy to get featured here.",
     /**
@@ -106,6 +109,11 @@ export const landingConfig = {
       { caption: "Cold-morning PSI check", videoSrc: "", poster: "" },
       { caption: "Pumping up the soccer ball", videoSrc: "", poster: "" },
     ],
+  },
+
+  faqHeading: {
+    eyebrow: "FAQ",
+    title: "Questions before you buy",
   },
 
   faq: [

@@ -7,25 +7,11 @@ import { BatteryCharging, Flashlight, Gauge, Package, Plus, ShieldCheck } from "
 import { landingConfig } from "@/config/landing";
 import type { ProductDisplay } from "@/types/product";
 import { MagneticButton } from "./magnetic-button";
+import { LandingHeading } from "./landing-heading";
 import { TiltCard } from "./tilt-card";
 import { useBuyBundle } from "./use-buy-bundle";
 
 const BENEFIT_ICONS = [Gauge, Package, BatteryCharging, Flashlight];
-
-function SectionTitle({ title, subtitle, dark = false }: { title: string; subtitle?: string; dark?: boolean }) {
-  return (
-    <div className="mx-auto max-w-2xl text-center">
-      <h2 data-reveal className="text-balance text-3xl font-black tracking-tight sm:text-5xl">
-        {title}
-      </h2>
-      {subtitle && (
-        <p data-reveal className={dark ? "mt-4 text-slate-400" : "mt-4 text-muted-foreground"}>
-          {subtitle}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export function TrustMarquee() {
   const items = [...landingConfig.trust, ...landingConfig.trust];
@@ -46,13 +32,13 @@ export function TrustMarquee() {
 export function Benefits() {
   const { benefits } = landingConfig;
   return (
-    <section className="container mx-auto px-4 py-20 md:py-28">
-      <SectionTitle title={benefits.title} />
-      <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <section className="container mx-auto px-4 py-16 md:py-28">
+      <LandingHeading eyebrow={benefits.eyebrow} title={benefits.title} />
+      <div className="mt-10 grid gap-4 sm:mt-14 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
         {benefits.items.map((b, i) => {
           const Icon = BENEFIT_ICONS[i % BENEFIT_ICONS.length];
           return (
-            <TiltCard key={b.title} data-reveal className="rounded-3xl border bg-card p-7 shadow-sm">
+            <TiltCard key={b.title} data-reveal className="rounded-3xl border bg-card p-6 shadow-[0_1px_0_rgba(255,255,255,0.5)_inset,0_10px_30px_-20px_rgba(28,23,18,0.5)] sm:p-7">
               <span className="flex size-12 items-center justify-center rounded-2xl bg-brand/10 text-brand">
                 <Icon className="size-6" />
               </span>
@@ -69,8 +55,8 @@ export function Benefits() {
 export function Faq() {
   const [open, setOpen] = useState<number | null>(0);
   return (
-    <section className="container mx-auto max-w-3xl px-4 py-20 md:py-28">
-      <SectionTitle title="Questions before you buy" />
+    <section id="faq" className="container mx-auto max-w-3xl scroll-mt-24 px-4 py-16 md:py-28">
+      <LandingHeading eyebrow={landingConfig.faqHeading.eyebrow} title={landingConfig.faqHeading.title} />
       <div className="mt-10 space-y-3">
         {landingConfig.faq.map((item, i) => {
           const isOpen = open === i;
@@ -112,13 +98,13 @@ export function FinalCta({ product }: { product: ProductDisplay | null }) {
   const buy = useBuyBundle(product);
   const soldOut = product !== null && product.stock <= 0;
   return (
-    <section className="relative overflow-hidden bg-[#05080f] py-24 text-white md:py-32">
+    <section className="relative overflow-hidden bg-ink-deep py-20 text-white md:py-32">
       <div className="pointer-events-none absolute left-1/2 top-1/2 size-[50vmax] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/20 blur-[140px] animate-glow" />
       <div className="container relative mx-auto max-w-3xl px-4 text-center">
-        <h2 data-reveal className="text-balance text-4xl font-black tracking-tight sm:text-6xl">
+        <h2 data-reveal className="text-balance text-[2.2rem] font-black leading-[1.05] tracking-tight sm:text-6xl">
           {finalCta.title}
         </h2>
-        <p data-reveal className="mx-auto mt-5 max-w-xl text-lg text-slate-300">
+        <p data-reveal className="mx-auto mt-5 max-w-xl text-lg text-stone-300">
           {finalCta.subtitle}
         </p>
         <div data-reveal className="mx-auto mt-10 max-w-sm">
@@ -126,7 +112,7 @@ export function FinalCta({ product }: { product: ProductDisplay | null }) {
             {soldOut ? "Sold out" : finalCta.cta}
           </MagneticButton>
         </div>
-        <p data-reveal className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-400">
+        <p data-reveal className="mt-5 flex items-center justify-center gap-2 text-sm text-stone-400">
           <ShieldCheck className="size-4 text-brand" />
           30-day money-back guarantee · Free US shipping
         </p>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
-import { Menu, Search, ShoppingBag, User, LayoutGrid, ChevronRight } from "lucide-react";
+import { ChevronRight, Menu, Search, ShoppingBag, User } from "lucide-react";
 
 import { siteConfig } from "@/config/site";
 import { useLanguage } from "@/contexts/language-context";
@@ -12,8 +12,8 @@ import { BrandLogo } from "@/components/layout/brand-logo";
 import { SearchDialog } from "@/components/layout/search-dialog";
 import { CartDrawer } from "@/components/layout/cart-drawer";
 import { SignInModal } from "@/components/layout/sign-in-modal";
-import { Button } from "@/components/ui/button";
 import { normalizeMediaSrc } from "@/lib/media-url";
+import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -22,6 +22,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+/** Landing-page sections (ids on the homepage) plus the full catalog. */
+const NAV_LINKS = [
+  { label: "How it works", href: "/#how" },
+  { label: "Bundles", href: "/#bundles" },
+  { label: "FAQ", href: "/#faq" },
+  { label: "Shop all", href: "/shop" },
+];
+
 interface NavbarProps {
   announcementText?: string;
   announcementVisible?: boolean;
@@ -29,6 +37,9 @@ interface NavbarProps {
   isLoggedIn?: boolean;
   customerImageUrl?: string | null;
 }
+
+const iconButton =
+  "relative inline-flex size-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function Navbar({
   announcementText,
@@ -41,12 +52,15 @@ export function Navbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useLanguage();
   const mounted = useMounted();
   const itemCount = useCartStore((s) => s.getItemCount());
+  const avatar = normalizeMediaSrc(customerImageUrl);
 
   useEffect(() => {
-    const onScroll = () => setIsScrolled(window.scrollY > 10);
+    const onScroll = () => setIsScrolled(window.scrollY > 8);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -68,190 +82,168 @@ export function Navbar({
   return (
     <>
       <header
-        className={`sticky top-0 z-50 w-full transition-all duration-300 ${
+        className={cn(
+          "sticky top-0 z-50 w-full transition-[background-color,box-shadow,border-color] duration-300",
           isScrolled
-            ? "border-b bg-background/80 backdrop-blur-lg"
-            : "bg-background"
-        }`}
+            ? "border-b border-border/70 bg-background/80 shadow-[0_6px_24px_-18px_rgba(28,23,18,0.6)] backdrop-blur-xl"
+            : "border-b border-transparent bg-background",
+        )}
       >
         {/* Announcement bar */}
         {announcementVisible && (
-          <div className="bg-primary text-primary-foreground">
-            <div className="container mx-auto flex h-8 items-center justify-center px-4 text-xs font-medium tracking-wide sm:text-sm">
-              {announcementText || t("nav.announcement")}
-            </div>
+          <div className="bg-ink text-[#F2E8DA]">
+            <p className="container mx-auto flex h-8 items-center justify-center gap-2 px-4 text-center text-[11px] font-semibold uppercase tracking-[0.18em] sm:h-9 sm:text-xs">
+              <span className="hidden size-1.5 shrink-0 rounded-full bg-brand sm:inline-block" />
+              <span className="truncate">{announcementText || t("nav.announcement")}</span>
+            </p>
           </div>
         )}
 
-        {/* Main header row */}
-        <nav className="relative container mx-auto flex h-16 items-center px-4 sm:h-20">
-
-          {/* ===== MOBILE LAYOUT (< lg) ===== */}
-          {/* Left: hamburger */}
-          <div className="flex shrink-0 items-center lg:hidden">
-            <Sheet>
+        <nav className="container mx-auto grid h-14 grid-cols-[1fr_auto_1fr] items-center px-3 sm:h-16 sm:px-4 lg:flex lg:gap-8">
+          {/* Mobile: menu */}
+          <div className="flex items-center lg:hidden">
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger
                 render={
-                  <Button variant="ghost" size="icon" className="size-9 text-foreground">
+                  <button type="button" className={iconButton} aria-label="Open menu">
                     <Menu className="size-5" />
-                    <span className="sr-only">Toggle menu</span>
-                  </Button>
+                  </button>
                 }
               />
-              <SheetContent side="left" className="w-80">
+              <SheetContent side="left" className="w-[86vw] max-w-sm">
                 <SheetHeader>
                   <SheetTitle className="sr-only">{siteConfig.name}</SheetTitle>
-                  <Link href="/" className="flex items-center">
+                  <Link href="/" onClick={() => setMenuOpen(false)}>
                     <BrandLogo />
                   </Link>
                 </SheetHeader>
-                <nav className="mt-6 flex flex-col gap-0.5 px-1">
-                  <Link
-                    href="/shop"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-semibold text-foreground transition-colors hover:bg-muted"
-                  >
-                    <LayoutGrid className="size-4 text-muted-foreground" />
-                    {t("nav.allProducts")}
-                  </Link>
+                <nav className="flex flex-col px-2">
+                  {NAV_LINKS.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center justify-between rounded-xl px-3 py-3.5 text-lg font-semibold tracking-tight transition-colors hover:bg-foreground/[0.06]"
+                    >
+                      {link.label}
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </Link>
+                  ))}
                   {categories.length > 0 && (
                     <>
-                      <div className="my-2 border-t" />
-                      <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <p className="mt-6 px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         {t("nav.categories")}
                       </p>
                       {categories.map((cat) => (
                         <Link
                           key={cat.slug}
                           href={`/shop?category=${cat.slug}`}
-                          className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          onClick={() => setMenuOpen(false)}
+                          className="rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
                         >
                           {cat.name}
-                          <ChevronRight className="size-3.5 opacity-40" />
                         </Link>
                       ))}
                     </>
                   )}
                 </nav>
+                <div className="mt-auto space-y-2 p-4">
+                  {isLoggedIn ? (
+                    <Link
+                      href="/account"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold"
+                    >
+                      <User className="size-4" />
+                      {t("nav.account")}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setSignInOpen(true);
+                      }}
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold"
+                    >
+                      <User className="size-4" />
+                      Sign in
+                    </button>
+                  )}
+                  <Link
+                    href="/#bundles"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex h-12 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white shadow-lg"
+                  >
+                    Buy now · Free US shipping
+                  </Link>
+                </div>
               </SheetContent>
             </Sheet>
           </div>
 
-          {/* Center: Logo — flex-1 on mobile to center, flex-initial on desktop */}
-          <Link
-            href="/"
-            className="flex flex-1 items-center justify-center lg:flex-initial lg:justify-start lg:ml-6 lg:mr-8 transition-transform hover:scale-[1.02]"
-          >
-            <BrandLogo />
+          {/* Logo */}
+          <Link href="/" className="justify-self-center lg:justify-self-auto" aria-label={`${siteConfig.name} home`}>
+            <BrandLogo className="text-[1.35rem] sm:text-2xl" />
           </Link>
 
-          {/* ===== DESKTOP LAYOUT (lg+) ===== */}
-          {/* Desktop: centered search */}
-          <div className="hidden lg:flex lg:flex-1 lg:justify-center">
-            <button
-              type="button"
-              onClick={openSearch}
-              className="flex h-11 w-full max-w-md items-center gap-3 rounded-full border border-border/50 bg-muted/40 px-5 text-sm text-muted-foreground shadow-sm transition-all hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-[360px] xl:w-[420px]"
-            >
-              <Search className="size-4 shrink-0 text-muted-foreground" />
-              <span className="truncate">{t("nav.searchPlaceholder")}</span>
-            </button>
-          </div>
-
-          {/* Right icons */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-4 lg:gap-5">
-            {/* Desktop categories dropdown */}
-            {categories.length > 0 && (
-              <div className="group relative hidden lg:block">
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  aria-label={t("nav.categories")}
+          {/* Desktop links */}
+          <ul className="hidden flex-1 items-center justify-center gap-1 lg:flex">
+            {NAV_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="group relative rounded-full px-4 py-2 text-sm font-semibold text-foreground/75 transition-colors hover:text-foreground"
                 >
-                  <LayoutGrid className="size-[18px]" />
-                </button>
-                <div className="invisible absolute right-0 top-full z-50 min-w-[200px] rounded-xl border bg-background p-2 opacity-0 shadow-lg transition-all group-hover:visible group-hover:opacity-100">
-                  <Link
-                    href="/shop"
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
-                  >
-                    {t("nav.allProducts")}
-                  </Link>
-                  <div className="my-1 border-t" />
-                  {categories.map((cat) => (
-                    <Link
-                      key={cat.slug}
-                      href={`/shop?category=${cat.slug}`}
-                      className="flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted"
-                    >
-                      {cat.name}
-                      <ChevronRight className="size-3 opacity-40" />
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+                  {link.label}
+                  <span className="absolute inset-x-4 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full bg-brand transition-transform duration-300 group-hover:scale-x-100" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+            <button type="button" onClick={openSearch} className={iconButton} aria-label={t("nav.search")}>
+              <Search className="size-[19px]" />
+            </button>
 
             {isLoggedIn ? (
-              <Link href="/account">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-10 text-foreground hover:bg-muted"
-                  aria-label={t("nav.account")}
-                >
-                  <div className="flex size-full items-center justify-center">
-                    {normalizeMediaSrc(customerImageUrl) ? (
-                      <img
-                        src={normalizeMediaSrc(customerImageUrl)}
-                        alt={t("nav.account")}
-                        className="size-[22px] rounded-full object-cover"
-                      />
-                    ) : (
-                      <User className="size-[22px]" />
-                    )}
-                  </div>
-                </Button>
+              <Link href="/account" className={cn(iconButton, "hidden sm:inline-flex")} aria-label={t("nav.account")}>
+                {avatar ? (
+                  <img src={avatar} alt="" className="size-[22px] rounded-full object-cover" />
+                ) : (
+                  <User className="size-[19px]" />
+                )}
               </Link>
             ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-10 text-foreground hover:bg-muted"
-                aria-label="Sign In"
+              <button
+                type="button"
                 onClick={() => setSignInOpen(true)}
+                className={cn(iconButton, "hidden sm:inline-flex")}
+                aria-label="Sign in"
               >
-                <User className="size-[22px]" />
-              </Button>
+                <User className="size-[19px]" />
+              </button>
             )}
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative size-10 text-foreground hover:bg-muted"
-              aria-label={t("nav.cart")}
-              onClick={openCart}
-            >
-              <ShoppingBag className="size-[22px]" />
+            <button type="button" onClick={openCart} className={iconButton} aria-label={t("nav.cart")}>
+              <ShoppingBag className="size-[19px]" />
               {mounted && itemCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                <span className="absolute right-0.5 top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-[18px] text-white">
                   {itemCount}
                 </span>
               )}
-            </Button>
+            </button>
+
+            <Link
+              href="/#bundles"
+              className="ml-2 hidden h-10 items-center rounded-full bg-ink px-5 text-sm font-bold text-[#F2E8DA] transition-colors hover:bg-ink-soft lg:inline-flex"
+            >
+              Buy now
+            </Link>
           </div>
         </nav>
-
-        {/* Mobile only: full-width pill search bar below header */}
-        <div className="px-4 pb-4 md:hidden">
-          <button
-            type="button"
-            onClick={openSearch}
-            className="flex w-full items-center gap-3 rounded-full border border-border/50 bg-muted/30 py-3.5 pl-5 pr-5 text-left text-sm text-muted-foreground shadow-md transition-all hover:bg-muted/50 hover:shadow-lg"
-          >
-            <Search className="size-4 shrink-0 text-muted-foreground" />
-            <span>{t("nav.searchPlaceholder")}</span>
-          </button>
-        </div>
       </header>
 
       <SearchDialog open={searchOpen} onClose={closeSearch} />

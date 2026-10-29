@@ -23,10 +23,13 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
+    const headerHeight = document.querySelector("header")?.getBoundingClientRect().height ?? 0;
     const lenis = new Lenis({
       autoRaf: false,
       lerp: 0.1,
       prevent: shouldPreventSmoothScroll,
+      // In-page links (#how, #bundles, #faq) glide and stop below the sticky header
+      anchors: { offset: -headerHeight },
     });
     const raf = (time: number) => lenis.raf(time * 1000);
     lenis.on("scroll", ScrollTrigger.update);

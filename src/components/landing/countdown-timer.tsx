@@ -9,6 +9,8 @@ interface CountdownTimerProps {
   label: string;
   /** ISO date string. Empty = count down to local midnight. */
   endsAt?: string;
+  /** "dark" for use on the hero's dark background */
+  tone?: "light" | "dark";
   className?: string;
 }
 
@@ -33,7 +35,7 @@ function splitRemaining(ms: number) {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function CountdownTimer({ label, endsAt, className }: CountdownTimerProps) {
+export function CountdownTimer({ label, endsAt, tone = "light", className }: CountdownTimerProps) {
   // null until mounted so server and client render the same markup
   const [remaining, setRemaining] = useState<number | null>(null);
 
@@ -57,7 +59,10 @@ export function CountdownTimer({ label, endsAt, className }: CountdownTimerProps
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+        "flex flex-wrap items-center justify-center gap-3 rounded-xl border px-4 py-3",
+        tone === "dark"
+          ? "border-white/10 bg-white/5 text-slate-200 backdrop-blur"
+          : "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
         className,
       )}
       role="timer"
@@ -71,7 +76,12 @@ export function CountdownTimer({ label, endsAt, className }: CountdownTimerProps
         {units.map(([unit, value], i) => (
           <span key={unit} className="flex items-center gap-1.5">
             {i > 0 && <span className="font-bold">:</span>}
-            <span className="flex flex-col items-center rounded-md bg-red-600 px-2 py-1 text-white">
+            <span
+              className={cn(
+                "flex flex-col items-center rounded-md px-2 py-1",
+                tone === "dark" ? "bg-white/10 text-white" : "bg-red-600 text-white",
+              )}
+            >
               <span className="text-lg font-bold leading-none">
                 {value === undefined ? "--" : pad(value)}
               </span>

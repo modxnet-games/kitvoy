@@ -8,7 +8,7 @@ export const en = {
     searchPlaceholder: "Search products…",
     account: "Account",
     cart: "Cart",
-    announcement: "Free US Shipping · 30-Day Money-Back Guarantee",
+    announcement: "Free US shipping on every order · 30-day money-back guarantee",
     allProducts: "All Products",
     categories: "Categories",
   },
@@ -34,9 +34,9 @@ export const en = {
     allRightsReserved: "All rights reserved.",
   },
   home: {
-    newsletterTitle: "Get road-trip deals first",
+    newsletterTitle: "Get restock alerts and bundle deals",
     newsletterSubtitle:
-      "Join the Kitvoy list for restock alerts, bundle deals and car-care tips. No spam, ever.",
+      "One email when stock drops or a bundle goes on sale, plus a seasonal tire-pressure reminder.",
     newsletterPlaceholder: "Enter your email",
     subscribe: "Subscribe",
     newsletterDisclaimer: "No spam, unsubscribe at any time.",

@@ -109,7 +109,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Clean up images/videos from Supabase Storage (non-blocking)
+    // Clean up uploaded images/videos from disk (non-blocking)
     const imageUrls = existing.images.map((i: { url: string }) => i.url);
     await deleteMultipleFromStorage(imageUrls);
 

@@ -1,10 +1,18 @@
+import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
-import { supabaseAdmin, STORAGE_BUCKET } from "@/lib/supabase";
 
-const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
+/**
+ * Uploads are stored on local disk under UPLOAD_DIR and served at /uploads/...
+ * In production nginx serves UPLOAD_DIR directly (Next.js does not serve files
+ * added to public/ after the build). Defaults to public/uploads for local dev.
+ */
+const UPLOAD_DIR = path.resolve(
+  process.env.UPLOAD_DIR?.trim() || path.join(process.cwd(), "public", "uploads"),
+);
+const PUBLIC_PREFIX = "/uploads/";
 
 /* ------------------------------------------------------------------ */
-/*  MIME / extension helpers  (unchanged from local-disk version)      */
+/*  MIME / extension helpers                                           */
 /* ------------------------------------------------------------------ */
 
 const ALLOWED_CANONICAL = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -117,91 +125,66 @@ function validateProductVideoFile(file: File): { error: string } | null {
 export type UploadSegment = "products" | "banners" | "categories" | "reviews";
 
 /* ------------------------------------------------------------------ */
-/*  Supabase Storage helpers                                           */
+/*  Local disk storage helpers                                         */
 /* ------------------------------------------------------------------ */
 
 /**
- * Build the full public URL for a file in the uploads bucket.
- */
-function publicUrl(storagePath: string): string {
-  return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${storagePath}`;
-}
-
-/**
- * Upload a buffer to Supabase Storage and return the public URL.
+ * Write a buffer to UPLOAD_DIR/{storagePath} and return its public URL.
  */
 async function uploadToStorage(
   storagePath: string,
   buffer: Buffer,
-  contentType: string,
 ): Promise<{ url: string } | { error: string }> {
-  const { error } = await supabaseAdmin.storage
-    .from(STORAGE_BUCKET)
-    .upload(storagePath, buffer, {
-      contentType,
-      upsert: false,
-    });
-
-  if (error) {
-    console.error("Supabase upload error:", error.message);
-    return { error: `Upload failed: ${error.message}` };
+  try {
+    const filePath = path.join(UPLOAD_DIR, storagePath);
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, buffer, { flag: "wx" });
+    return { url: `${PUBLIC_PREFIX}${storagePath}` };
+  } catch (err) {
+    console.error("Upload write error:", err);
+    return { error: "Upload failed. Please try again." };
   }
+}
 
-  return { url: publicUrl(storagePath) };
+/** Map a stored /uploads/... URL to its file on disk, or null if it isn't one. */
+function toUploadFilePath(fileUrl: string): string | null {
+  let pathname = fileUrl;
+  try {
+    pathname = new URL(fileUrl, "http://localhost").pathname;
+  } catch {
+    return null;
+  }
+  if (!pathname.startsWith(PUBLIC_PREFIX)) return null;
+
+  const filePath = path.resolve(UPLOAD_DIR, decodeURIComponent(pathname.slice(PUBLIC_PREFIX.length)));
+  // Never delete outside the uploads directory
+  if (!filePath.startsWith(UPLOAD_DIR + path.sep)) return null;
+  return filePath;
 }
 
 /**
- * Delete a file from Supabase Storage given its full public URL.
+ * Delete an uploaded file given its public URL.
  * Silently logs errors — callers should not block on storage cleanup failures.
  */
 export async function deleteFromStorage(fileUrl: string): Promise<void> {
   if (!fileUrl) return;
+  const filePath = toUploadFilePath(fileUrl);
+  if (!filePath) return;
 
-  // Extract the storage path from the full URL
-  // URL format: {SUPABASE_URL}/storage/v1/object/public/uploads/{segment}/{filename}
-  const marker = `/storage/v1/object/public/${STORAGE_BUCKET}/`;
-  const idx = fileUrl.indexOf(marker);
-  if (idx === -1) {
-    // Not a Supabase Storage URL (could be an old local path) — skip
-    return;
-  }
-
-  const storagePath = fileUrl.slice(idx + marker.length);
-  if (!storagePath) return;
-
-  const { error } = await supabaseAdmin.storage
-    .from(STORAGE_BUCKET)
-    .remove([storagePath]);
-
-  if (error) {
-    console.error(`Failed to delete ${storagePath} from storage:`, error.message);
+  try {
+    await unlink(filePath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.error(`Failed to delete ${filePath}:`, err);
+    }
   }
 }
 
 /**
- * Delete multiple files from Supabase Storage. Non-blocking — errors are logged.
+ * Delete multiple uploaded files. Non-blocking — errors are logged.
  */
 export async function deleteMultipleFromStorage(fileUrls: string[]): Promise<void> {
-  const paths: string[] = [];
-  const marker = `/storage/v1/object/public/${STORAGE_BUCKET}/`;
-
-  for (const url of fileUrls) {
-    if (!url) continue;
-    const idx = url.indexOf(marker);
-    if (idx === -1) continue;
-    const p = url.slice(idx + marker.length);
-    if (p) paths.push(p);
-  }
-
-  if (paths.length === 0) return;
-
-  const { error } = await supabaseAdmin.storage
-    .from(STORAGE_BUCKET)
-    .remove(paths);
-
-  if (error) {
-    console.error("Failed to delete files from storage:", error.message);
-  }
+  await Promise.all(fileUrls.map(deleteFromStorage));
 }
 
 /* ------------------------------------------------------------------ */
@@ -226,7 +209,7 @@ async function saveUploadImage(
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  return uploadToStorage(storagePath, buffer, mime);
+  return uploadToStorage(storagePath, buffer);
 }
 
 /* ------------------------------------------------------------------ */
@@ -251,7 +234,7 @@ async function saveUploadVideo(
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  return uploadToStorage(storagePath, buffer, mime);
+  return uploadToStorage(storagePath, buffer);
 }
 
 /* ------------------------------------------------------------------ */

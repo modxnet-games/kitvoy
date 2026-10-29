@@ -46,11 +46,6 @@ export function normalizeMediaSrc(stored: string | null | undefined): string {
       const u = new URL(s);
       const host = u.hostname.toLowerCase();
 
-      // Supabase Storage URLs are external CDN — return as-is
-      if (host.endsWith(".supabase.co")) {
-        return s;
-      }
-
       if (
         host === "localhost" ||
         host === "127.0.0.1" ||

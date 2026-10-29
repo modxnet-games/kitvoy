@@ -18,7 +18,7 @@ export function UgcVideoGrid() {
           <figure
             key={video.caption}
             data-reveal
-            className={`group relative aspect-[9/16] w-[62vw] max-w-[260px] shrink-0 snap-center overflow-hidden rounded-3xl md:w-auto md:max-w-none bg-gradient-to-b from-stone-800 to-stone-950 shadow-lg ring-1 ring-black/5 ${i % 3 === 1 ? "md:translate-y-10" : ""}`}
+            className={`group relative aspect-[9/16] w-[62vw] max-w-[260px] shrink-0 snap-center overflow-hidden rounded-3xl md:w-auto md:max-w-none bg-gradient-to-b from-zinc-800 to-zinc-950 shadow-lg ring-1 ring-black/5 ${i % 3 === 1 ? "md:translate-y-10" : ""}`}
           >
             {video.videoSrc ? (
               <video
@@ -31,7 +31,7 @@ export function UgcVideoGrid() {
               />
             ) : (
               <div className="flex size-full items-center justify-center">
-                <span className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(249,115,22,0.25),transparent_60%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                <span className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,122,26,0.25),transparent_60%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                 <span className="relative flex size-16 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/25 backdrop-blur transition-transform duration-500 group-hover:scale-110">
                   <Play className="ml-1 size-6 fill-current" />
                 </span>

@@ -41,7 +41,7 @@ export function MagneticButton({ children, onClick, disabled, className }: Magne
       style={{ x, y }}
       whileTap={reduce ? undefined : { scale: 0.96 }}
       className={cn(
-        "group relative w-full overflow-hidden rounded-2xl bg-brand px-8 py-4 text-lg font-bold text-white shadow-[0_10px_40px_-10px_rgba(249,115,22,0.8)] transition-shadow hover:shadow-[0_14px_50px_-8px_rgba(249,115,22,0.95)] disabled:opacity-50",
+        "group relative w-full overflow-hidden rounded-2xl bg-brand px-8 py-4 text-lg font-bold text-ink shadow-[0_10px_40px_-10px_rgba(255,122,26,0.8)] transition-shadow hover:shadow-[0_14px_50px_-8px_rgba(255,122,26,0.95)] disabled:opacity-50",
         className,
       )}
     >

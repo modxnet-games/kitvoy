@@ -157,7 +157,7 @@ export function ProductStory({ product }: ProductStoryProps) {
   return (
     <section
       ref={section}
-      className="relative bg-[radial-gradient(ellipse_at_70%_40%,#3a2b1f_0%,var(--ink)_55%,var(--ink-deep)_100%)] text-white"
+      className="relative bg-[radial-gradient(ellipse_at_70%_40%,#1d1d27_0%,var(--ink)_55%,var(--ink-deep)_100%)] text-white"
     >
       {/* Pinned 3D stage */}
       <div className="sticky top-[var(--header-h,0px)] h-[calc(100svh-var(--header-h,0px))] overflow-hidden">
@@ -188,7 +188,7 @@ export function ProductStory({ product }: ProductStoryProps) {
                 <span className="absolute bottom-4 left-[17px] top-4 w-px bg-white/10" aria-hidden />
                 <span
                   ref={trackFill}
-                  className="absolute bottom-4 left-[17px] top-4 w-px origin-top bg-gradient-to-b from-brand to-amber-300"
+                  className="absolute bottom-4 left-[17px] top-4 w-px origin-top bg-gradient-to-b from-brand to-[#FFB27A]"
                   style={{ transform: "scaleY(0)" }}
                   aria-hidden
                 />
@@ -199,9 +199,9 @@ export function ProductStory({ product }: ProductStoryProps) {
                       <span
                         className={cn(
                           "relative z-10 flex size-[35px] shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-all duration-500",
-                          state === "active" && "border-brand bg-brand text-white shadow-[0_0_0_6px_rgba(249,115,22,0.15)]",
+                          state === "active" && "border-brand bg-brand text-ink shadow-[0_0_0_6px_rgba(255,122,26,0.15)]",
                           state === "done" && "border-brand bg-ink text-brand",
-                          state === "next" && "border-white/15 bg-ink text-stone-500",
+                          state === "next" && "border-white/15 bg-ink text-zinc-500",
                         )}
                       >
                         {state === "done" ? <Check className="size-4" /> : i + 1}
@@ -210,7 +210,7 @@ export function ProductStory({ product }: ProductStoryProps) {
                         <h3
                           className={cn(
                             "text-xl font-bold tracking-tight transition-colors duration-500",
-                            state === "active" ? "text-white" : "text-stone-500",
+                            state === "active" ? "text-white" : "text-zinc-500",
                           )}
                         >
                           {st.title}
@@ -222,7 +222,7 @@ export function ProductStory({ product }: ProductStoryProps) {
                               animate={{ height: "auto", opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
                               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                              className="overflow-hidden text-[15px] leading-relaxed text-stone-300"
+                              className="overflow-hidden text-[15px] leading-relaxed text-zinc-300"
                             >
                               <span className="block pt-2">{st.text}</span>
                             </motion.p>
@@ -252,11 +252,11 @@ export function ProductStory({ product }: ProductStoryProps) {
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                     >
-                      <p className="text-xs font-semibold text-stone-400">
+                      <p className="text-xs font-semibold text-zinc-400">
                         Step {step + 1} of {story.length}
                       </p>
                       <h3 className="mt-1 text-[1.6rem] font-bold leading-tight tracking-tight">{story[step].title}</h3>
-                      <p className="mt-2 text-[15px] leading-relaxed text-stone-300">{story[step].text}</p>
+                      <p className="mt-2 text-[15px] leading-relaxed text-zinc-300">{story[step].text}</p>
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -278,7 +278,7 @@ export function ProductStory({ product }: ProductStoryProps) {
             <h1 data-hero-item className="text-balance text-[2.5rem] font-black leading-[1.02] tracking-tight sm:text-6xl lg:text-[3.6rem] xl:text-7xl">
               {hero.title.split(" ").map((word, i, words) =>
                 i >= words.length - 2 ? (
-                  <span key={i} className="bg-gradient-to-r from-brand to-amber-300 bg-clip-text text-transparent">
+                  <span key={i} className="bg-gradient-to-r from-brand to-[#FFB27A] bg-clip-text text-transparent">
                     {word}{" "}
                   </span>
                 ) : (
@@ -286,7 +286,7 @@ export function ProductStory({ product }: ProductStoryProps) {
                 ),
               )}
             </h1>
-            <p data-hero-item className="max-w-md text-[15px] leading-relaxed text-stone-300 sm:text-lg">
+            <p data-hero-item className="max-w-md text-[15px] leading-relaxed text-zinc-300 sm:text-lg">
               {hero.subtitle}
             </p>
 
@@ -298,7 +298,7 @@ export function ProductStory({ product }: ProductStoryProps) {
                   ))}
                 </span>
                 <span className="font-semibold">{product.rating.toFixed(1)}</span>
-                <span className="text-stone-400">({product.reviewCount} reviews)</span>
+                <span className="text-zinc-400">({product.reviewCount} reviews)</span>
               </div>
             )}
 
@@ -306,8 +306,8 @@ export function ProductStory({ product }: ProductStoryProps) {
               <Price value={price} className="text-4xl font-black" />
               {compareAt != null && compareAt > price && (
                 <>
-                  <Price value={compareAt} className="text-lg text-stone-500 line-through" />
-                  <span className="rounded-full bg-brand px-2.5 py-0.5 text-xs font-bold text-white">
+                  <Price value={compareAt} className="text-lg text-zinc-500 line-through" />
+                  <span className="rounded-full bg-brand px-2.5 py-0.5 text-xs font-bold text-ink">
                     Save {Math.round((1 - price / compareAt) * 100)}%
                   </span>
                 </>
@@ -321,13 +321,13 @@ export function ProductStory({ product }: ProductStoryProps) {
               <CountdownTimer label={countdown.label} endsAt={countdown.endsAt} tone="dark" />
             </div>
 
-            <div data-hero-item className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-stone-400">
+            <div data-hero-item className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-400">
               <span className="flex items-center gap-1.5"><Truck className="size-4 text-brand" />Free US shipping</span>
               <span className="flex items-center gap-1.5"><ShieldCheck className="size-4 text-brand" />Secure checkout</span>
               <span className="flex items-center gap-1.5"><Check className="size-4 text-brand" />30-day guarantee</span>
             </div>
 
-            <p data-hero-item className="hidden items-center gap-2 pt-4 text-xs uppercase tracking-[0.25em] text-stone-500 lg:flex">
+            <p data-hero-item className="hidden items-center gap-2 pt-4 text-xs uppercase tracking-[0.25em] text-zinc-500 lg:flex">
               <ArrowDown className="size-4 animate-bounce" />
               {hero.scrollHint}
             </p>

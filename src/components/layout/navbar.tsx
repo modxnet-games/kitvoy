@@ -85,13 +85,13 @@ export function Navbar({
         className={cn(
           "sticky top-0 z-50 w-full transition-[background-color,box-shadow,border-color] duration-300",
           isScrolled
-            ? "border-b border-border/70 bg-background/80 shadow-[0_6px_24px_-18px_rgba(28,23,18,0.6)] backdrop-blur-xl"
+            ? "border-b border-border/70 bg-background/80 shadow-[0_6px_24px_-18px_rgba(11,11,15,0.35)] backdrop-blur-xl"
             : "border-b border-transparent bg-background",
         )}
       >
         {/* Announcement bar */}
         {announcementVisible && (
-          <div className="bg-ink text-[#F2E8DA]">
+          <div className="bg-ink text-[#FFFFFF]">
             <p className="container mx-auto flex h-8 items-center justify-center gap-2 px-4 text-center text-[11px] font-semibold uppercase tracking-[0.18em] sm:h-9 sm:text-xs">
               <span className="hidden size-1.5 shrink-0 rounded-full bg-brand sm:inline-block" />
               <span className="truncate">{announcementText || t("nav.announcement")}</span>
@@ -173,7 +173,7 @@ export function Navbar({
                   <Link
                     href="/#bundles"
                     onClick={() => setMenuOpen(false)}
-                    className="flex h-12 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white shadow-lg"
+                    className="flex h-12 items-center justify-center rounded-xl bg-brand text-sm font-bold text-ink shadow-lg"
                   >
                     Buy now · Free US shipping
                   </Link>
@@ -230,7 +230,7 @@ export function Navbar({
             <button type="button" onClick={openCart} className={iconButton} aria-label={t("nav.cart")}>
               <ShoppingBag className="size-[19px]" />
               {mounted && itemCount > 0 && (
-                <span className="absolute right-0.5 top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-[18px] text-white">
+                <span className="absolute right-0.5 top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-[18px] text-ink">
                   {itemCount}
                 </span>
               )}
@@ -238,7 +238,7 @@ export function Navbar({
 
             <Link
               href="/#bundles"
-              className="ml-2 hidden h-10 items-center rounded-full bg-ink px-5 text-sm font-bold text-[#F2E8DA] transition-colors hover:bg-ink-soft lg:inline-flex"
+              className="ml-2 hidden h-10 items-center rounded-full bg-ink px-5 text-sm font-bold text-[#FFFFFF] transition-colors hover:bg-ink-soft lg:inline-flex"
             >
               Buy now
             </Link>

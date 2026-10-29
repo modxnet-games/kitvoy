@@ -36,7 +36,7 @@ export function LandingHeading({ eyebrow, title, subtitle, tone = "light", class
           data-reveal
           className={cn(
             "mx-auto mt-4 max-w-xl text-[15px] leading-relaxed sm:text-base",
-            dark ? "text-stone-400" : "text-muted-foreground",
+            dark ? "text-zinc-400" : "text-muted-foreground",
           )}
         >
           {subtitle}

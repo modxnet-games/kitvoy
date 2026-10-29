@@ -19,7 +19,7 @@ export function TiltCard({ children, className, max = 10, ...rest }: TiltCardPro
   const ry = useSpring(0, { stiffness: 180, damping: 18 });
   const mx = useMotionValue(50);
   const my = useMotionValue(50);
-  const spotlight = useMotionTemplate`radial-gradient(320px circle at ${mx}% ${my}%, rgba(249,115,22,0.16), transparent 70%)`;
+  const spotlight = useMotionTemplate`radial-gradient(320px circle at ${mx}% ${my}%, rgba(255,122,26,0.16), transparent 70%)`;
 
   const onMove = (e: React.PointerEvent) => {
     if (reduce || e.pointerType !== "mouse" || !ref.current) return;
@@ -43,9 +43,12 @@ export function TiltCard({ children, className, max = 10, ...rest }: TiltCardPro
         onPointerMove={onMove}
         onPointerLeave={reset}
         style={{ rotateX: rx, rotateY: ry, transformStyle: "preserve-3d" }}
-        className={cn("relative h-full overflow-hidden", className)}
+        className={cn("group/tilt relative h-full overflow-hidden", className)}
       >
-        <motion.div className="pointer-events-none absolute inset-0" style={{ background: spotlight }} />
+        <motion.div
+          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/tilt:opacity-100"
+          style={{ background: spotlight }}
+        />
         <div className="relative" style={{ transform: "translateZ(30px)" }}>
           {children}
         </div>

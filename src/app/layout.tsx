@@ -17,7 +17,7 @@ const inter = Inter({
 export const viewport: Viewport = {
   // Lets fixed bars pad for the iPhone home indicator via env(safe-area-inset-bottom)
   viewportFit: "cover",
-  themeColor: "#E6D5BD",
+  themeColor: "#FFFFFF",
 };
 
 export const metadata: Metadata = {

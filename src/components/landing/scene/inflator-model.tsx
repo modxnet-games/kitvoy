@@ -8,7 +8,7 @@ import * as THREE from "three";
 /** 0 → 1 across the pinned story (hero + 3 steps). Written by GSAP, read per frame. */
 export type ProgressRef = { current: number };
 
-const BRAND = "#f97316";
+const BRAND = "#FF7A1A";
 const START_PSI = 22;
 const TARGET_PSI = 35;
 
@@ -56,14 +56,14 @@ type Readout = { value: string; label: string; color: string; inflating: boolean
 /** What the inflator's screen shows at a given story progress. */
 function readoutAt(p: number): Readout {
   if (p < 1 / 6) return { value: String(TARGET_PSI), label: "PSI", color: BRAND, inflating: false };
-  if (p < 0.5) return { value: String(START_PSI), label: "PSI NOW", color: "#e2e8f0", inflating: false };
+  if (p < 0.5) return { value: String(START_PSI), label: "PSI NOW", color: "#ECECF1", inflating: false };
   if (p < 5 / 6) {
     const v = Math.round(THREE.MathUtils.lerp(START_PSI, TARGET_PSI, ramp(p, 0.52, 0.72)));
     return { value: String(v), label: "TARGET", color: BRAND, inflating: false };
   }
   if (p < 0.97) {
     const v = Math.round(THREE.MathUtils.lerp(START_PSI, TARGET_PSI, ramp(p, 0.84, 0.96)));
-    return { value: String(v), label: "FILLING", color: "#e2e8f0", inflating: true };
+    return { value: String(v), label: "FILLING", color: "#ECECF1", inflating: true };
   }
   return { value: String(TARGET_PSI), label: "DONE ✓", color: "#4ade80", inflating: false };
 }
@@ -91,7 +91,7 @@ class LcdScreen {
     this.last = key;
     const { canvas, ctx } = this;
 
-    ctx.fillStyle = "#05080f";
+    ctx.fillStyle = "#050507";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     // faint scanlines for an LCD feel
     ctx.fillStyle = "rgba(255,255,255,0.03)";
@@ -105,7 +105,7 @@ class LcdScreen {
     ctx.fillText(r.value, canvas.width / 2, 170);
     ctx.shadowBlur = 0;
     ctx.font = "600 44px ui-sans-serif, system-ui, sans-serif";
-    ctx.fillStyle = "rgba(226,232,240,0.75)";
+    ctx.fillStyle = "rgba(236,236,241,0.75)";
     ctx.fillText(r.label, canvas.width / 2, 245);
     this.texture.needsUpdate = true;
   }
@@ -140,7 +140,7 @@ function Hose() {
     <group>
       <mesh castShadow>
         <tubeGeometry args={[curve, 96, 0.055, 16, false]} />
-        <meshStandardMaterial color="#111827" roughness={0.75} />
+        <meshStandardMaterial color="#111116" roughness={0.75} />
       </mesh>
       {/* brass chuck */}
       <mesh position={[end.x, end.y - 0.12, end.z]} castShadow>
@@ -210,7 +210,7 @@ export function InflatorModel({ progress, reducedMotion = false }: InflatorModel
     <group ref={root} dispose={null}>
       {/* body */}
       <RoundedBox args={[1.1, 2.05, 0.62]} radius={0.2} smoothness={6} castShadow receiveShadow>
-        <meshPhysicalMaterial color="#0f172a" roughness={0.32} metalness={0.25} clearcoat={1} clearcoatRoughness={0.25} />
+        <meshPhysicalMaterial color="#16161C" roughness={0.32} metalness={0.25} clearcoat={1} clearcoatRoughness={0.25} />
       </RoundedBox>
 
       {/* orange band */}
@@ -220,7 +220,7 @@ export function InflatorModel({ progress, reducedMotion = false }: InflatorModel
 
       {/* screen bezel + LCD */}
       <RoundedBox args={[0.86, 0.56, 0.04]} radius={0.06} smoothness={4} position={[0, 0.5, 0.305]}>
-        <meshStandardMaterial color="#020617" roughness={0.2} metalness={0.4} />
+        <meshStandardMaterial color="#050507" roughness={0.2} metalness={0.4} />
       </RoundedBox>
       <mesh position={[0, 0.5, 0.328]}>
         <planeGeometry args={[0.76, 0.43]} />
@@ -232,7 +232,7 @@ export function InflatorModel({ progress, reducedMotion = false }: InflatorModel
         <mesh key={x} position={[x, -0.1, 0.31]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[x === 0 ? 0.1 : 0.075, x === 0 ? 0.1 : 0.075, 0.05, 32]} />
           <meshStandardMaterial
-            color={x === 0 ? BRAND : "#334155"}
+            color={x === 0 ? BRAND : "#3B3B45"}
             emissive={x === 0 ? BRAND : "#000000"}
             emissiveIntensity={x === 0 ? 0.4 : 0}
             roughness={0.35}
@@ -243,18 +243,18 @@ export function InflatorModel({ progress, reducedMotion = false }: InflatorModel
       {/* grip ribs */}
       {[-0.45, -0.58, -0.71, -0.84].map((y) => (
         <RoundedBox key={y} args={[1.13, 0.05, 0.64]} radius={0.02} smoothness={2} position={[0, y, 0]}>
-          <meshStandardMaterial color="#1e293b" roughness={0.9} />
+          <meshStandardMaterial color="#25252D" roughness={0.9} />
         </RoundedBox>
       ))}
 
       {/* top cap with LED */}
       <mesh position={[0, 1.04, 0]}>
         <cylinderGeometry args={[0.16, 0.2, 0.1, 32]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.5} metalness={0.3} />
+        <meshStandardMaterial color="#25252D" roughness={0.5} metalness={0.3} />
       </mesh>
       <mesh position={[0, 0.9, 0.312]}>
         <boxGeometry args={[0.5, 0.05, 0.02]} />
-        <meshStandardMaterial ref={led} color="#fff7ed" emissive="#fdba74" emissiveIntensity={0.35} toneMapped={false} />
+        <meshStandardMaterial ref={led} color="#fff7ed" emissive="#FFB27A" emissiveIntensity={0.35} toneMapped={false} />
       </mesh>
       <pointLight ref={glow} position={[0, 0.9, 0.8]} color={BRAND} intensity={1.2} distance={4} />
 

@@ -39,14 +39,14 @@ export function StickyBuyBar({ product }: { product: ProductDisplay | null }) {
           <div className="container mx-auto flex items-center justify-between gap-4 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{name}</p>
-              <p className="text-xs text-stone-400">
+              <p className="text-xs text-zinc-400">
                 <Price value={price} className="font-bold text-white" /> · Free US shipping
               </p>
             </div>
             <button
               type="button"
               onClick={() => buy(1)}
-              className="shrink-0 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-orange-500"
+              className="shrink-0 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-ink shadow-lg transition hover:bg-brand/90"
             >
               {landingConfig.hero.cta}
             </button>

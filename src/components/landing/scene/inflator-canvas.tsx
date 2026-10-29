@@ -27,12 +27,12 @@ export default function InflatorCanvas({ progress, eventSource, active, reducedM
     >
       <ambientLight intensity={0.35} />
       <directionalLight position={[3, 5, 4]} intensity={1.6} castShadow />
-      <directionalLight position={[-4, 2, -3]} intensity={1.2} color="#f97316" />
+      <directionalLight position={[-4, 2, -3]} intensity={1.2} color="#FF7A1A" />
 
       {/* Studio reflections generated locally, so no HDR file is downloaded */}
       <Environment resolution={256} frames={1}>
         <Lightformer intensity={2.2} position={[0, 4, -6]} scale={[10, 2, 1]} />
-        <Lightformer intensity={1.6} color="#f97316" position={[-5, 1, -1]} rotation-y={Math.PI / 2} scale={[6, 2, 1]} />
+        <Lightformer intensity={1.6} color="#FF7A1A" position={[-5, 1, -1]} rotation-y={Math.PI / 2} scale={[6, 2, 1]} />
         <Lightformer intensity={1.1} position={[5, 1, 1]} rotation-y={-Math.PI / 2} scale={[6, 2, 1]} />
         <Lightformer intensity={0.6} position={[0, -3, 3]} rotation-x={-Math.PI / 2} scale={[8, 8, 1]} />
       </Environment>

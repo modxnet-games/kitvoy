@@ -56,12 +56,12 @@ export function BundleOffer({ product }: BundleOfferProps) {
                 {isSelected && (
                   <motion.span
                     layoutId="bundle-ring"
-                    className="absolute inset-0 rounded-2xl border-2 border-brand bg-brand/10 shadow-[0_0_60px_-12px_rgba(249,115,22,0.7)] md:rounded-3xl"
+                    className="absolute inset-0 rounded-2xl border-2 border-brand bg-brand/10 shadow-[0_0_60px_-12px_rgba(255,122,26,0.7)] md:rounded-3xl"
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
                 {tier.badge && (
-                  <span className="absolute -top-2.5 left-5 z-10 rounded-full bg-brand px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white md:-top-3 md:left-1/2 md:-translate-x-1/2 md:px-3 md:text-xs">
+                  <span className="absolute -top-2.5 left-5 z-10 rounded-full bg-brand px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink md:-top-3 md:left-1/2 md:-translate-x-1/2 md:px-3 md:text-xs">
                     {tier.badge}
                   </span>
                 )}
@@ -73,11 +73,11 @@ export function BundleOffer({ product }: BundleOfferProps) {
                     )}
                     aria-hidden
                   >
-                    {isSelected && <Check className="size-3 text-white" strokeWidth={3} />}
+                    {isSelected && <Check className="size-3 text-ink" strokeWidth={3} />}
                   </span>
                   <span className="flex flex-col md:items-center">
                     <span className="text-base font-bold md:text-lg">{tier.label}</span>
-                    <span className="text-xs text-stone-400 md:text-sm">
+                    <span className="text-xs text-zinc-400 md:text-sm">
                       {tier.quantity} {tier.quantity === 1 ? "inflator" : "inflators"} · <Price value={lineTotal / tier.quantity} /> each
                     </span>
                   </span>
@@ -116,7 +116,7 @@ export function BundleOffer({ product }: BundleOfferProps) {
               </AnimatePresence>
             </span>
           </MagneticButton>
-          <p className="mt-3 text-center text-xs text-stone-500">
+          <p className="mt-3 text-center text-xs text-zinc-500">
             Free US shipping on every bundle · 30-day money-back guarantee
           </p>
         </div>

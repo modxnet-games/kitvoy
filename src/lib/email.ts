@@ -342,6 +342,80 @@ export async function sendShippingConfirmation(
   }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Customer message (written by hand in the admin dashboard)          */
+/* ------------------------------------------------------------------ */
+
+export interface CustomerMessagePayload {
+  from: { name: string; email: string };
+  to: string;
+  subject: string;
+  /** Plain text as typed; blank lines separate paragraphs */
+  body: string;
+}
+
+/**
+ * Sends an admin-written email in the Kitvoy template, with Reply-To set to the
+ * sender address. Needs SMTP_* only. Never throws.
+ */
+export async function sendCustomerMessage(
+  p: CustomerMessagePayload,
+): Promise<{ sent: true } | { sent: false; reason: string }> {
+  const transport = getTransport();
+  if (!transport) return { sent: false, reason: "SMTP is not configured (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)" };
+
+  const { text, html } = buildCustomerMessageEmail(p);
+  try {
+    await transport.sendMail({
+      from: { name: p.from.name, address: p.from.email },
+      replyTo: { name: p.from.name, address: p.from.email },
+      to: p.to,
+      subject: p.subject,
+      text,
+      html,
+    });
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[email] Failed to send customer message:", message);
+    return { sent: false, reason: message };
+  }
+}
+
+/** Plain text and HTML for an admin-written message (no sending). */
+export function buildCustomerMessageEmail(p: Pick<CustomerMessagePayload, "from" | "subject" | "body">): { text: string; html: string } {
+  const storeName = "Kitvoy";
+  const body = p.body.replace(/\r\n?/g, "\n").trim();
+  const text = `${body}\n\n— ${p.from.name}\n${p.from.email}`;
+
+  const ink = "#0B0B0F";
+  const muted = "#5A5A66";
+  const paragraphs = body
+    .split(/\n{2,}/)
+    .map((para) => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${escapeHtml(para).replace(/\n/g, "<br>")}</p>`)
+    .join("\n          ");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(p.subject)}</title></head>
+<body style="margin:0;padding:0;background:#F4F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
+        <tr><td style="background:${ink};padding:20px 28px;color:#FFFFFF;font-size:20px;font-weight:800;">${storeName}</td></tr>
+        <tr><td style="padding:28px;">
+          ${paragraphs}
+          <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #E7E7EC;font-size:14px;line-height:1.5;color:${muted};"><strong style="color:${ink};">${escapeHtml(p.from.name)}</strong><br>${escapeHtml(p.from.email)}</p>
+        </td></tr>
+      </table>
+      <p style="margin:14px 0 0;font-size:12px;color:${muted};">Reply to this email to reach ${storeName}.</p>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return { text, html };
+}
+
 /** Subject, plain text and HTML for the shipping email (no sending). */
 export function buildShippingEmail(p: ShippingConfirmationPayload): { subject: string; text: string; html: string } {
   const storeName = "Kitvoy";

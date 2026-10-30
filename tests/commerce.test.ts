@@ -6,6 +6,8 @@ import { useCartStore, getShippingForItems } from "../src/store/cart-store";
 import type { ProductDisplay } from "../src/types/product";
 import { buildCjOrderPayload, type CjOrderInput } from "../src/lib/fulfillment/cj-order";
 import { cjFulfillment, isCjSandbox } from "../src/config/fulfillment";
+import { buildCustomerMessageEmail } from "../src/lib/email";
+import { validateAdminEmail } from "../src/lib/data/sent-emails";
 
 const product: ProductDisplay = { id: "unit-test", slug: "inflator", name: "Inflator", shortDescription: "", description: "", details: "", price: 59.99, shippingTax: 0, rating: 0, reviewCount: 0, stock: 9, sku: "TEST", isFeatured: false, category: { id: "test", slug: "test", name: "Test" }, images: [] };
 const valid: CheckoutDetails = { email: "test@example.com", fullName: "Test Customer", phone: "2025550143", address1: "123 Test St", address2: "", city: "Washington", state: "DC", zip: "20001", paymentMethod: "paypal" };
@@ -110,4 +112,28 @@ test("CJ sandbox follows PayPal mode unless overridden", () => {
   process.env.PAYPAL_ENV = saved.paypal; process.env.CJ_SANDBOX = saved.cj;
   if (saved.paypal === undefined) delete process.env.PAYPAL_ENV;
   if (saved.cj === undefined) delete process.env.CJ_SANDBOX;
+});
+
+test("admin customer email escapes HTML, keeps paragraphs, and signs with the sender", () => {
+  const { html, text } = buildCustomerMessageEmail({
+    from: { name: "Kitvoy <Support>", email: "support@kitvoy.com" },
+    subject: "Your order <b>KTV-1</b>",
+    body: "Hi \"Sam\" & co,\r\n\r\n<script>alert('x')</script>\nSecond line",
+  });
+  assert.ok(!html.includes("<script>"));
+  assert.ok(html.includes("&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;<br>Second line"));
+  assert.ok(html.includes("Hi &quot;Sam&quot; &amp; co,</p>"));
+  assert.ok(html.includes("<title>Your order &lt;b&gt;KTV-1&lt;/b&gt;</title>"));
+  assert.ok(html.includes("Kitvoy &lt;Support&gt;"));
+  assert.equal(text, "Hi \"Sam\" & co,\n\n<script>alert('x')</script>\nSecond line\n\n— Kitvoy <Support>\nsupport@kitvoy.com");
+});
+
+test("admin email validation rejects bad input and flattens the subject to one line", () => {
+  const ok = validateAdminEmail({ sender: "support", to: " sam@example.com ", subject: "Hi\r\nBcc: evil@example.com", body: " Hello \r\n" });
+  assert.ok(ok.ok);
+  assert.deepEqual(ok.value, { sender: "support", to: "sam@example.com", subject: "Hi Bcc: evil@example.com", body: "Hello", orderId: null });
+  const bad = validateAdminEmail({ sender: "ceo", to: "a@example.com, b@example.com", subject: "", body: "x".repeat(20_001) });
+  assert.ok(!bad.ok);
+  assert.deepEqual(Object.keys(bad.errors).sort(), ["body", "sender", "subject", "to"]);
+  assert.equal(validateAdminEmail({ sender: "orders", to: "a@example.com", subject: "s", body: "b", orderId: "ord1" }).ok, true);
 });

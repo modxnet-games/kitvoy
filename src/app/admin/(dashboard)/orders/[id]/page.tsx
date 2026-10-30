@@ -10,6 +10,9 @@ import { FulfillmentCard } from "./fulfillment-card";
 import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
 import type { ShippingAddress } from "@/lib/us-address";
 import { isCjConfigured } from "@/config/fulfillment";
+import { listSentEmails } from "@/lib/data/sent-emails";
+import { SentEmailList } from "@/components/admin/sent-email-list";
+import { EmailCustomerCard } from "./email-customer-card";
 
 interface OrderPageProps {
   params: Promise<{ id: string }>;
@@ -24,6 +27,7 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
   const orderReference = formatOrderReference(order.id);
   const isPaid = order.paymentStatus === "paid";
   const address = order.shippingAddress as unknown as ShippingAddress | null;
+  const sentEmails = await listSentEmails({ orderId: order.id }).catch(() => []);
 
   return (
     <div>
@@ -135,6 +139,10 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
             shippedAt={order.shippedAt ? order.shippedAt.toISOString() : null}
             cj={isCjConfigured() ? { orderId: order.fulfillmentRef, status: order.supplierStatus, error: order.fulfillmentError } : null}
           />
+
+          <EmailCustomerCard orderId={order.id} orderReference={orderReference} customerEmail={order.email}>
+            <SentEmailList emails={sentEmails} showOrder={false} />
+          </EmailCustomerCard>
 
           <div className="rounded-xl border bg-card p-6">
             <h2 className="font-semibold">Customer</h2>

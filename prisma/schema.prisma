@@ -152,6 +152,7 @@ model Order {
   updatedAt         DateTime          @updatedAt
   user              User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   items             OrderItem[]
+  sentEmails        SentEmail[]
 
   @@index([status])
   @@index([createdAt])
@@ -243,4 +244,26 @@ model AdminDevice {
   updatedAt DateTime @updatedAt
 
   @@map("admin_devices")
+}
+
+/// Emails sent by hand from the admin dashboard (Messages page or an order)
+model SentEmail {
+  id          String   @id @default(cuid())
+  /// Display form, e.g. "Kitvoy Support <support@kitvoy.com>"
+  fromAddress String
+  toAddress   String
+  subject     String
+  /// Plain-text message as typed; the HTML email is built from it
+  body        String
+  /// "sent" | "failed"
+  status      String
+  /// SMTP error when sending failed
+  error       String?
+  orderId     String?
+  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("sent_emails")
 }

@@ -12,6 +12,7 @@ import {
   Settings,
   Navigation,
   Mail,
+  Send,
 } from "lucide-react";
 
 import { isAdminAuthenticated } from "@/lib/auth/admin-session";
@@ -20,6 +21,7 @@ import { logoutAction } from "@/app/admin/login/actions";
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: Package },
+  { href: "/admin/messages", label: "Messages", icon: Send },
   { href: "/admin/products", label: "Products", icon: ShoppingBag },
   { href: "/admin/categories", label: "Categories", icon: FolderTree },
   { href: "/admin/reviews", label: "Reviews", icon: Star },

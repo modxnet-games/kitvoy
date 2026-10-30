@@ -211,34 +211,3 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     orderReference,
   };
 }
-
-/** Push notification to the admin mobile app's registered devices (best-effort). */
-export async function notifyAdminDevices(order: {
-  id: string;
-  reference: string;
-  customerName: string;
-  total: number;
-}): Promise<void> {
-  try {
-    const devices = await prisma.adminDevice.findMany({ select: { token: true } });
-    if (devices.length === 0) return;
-    await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Accept-encoding": "gzip, deflate",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        to: devices.map((d) => d.token),
-        // Sound asset bundled in the admin mobile app
-        sound: "madilik_notification",
-        title: "💸 New paid order",
-        body: `${order.reference} • ${order.customerName}\nTotal: $${order.total.toFixed(2)}`,
-        data: { orderId: order.id },
-      }),
-    });
-  } catch (err) {
-    console.error("[PushNotification] Delivery failed:", err);
-  }
-}

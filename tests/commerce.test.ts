@@ -8,6 +8,8 @@ import { buildCjOrderPayload, type CjOrderInput } from "../src/lib/fulfillment/c
 import { cjFulfillment, isCjSandbox } from "../src/config/fulfillment";
 import { buildCustomerMessageEmail } from "../src/lib/email";
 import { validateAdminEmail } from "../src/lib/data/sent-emails";
+import { buildSaleMessage } from "../src/lib/push/fcm";
+import { salePush } from "../src/lib/push/admin-devices";
 
 const product: ProductDisplay = { id: "unit-test", slug: "inflator", name: "Inflator", shortDescription: "", description: "", details: "", price: 59.99, shippingTax: 0, rating: 0, reviewCount: 0, stock: 9, sku: "TEST", isFeatured: false, category: { id: "test", slug: "test", name: "Test" }, images: [] };
 const valid: CheckoutDetails = { email: "test@example.com", fullName: "Test Customer", phone: "2025550143", address1: "123 Test St", address2: "", city: "Washington", state: "DC", zip: "20001", paymentMethod: "paypal" };
@@ -136,4 +138,19 @@ test("admin email validation rejects bad input and flattens the subject to one l
   assert.ok(!bad.ok);
   assert.deepEqual(Object.keys(bad.errors).sort(), ["body", "sender", "subject", "to"]);
   assert.equal(validateAdminEmail({ sender: "orders", to: "a@example.com", subject: "s", body: "b", orderId: "ord1" }).ok, true);
+});
+
+test("sale push rings the kitvoy_sales channel with the custom sound at high priority", () => {
+  const push = salePush({ id: "cmorder1", reference: "KTV-ABCDEFGH", customerName: "Sam Lee", total: 134.98, itemCount: 3 });
+  assert.equal(push.title, "New sale · $134.98");
+  assert.equal(push.body, "KTV-ABCDEFGH · Sam Lee · 3 items");
+  const { message } = buildSaleMessage("device-token", push);
+  assert.equal(message.token, "device-token");
+  assert.deepEqual(message.notification, { title: push.title, body: push.body });
+  assert.equal(message.android.priority, "HIGH");
+  assert.equal(message.android.notification.channel_id, "kitvoy_sales");
+  assert.equal(message.android.notification.sound, "notification");
+  assert.equal(message.apns.payload.aps.sound, "notification.wav");
+  assert.ok(Object.values(message.data).every(v => typeof v === "string"));
+  assert.equal(salePush({ id: "x", reference: "KTV-1", customerName: "A", total: 59.99, itemCount: 1 }).body, "KTV-1 · A · 1 item");
 });

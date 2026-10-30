@@ -3,7 +3,7 @@ import { sendOrderNotification } from "@/lib/email";
 import { isCjConfigured } from "@/config/fulfillment";
 import { sendOrderToCj } from "@/lib/fulfillment/cj";
 import { recordFulfillment, sendOrderToZendrop } from "@/lib/fulfillment/zendrop";
-import { notifyAdminDevices } from "@/lib/orders";
+import { notifyAdminDevices } from "@/lib/push/admin-devices";
 import { validateStockForCheckout } from "@/lib/stock";
 
 /** Order amounts are stored in dollars; payment providers want cents. */
@@ -102,7 +102,13 @@ export async function afterOrderPaid(orderId: string): Promise<void> {
     console.error("[orders] Order notification error:", err);
   }
 
-  await notifyAdminDevices({ id: order.id, reference, customerName: order.customerName, total: order.total });
+  await notifyAdminDevices({
+    id: order.id,
+    reference,
+    customerName: order.customerName,
+    total: order.total,
+    itemCount: order.items.reduce((sum, i) => sum + i.quantity, 0),
+  });
 
   try {
     if (isCjConfigured()) {

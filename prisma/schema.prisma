@@ -237,11 +237,17 @@ model EmailSubscriber {
   @@map("email_subscribers")
 }
 
+/// Phones running the Kitvoy admin app that receive sale push notifications
 model AdminDevice {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  /// FCM registration token (Android) or APNs-backed FCM token (iOS)
+  token      String   @unique
+  /// "android" | "ios"
+  platform   String   @default("android")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  /// Last time the app re-registered this token
+  lastSeenAt DateTime @default(now())
 
   @@map("admin_devices")
 }

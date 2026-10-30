@@ -4,6 +4,8 @@ import { getLineTotal, getBundleSavings } from "../src/lib/bundles";
 import { validateCheckoutDetails, toShippingAddress, type CheckoutDetails } from "../src/lib/us-address";
 import { useCartStore, getShippingForItems } from "../src/store/cart-store";
 import type { ProductDisplay } from "../src/types/product";
+import { buildCjOrderPayload, type CjOrderInput } from "../src/lib/fulfillment/cj-order";
+import { cjFulfillment, isCjSandbox } from "../src/config/fulfillment";
 
 const product: ProductDisplay = { id: "unit-test", slug: "inflator", name: "Inflator", shortDescription: "", description: "", details: "", price: 59.99, shippingTax: 0, rating: 0, reviewCount: 0, stock: 9, sku: "TEST", isFeatured: false, category: { id: "test", slug: "test", name: "Test" }, images: [] };
 const valid: CheckoutDetails = { email: "test@example.com", fullName: "Test Customer", phone: "2025550143", address1: "123 Test St", address2: "", city: "Washington", state: "DC", zip: "20001", paymentMethod: "paypal" };
@@ -74,4 +76,38 @@ test("primary buttons and body text meet WCAG AA contrast for normal text", () =
     const ratio = (values[0] + .05) / (values[1] + .05);
     assert.ok(ratio >= 4.5, a + " / " + b + " contrast: " + ratio.toFixed(2));
   }
+});
+
+test("CJ order payload maps the product to its variant, aggregates quantities, and refuses incomplete orders", () => {
+  const order: CjOrderInput = {
+    id: "cmorder1234567890abcdefgh", reference: "KTV-ABCDEFGH", customerName: "Test Customer", email: "test@example.com", phone: "2025550143", total: 101.98,
+    shippingAddress: toShippingAddress(valid),
+    items: [{ productSlug: "cordless-tire-inflator", productName: "Cordless Tire Inflator", quantity: 2 }, { productSlug: "cordless-tire-inflator", productName: "Cordless Tire Inflator", quantity: 1 }],
+  };
+  const built = buildCjOrderPayload(order, { payType: 2, sandbox: false });
+  assert.ok(built.ok);
+  assert.deepEqual(built.payload.products, [{ vid: cjFulfillment.variants["cordless-tire-inflator"].vid, quantity: 3 }]);
+  assert.equal(built.payload.orderNumber, order.id);
+  assert.equal(built.payload.shippingProvince, "District of Columbia");
+  assert.equal(built.payload.isSandbox, 0);
+  assert.equal(built.payload.logisticName, "CJPacket Sensitive");
+  assert.equal("shippingAddress2" in built.payload, false);
+  const sandboxBuilt = buildCjOrderPayload(order, { payType: 3, sandbox: true });
+  assert.ok(sandboxBuilt.ok);
+  assert.equal(sandboxBuilt.payload.isSandbox, 1);
+  assert.equal(buildCjOrderPayload({ ...order, items: [{ productSlug: "other", productName: "Other", quantity: 1 }] }, { payType: 2, sandbox: false }).ok, false);
+  assert.equal(buildCjOrderPayload({ ...order, shippingAddress: null }, { payType: 2, sandbox: false }).ok, false);
+});
+
+test("CJ sandbox follows PayPal mode unless overridden", () => {
+  const saved = { paypal: process.env.PAYPAL_ENV, cj: process.env.CJ_SANDBOX };
+  process.env.PAYPAL_ENV = "sandbox"; delete process.env.CJ_SANDBOX;
+  assert.equal(isCjSandbox(), true);
+  process.env.PAYPAL_ENV = "live";
+  assert.equal(isCjSandbox(), false);
+  process.env.CJ_SANDBOX = "true";
+  assert.equal(isCjSandbox(), true);
+  process.env.PAYPAL_ENV = saved.paypal; process.env.CJ_SANDBOX = saved.cj;
+  if (saved.paypal === undefined) delete process.env.PAYPAL_ENV;
+  if (saved.cj === undefined) delete process.env.CJ_SANDBOX;
 });

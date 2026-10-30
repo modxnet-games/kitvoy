@@ -138,8 +138,12 @@ model Order {
   paymentStatus     String            @default("unpaid")
   /// Stripe PaymentIntent id or PayPal order id
   paymentRef        String?
-  /// Zendrop order id once fulfillment has been triggered
+  /// Supplier (CJdropshipping) order id once fulfillment has been triggered
   fulfillmentRef    String?
+  /// Supplier's own order status, e.g. CJ's CREATED, UNPAID, UNSHIPPED, SHIPPED
+  supplierStatus    String?
+  /// Why automatic fulfillment needs attention (shown in admin); null when fine
+  fulfillmentError  String?
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
   trackingNumber    String?
   shippedAt         DateTime?

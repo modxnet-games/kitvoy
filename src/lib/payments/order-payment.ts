@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sendOrderNotification } from "@/lib/email";
+import { isCjConfigured } from "@/config/fulfillment";
+import { sendOrderToCj } from "@/lib/fulfillment/cj";
 import { recordFulfillment, sendOrderToZendrop } from "@/lib/fulfillment/zendrop";
 import { notifyAdminDevices } from "@/lib/orders";
 import { validateStockForCheckout } from "@/lib/stock";
@@ -103,6 +105,12 @@ export async function afterOrderPaid(orderId: string): Promise<void> {
   await notifyAdminDevices({ id: order.id, reference, customerName: order.customerName, total: order.total });
 
   try {
+    if (isCjConfigured()) {
+      const cj = await sendOrderToCj(order.id);
+      if (cj.ok) console.info(`[fulfillment] ${reference} sent to CJ as ${cj.cjOrderId} (${cj.status})`);
+      else console.warn(`[fulfillment] ${reference} needs attention: ${cj.error}`);
+      return;
+    }
     const fulfillment = await sendOrderToZendrop(order.id);
     if (fulfillment.ok && !fulfillment.alreadyFulfilled) {
       await recordFulfillment(order.id, fulfillment.fulfillmentRef);

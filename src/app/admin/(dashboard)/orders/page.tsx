@@ -4,19 +4,24 @@ import { formatPrice } from "@/lib/formatters";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { DeleteOrderButton } from "./delete-order-button";
 import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
+import { isCjConfigured } from "@/config/fulfillment";
+import { CjSyncButton } from "./cj-sync-button";
 
 export default async function AdminOrdersPage() {
   const orders = await getAllOrders();
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-          Orders
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage paid orders and fulfillment
-        </p>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+            Orders
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            Manage paid orders and fulfillment
+          </p>
+        </div>
+        {isCjConfigured() && <CjSyncButton />}
       </div>
 
       <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">

@@ -9,6 +9,7 @@ import { PrintOrderButton } from "./print-order-button";
 import { FulfillmentCard } from "./fulfillment-card";
 import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
 import type { ShippingAddress } from "@/lib/us-address";
+import { isCjConfigured } from "@/config/fulfillment";
 
 interface OrderPageProps {
   params: Promise<{ id: string }>;
@@ -132,6 +133,7 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
             fulfillmentStatus={order.fulfillmentStatus}
             trackingNumber={order.trackingNumber}
             shippedAt={order.shippedAt ? order.shippedAt.toISOString() : null}
+            cj={isCjConfigured() ? { orderId: order.fulfillmentRef, status: order.supplierStatus, error: order.fulfillmentError } : null}
           />
 
           <div className="rounded-xl border bg-card p-6">

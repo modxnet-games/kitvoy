@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCard, Lock, Wallet } from "lucide-react";
+import { Lock } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
 import {
@@ -9,7 +9,6 @@ import {
   validateCheckoutDetails,
   type CheckoutDetails,
   type CheckoutErrors,
-  type PaymentMethod,
 } from "@/lib/us-address";
 import { cn } from "@/lib/utils";
 import { CheckoutField } from "./checkout-field";
@@ -26,7 +25,8 @@ const EMPTY_FORM: CheckoutFormData = {
   city: "",
   state: "",
   zip: "",
-  paymentMethod: "card",
+  // Payment happens on the next step with PayPal (PayPal account or guest card)
+  paymentMethod: "paypal",
 };
 
 const ALL_TOUCHED = Object.fromEntries(
@@ -36,11 +36,14 @@ const ALL_TOUCHED = Object.fromEntries(
 interface CheckoutFormProps {
   onSubmit: (data: CheckoutFormData) => void;
   isSubmitting?: boolean;
+  /** Pre-fill when the customer goes back to edit their details */
+  initialValues?: CheckoutFormData;
+  submitLabel?: string;
 }
 
-export function CheckoutForm({ onSubmit, isSubmitting = false }: CheckoutFormProps) {
+export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, submitLabel }: CheckoutFormProps) {
   const { t } = useLanguage();
-  const [values, setValues] = useState<CheckoutFormData>(EMPTY_FORM);
+  const [values, setValues] = useState<CheckoutFormData>(initialValues ?? EMPTY_FORM);
   const [errors, setErrors] = useState<CheckoutErrors>({});
   const [touched, setTouched] = useState<Partial<Record<keyof CheckoutFormData, boolean>>>({});
 
@@ -184,71 +187,18 @@ export function CheckoutForm({ onSubmit, isSubmitting = false }: CheckoutFormPro
         />
       </CheckoutSection>
 
-      <CheckoutSection title={t("checkout.paymentTitle")}>
-        <div role="radiogroup" className="grid gap-3 sm:grid-cols-2">
-          <PaymentOption
-            method="card"
-            selected={values.paymentMethod}
-            onSelect={(m) => setField("paymentMethod", m)}
-            icon={<CreditCard className="size-5" />}
-            title={t("checkout.payCard")}
-            detail={t("checkout.payCardDetail")}
-          />
-          <PaymentOption
-            method="paypal"
-            selected={values.paymentMethod}
-            onSelect={(m) => setField("paymentMethod", m)}
-            icon={<Wallet className="size-5" />}
-            title={t("checkout.payPaypal")}
-            detail={t("checkout.payPaypalDetail")}
-          />
-        </div>
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Lock className="size-3.5" />
-          {t("checkout.secureNote")}
-        </p>
-      </CheckoutSection>
+      <p className="flex items-start gap-2 rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground">
+        <Lock className="mt-0.5 size-3.5 shrink-0" />
+        {t("checkout.paymentIntro")}
+      </p>
 
       <button
         type="submit"
         disabled={isSubmitting}
         className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
       >
-        {isSubmitting ? t("checkout.processing") : t("checkout.placeOrder")}
+        {isSubmitting ? t("checkout.processing") : (submitLabel ?? t("checkout.placeOrder"))}
       </button>
     </form>
-  );
-}
-
-interface PaymentOptionProps {
-  method: PaymentMethod;
-  selected: PaymentMethod;
-  onSelect: (method: PaymentMethod) => void;
-  icon: React.ReactNode;
-  title: string;
-  detail: string;
-}
-
-function PaymentOption({ method, selected, onSelect, icon, title, detail }: PaymentOptionProps) {
-  const isSelected = method === selected;
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={isSelected}
-      onClick={() => onSelect(method)}
-      className={cn(
-        "flex items-start gap-3 rounded-xl border p-4 text-left transition-colors",
-        isSelected ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/50",
-      )}
-    >
-      <span className={cn("mt-0.5", isSelected ? "text-primary" : "text-muted-foreground")}>
-        {icon}
-      </span>
-      <span>
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="block text-xs text-muted-foreground">{detail}</span>
-      </span>
-    </button>
   );
 }

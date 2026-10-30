@@ -38,6 +38,12 @@ export function getShippingForItems(items: CartItem[]): number {
   );
 }
 
+/**
+ * Set right before an add that goes straight to checkout, so the header
+ * doesn't pop the cart drawer over the checkout page.
+ */
+export const cartDrawerControl = { skipNextOpen: false };
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({

@@ -38,6 +38,7 @@ export default async function AdminOrdersPage() {
                 <th className="px-4 py-3.5">Location</th>
                 <th className="px-4 py-3.5">Items</th>
                 <th className="px-4 py-3.5">Total</th>
+                <th className="px-4 py-3.5">Payment</th>
                 <th className="px-4 py-3.5">Status</th>
                 <th className="px-4 py-3.5">Date</th>
                 <th className="px-4 py-3.5" />
@@ -70,6 +71,20 @@ export default async function AdminOrdersPage() {
                   </td>
                   <td className="px-4 py-3.5 font-semibold">
                     {formatPrice(order.total)}
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {order.paymentStatus === "paid" ? (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                        Paid
+                      </span>
+                    ) : (
+                      <span
+                        className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+                        title="Checkout started but not paid"
+                      >
+                        Unpaid
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3.5">
                     <StatusBadge status={order.status} />

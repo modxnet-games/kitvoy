@@ -6,7 +6,7 @@ import { ChevronRight, Menu, ShoppingBag } from "lucide-react";
 
 import { siteConfig } from "@/config/site";
 import { useLanguage } from "@/contexts/language-context";
-import { useCartStore } from "@/store/cart-store";
+import { cartDrawerControl, useCartStore } from "@/store/cart-store";
 import { useMounted } from "@/hooks/use-mounted";
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { CartDrawer } from "@/components/layout/cart-drawer";
@@ -55,6 +55,10 @@ export function Navbar({ announcementText, announcementVisible = true }: NavbarP
   useEffect(() => {
     const unsubscribe = useCartStore.subscribe((state, prevState) => {
       if (state.items.length > prevState.items.length) {
+        if (cartDrawerControl.skipNextOpen) {
+          cartDrawerControl.skipNextOpen = false;
+          return;
+        }
         setCartOpen(true);
       }
     });

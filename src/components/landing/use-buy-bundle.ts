@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 
-import { useCartStore } from "@/store/cart-store";
+import { cartDrawerControl, useCartStore } from "@/store/cart-store";
 import type { ProductDisplay } from "@/types/product";
 
 /**
@@ -29,7 +29,10 @@ export function useBuyBundle(product: ProductDisplay | null) {
         .getState()
         .items.some((i) => i.product.id === product.id);
       if (inCart) updateQuantity(product.id, quantity);
-      else addItem(product, quantity);
+      else {
+        cartDrawerControl.skipNextOpen = true;
+        addItem(product, quantity);
+      }
       router.push("/checkout");
     },
     [product, router, addItem, updateQuantity],

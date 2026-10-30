@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { createOrder, validateOrderInput } from "@/lib/orders";
 import { getCustomer } from "@/lib/auth/customer-session";
-import { getOrderById } from "@/lib/data/admin-orders";
-import { sendOrderNotification } from "@/lib/email";
 import { saveSubscriberEmail } from "@/lib/subscribers";
 
 export async function POST(request: Request) {
@@ -32,39 +30,6 @@ export async function POST(request: Request) {
         { error: result.error },
         { status: 400 },
       );
-    }
-
-    // Notify store owner by email (best-effort; do not fail the request)
-    try {
-      const order = await getOrderById(result.orderId);
-      if (order) {
-        const emailResult = await sendOrderNotification({
-          id: order.id,
-          orderReference: result.orderReference,
-          customerName: order.customerName,
-          phone: order.phone,
-          location: order.location,
-          items: order.items.map((i) => ({
-            productName: i.productName,
-            productSlug: i.productSlug,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            lineTotal: i.lineTotal,
-          })),
-          subtotal: order.subtotal,
-          shippingCost: order.shippingCost,
-          total: order.total,
-          currency: order.currency,
-          locale: order.locale,
-          paymentMethod: order.paymentMethod,
-          createdAt: order.createdAt,
-        });
-        if (!emailResult.sent) {
-          console.warn("[orders] Order notification not sent:", emailResult.reason);
-        }
-      }
-    } catch (emailErr) {
-      console.error("[orders] Order notification error:", emailErr);
     }
 
     return NextResponse.json({

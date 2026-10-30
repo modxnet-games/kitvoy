@@ -1,21 +1,23 @@
 import { prisma } from "@/lib/db";
-import type { ShippingAddress } from "@/lib/us-address";
 
 export type FulfillmentResult =
   | { ok: true; fulfillmentRef: string; alreadyFulfilled?: boolean }
   | { ok: false; error: string };
 
 /**
- * Sends a paid order to Zendrop for fulfillment.
+ * Hands a paid order to Zendrop for fulfillment.
  *
- * PLACEHOLDER: the Zendrop API call below is not implemented yet. Map each
- * order item's product to its Zendrop SKU, POST the order with your
- * ZENDROP_API_KEY, and store the Zendrop order id it returns.
+ * Zendrop does not document an API for creating orders from a custom store:
+ * its help center only supports orders synced from connected Shopify,
+ * ClickFunnels or TikTok Shop stores, or orders placed by hand in the Zendrop
+ * dashboard. Until Zendrop publishes an order API, paid orders are flagged for
+ * manual fulfillment and the owner's order email carries everything needed to
+ * place them. Plug the API call in here once it exists.
  */
 export async function sendOrderToZendrop(orderId: string): Promise<FulfillmentResult> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: true },
+    select: { paymentStatus: true, fulfillmentRef: true },
   });
   if (!order) return { ok: false, error: "ORDER_NOT_FOUND" };
   if (order.paymentStatus !== "paid") return { ok: false, error: "ORDER_NOT_PAID" };
@@ -23,28 +25,7 @@ export async function sendOrderToZendrop(orderId: string): Promise<FulfillmentRe
     return { ok: true, fulfillmentRef: order.fulfillmentRef, alreadyFulfilled: true };
   }
 
-  const apiKey = process.env.ZENDROP_API_KEY?.trim();
-  if (!apiKey) return { ok: false, error: "ZENDROP_NOT_CONFIGURED" };
-
-  const address = order.shippingAddress as unknown as ShippingAddress | null;
-  if (!address) return { ok: false, error: "MISSING_SHIPPING_ADDRESS" };
-
-  const payload = {
-    external_order_id: order.id,
-    customer: { name: order.customerName, email: order.email, phone: order.phone },
-    shipping_address: address,
-    line_items: order.items.map((i) => ({ sku: i.productSlug, quantity: i.quantity })),
-  };
-
-  // TODO(zendrop): replace with the real request, e.g.
-  //   const res = await fetch(`${ZENDROP_API_URL}/orders`, {
-  //     method: "POST",
-  //     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-  //     body: JSON.stringify(payload),
-  //   });
-  //   const fulfillmentRef = (await res.json()).id;
-  console.info("[zendrop] fulfillment not implemented yet; payload:", JSON.stringify(payload));
-  return { ok: false, error: "ZENDROP_NOT_IMPLEMENTED" };
+  return { ok: false, error: "ZENDROP_ORDER_API_UNAVAILABLE" };
 }
 
 /** Saves the Zendrop order id and moves the order into PREPARING. */

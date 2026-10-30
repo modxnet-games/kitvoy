@@ -171,82 +171,74 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   );
   const total = subtotal + shippingCost;
 
-  const order = await prisma.$transaction(async (tx) => {
-    const created = await tx.order.create({
-      data: {
-        customerName: input.customerName,
-        email: input.email,
-        phone: input.phone,
-        location: formatAddressLine(input.shippingAddress),
-        shippingAddress: { ...input.shippingAddress },
-        status: "PENDING",
-        subtotal,
-        shippingCost,
-        total,
-        currency: "USD",
-        locale: "en",
-        paymentMethod: input.paymentMethod,
-        paymentStatus: "unpaid",
-        ...(input.userId && { userId: input.userId }),
-        items: {
-          create: pricedItems.map((item) => ({
-            productId: item.productId,
-            productName: item.productName,
-            productSlug: item.productSlug,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-            lineTotal: item.lineTotal,
-          })),
-        },
+  // Stock is reserved when the payment is captured (see completePaidOrder),
+  // so abandoned checkouts don't drain inventory.
+  const order = await prisma.order.create({
+    data: {
+      customerName: input.customerName,
+      email: input.email,
+      phone: input.phone,
+      location: formatAddressLine(input.shippingAddress),
+      shippingAddress: { ...input.shippingAddress },
+      status: "PENDING",
+      subtotal,
+      shippingCost,
+      total,
+      currency: "USD",
+      locale: "en",
+      paymentMethod: input.paymentMethod,
+      paymentStatus: "unpaid",
+      ...(input.userId && { userId: input.userId }),
+      items: {
+        create: pricedItems.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          productSlug: item.productSlug,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          lineTotal: item.lineTotal,
+        })),
       },
-      include: { items: true },
-    });
-
-    for (const item of pricedItems) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: {
-          stock: {
-            decrement: item.quantity,
-          },
-        },
-      });
-    }
-
-    return created;
+    },
+    include: { items: true },
   });
 
   const orderReference = `KTV-${order.id.slice(-8).toUpperCase()}`;
-
-  // Trigger Expo Push Notification to all registered Admin Devices (non-blocking)
-  (prisma as any).adminDevice.findMany({ select: { token: true } })
-    .then(async (devices: any[]) => {
-      if (devices.length === 0) return;
-      const tokens = devices.map((d: any) => d.token);
-      
-      const message = {
-        to: tokens,
-        sound: 'madilik_notification',
-        title: '💸 New Order!',
-        body: `${orderReference} • ${input.customerName}\nTotal: $${total.toFixed(2)}`,
-        data: { orderId: order.id },
-      };
-
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Accept-encoding': 'gzip, deflate',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message),
-      });
-    })
-    .catch((err: any) => console.error('[PushNotification] Delivery failed:', err));
 
   return {
     success: true,
     orderId: order.id,
     orderReference,
   };
+}
+
+/** Push notification to the admin mobile app's registered devices (best-effort). */
+export async function notifyAdminDevices(order: {
+  id: string;
+  reference: string;
+  customerName: string;
+  total: number;
+}): Promise<void> {
+  try {
+    const devices = await prisma.adminDevice.findMany({ select: { token: true } });
+    if (devices.length === 0) return;
+    await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        to: devices.map((d) => d.token),
+        // Sound asset bundled in the admin mobile app
+        sound: "madilik_notification",
+        title: "💸 New paid order",
+        body: `${order.reference} • ${order.customerName}\nTotal: $${order.total.toFixed(2)}`,
+        data: { orderId: order.id },
+      }),
+    });
+  } catch (err) {
+    console.error("[PushNotification] Delivery failed:", err);
+  }
 }

@@ -12,7 +12,7 @@ import { getStripe } from "@/lib/payments/stripe";
  * order in the database, never from the client.
  *
  * TODO(payments): confirm the payment from a Stripe webhook
- * (payment_intent.succeeded) → markOrderPaid() → sendOrderToZendrop().
+ * (payment_intent.succeeded) → completePaidOrder() → afterOrderPaid().
  */
 export async function POST(request: Request) {
   const stripe = getStripe();

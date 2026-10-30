@@ -56,6 +56,8 @@ export function ProductLineImage({
             className={cn("absolute inset-0 size-full object-cover", imgClassName)}
             onError={() => setFailedSrc(src)}
             loading="lazy"
+            // Uploads are served by nginx outside public/, so the optimizer can't read them
+            unoptimized={src.startsWith("/uploads/")}
           />
         )
       ) : (

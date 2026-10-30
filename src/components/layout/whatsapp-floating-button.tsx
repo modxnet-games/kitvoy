@@ -44,7 +44,7 @@ export function WhatsappFloatingButton({
       target="_blank"
       rel="noreferrer"
       aria-label="Contact us on WhatsApp"
-      className="fixed bottom-4 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105 hover:shadow-xl md:bottom-6 md:right-6"
+      className="whatsapp-fab fixed bottom-4 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105 hover:shadow-xl md:bottom-6 md:right-6"
     >
       <WhatsAppIcon className="size-6" />
     </a>

@@ -12,8 +12,8 @@ export interface BundleTier {
 
 export const BUNDLE_TIERS: BundleTier[] = [
   { quantity: 1, discount: 0, label: "Buy 1" },
-  { quantity: 2, discount: 0.15, label: "Buy 2", badge: "Most Popular" },
-  { quantity: 3, discount: 0.25, label: "Buy 3", badge: "Best Value" },
+  { quantity: 2, discount: 0.15, label: "Buy 2" },
+  { quantity: 3, discount: 0.25, label: "Buy 3" },
 ];
 
 function roundCents(value: number): number {

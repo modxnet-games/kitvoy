@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "lenis/dist/lenis.css";
+@import "./storefront.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -55,29 +56,29 @@
 
 :root {
   /* Kitvoy: white surfaces, near-black ink, orange accent */
-  --brand: #FF7A1A;
+  --brand: #C94B16;
   --brand-foreground: #ffffff;
-  --ink: #0B0B0F;
+  --ink: #171918;
   --ink-soft: #17171E;
   --ink-deep: #050507;
-  --background: #FFFFFF;
-  --foreground: #0B0B0F;
+  --background: #FAF9F6;
+  --foreground: #171918;
   --card: #FFFFFF;
   --card-foreground: #0B0B0F;
   --popover: #FFFFFF;
   --popover-foreground: #0B0B0F;
-  --primary: #0B0B0F;
+  --primary: #C94B16;
   --primary-foreground: #FFFFFF;
   --secondary: #F4F4F6;
   --secondary-foreground: #0B0B0F;
   --muted: #F4F4F6;
-  --muted-foreground: #5A5A66;
-  --accent: #FF7A1A;
+  --muted-foreground: #666A67;
+  --accent: #E56624;
   --accent-foreground: #ffffff;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #E6E6EB;
-  --input: #DCDCE3;
-  --ring: #FF7A1A;
+  --border: #E7E5DF;
+  --input: #C7CAC6;
+  --ring: #C94B16;
   --chart-1: #FF7A1A;
   --chart-2: #E5640A;
   --chart-3: #0B0B0F;

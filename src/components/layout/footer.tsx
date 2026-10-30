@@ -1,126 +1,28 @@
 "use client";
-
 import Link from "next/link";
-import { Facebook, Instagram, MessageCircle, Music2, RotateCcw, ShieldCheck, Truck } from "lucide-react";
-
-import { siteConfig } from "@/config/site";
-import { BrandLogo } from "@/components/layout/brand-logo";
-
-/** Only pages that exist: sections of the sales page plus order tracking. */
-const FOOTER_LINKS = [
-  { label: "How it works", href: "/#how" },
-  { label: "Bundles", href: "/#bundles" },
-  { label: "FAQ", href: "/#faq" },
-  { label: "Track my order", href: "/account/orders" },
-];
-
-const GUARANTEES = [
-  { icon: Truck, label: "Free US shipping" },
-  { icon: ShieldCheck, label: "Secure checkout" },
-  { icon: RotateCcw, label: "30-day money-back guarantee" },
-];
+import { Facebook, Instagram, MessageCircle, Music2, ArrowUpRight } from "lucide-react";
+import { BrandLogo } from "./brand-logo";
 
 type FooterSocialProps = {
-  whatsappEnabled: boolean;
-  whatsappNumber: string;
-  whatsappLink: string;
-  facebookEnabled: boolean;
-  facebookUrl: string;
-  instagramEnabled: boolean;
-  instagramUrl: string;
-  tiktokEnabled: boolean;
-  tiktokUrl: string;
+  whatsappEnabled: boolean; whatsappNumber: string; whatsappLink: string;
+  facebookEnabled: boolean; facebookUrl: string;
+  instagramEnabled: boolean; instagramUrl: string;
+  tiktokEnabled: boolean; tiktokUrl: string;
 };
-
-interface FooterProps {
-  social?: FooterSocialProps;
-}
-
-function buildWhatsappHref(link?: string, number?: string): string | null {
-  if (link && link.trim()) return link.trim();
-  if (!number) return null;
-  const digits = number.replace(/[^0-9]/g, "");
-  if (!digits) return null;
-  return `https://wa.me/${digits}`;
-}
-
-export function Footer({ social }: FooterProps) {
-  const whatsappHref =
-    social && social.whatsappEnabled
-      ? buildWhatsappHref(social.whatsappLink, social.whatsappNumber)
-      : null;
-
+export function Footer({ social }: { social?: FooterSocialProps }) {
+  const whatsapp = social?.whatsappLink || (social?.whatsappNumber ? "https://wa.me/" + social.whatsappNumber.replace(/[^0-9]/g, "") : "");
   const socials = [
     social?.facebookEnabled && social.facebookUrl && { href: social.facebookUrl, label: "Facebook", icon: Facebook },
     social?.instagramEnabled && social.instagramUrl && { href: social.instagramUrl, label: "Instagram", icon: Instagram },
     social?.tiktokEnabled && social.tiktokUrl && { href: social.tiktokUrl, label: "TikTok", icon: Music2 },
-    whatsappHref && { href: whatsappHref, label: "WhatsApp", icon: MessageCircle },
+    social?.whatsappEnabled && whatsapp && { href: whatsapp, label: "WhatsApp", icon: MessageCircle },
   ].filter(Boolean) as { href: string; label: string; icon: typeof Facebook }[];
-
-  return (
-    <footer className="border-t bg-background">
-      <div className="container mx-auto px-4 py-12 md:py-14">
-        <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-xs">
-            <Link href="/" aria-label={`${siteConfig.name} home`}>
-              <BrandLogo />
-            </Link>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{siteConfig.description}</p>
-          </div>
-
-          <nav aria-label="Footer">
-            <ul className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm font-medium sm:flex sm:gap-8">
-              {FOOTER_LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="text-foreground/75 transition-colors hover:text-foreground">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-
-        <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2 border-t pt-6 text-xs text-muted-foreground">
-          {GUARANTEES.map(({ icon: Icon, label }) => (
-            <li key={label} className="flex items-center gap-1.5">
-              <Icon className="size-4 text-brand" />
-              {label}
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-6 flex flex-col-reverse items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
-            <span className="mx-2">·</span>
-            <a
-              href="https://oussamahitte.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:text-foreground"
-            >
-              Designed &amp; developed by oussamahitte.com
-            </a>
-          </p>
-          {socials.length > 0 && (
-            <div className="flex items-center gap-3">
-              {socials.map(({ href, label, icon: Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={label}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Icon className="size-5" />
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </footer>
-  );
+  return <footer className="store-footer"><div className="store-container">
+    <div className="footer-top"><div className="footer-brand"><Link href="/" aria-label="Kitvoy home"><BrandLogo /></Link><p>A little preparation.<br />More room for the road ahead.</p></div>
+      <nav aria-label="Explore"><h2>Explore</h2><Link href="/#how">How it works</Link><Link href="/#bundles">Choose a bundle</Link><Link href="/#faq">Common questions</Link></nav>
+      <nav aria-label="Help and policies"><h2>Here to help</h2><Link href="/support#shipping-returns">Shipping & returns</Link><Link href="/support#privacy">Privacy information</Link><Link href="/support#contact">Contact</Link></nav>
+      <nav aria-label="Your account"><h2>Your Kitvoy</h2><Link href="/account/orders">Track your order <ArrowUpRight size={14} /></Link><Link href="/account">My account</Link>{socials.map(({ href, label, icon: Icon }) => <a key={label} href={href} target="_blank" rel="noreferrer"><Icon size={15} />{label}</a>)}</nav>
+    </div>
+    <div className="footer-bottom"><p>© {new Date().getFullYear()} Kitvoy. All rights reserved.</p><span>United States · USD</span><a href="https://oussamahitte.com" target="_blank" rel="noreferrer">Design & development by oussamahitte.com</a></div>
+  </div></footer>;
 }

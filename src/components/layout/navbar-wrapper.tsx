@@ -7,7 +7,10 @@ export async function NavbarWrapper() {
 
   try {
     const content = await getHomepageContent();
-    announcementText = content.announcementBar;
+    // Suppress the legacy, unapproved returns/shipping promise until the
+    // merchant supplies policy-backed announcement copy in the CMS.
+    announcementText = /30.day|money.back|guarantee|free.*shipping/i.test(content.announcementBar)
+      ? undefined : content.announcementBar;
     announcementVisible = content.announcementBarVisible;
   } catch {
     // DB not ready — Navbar falls back to defaults

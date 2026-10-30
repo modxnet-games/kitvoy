@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import Image from "next/image";
 import { normalizeMediaSrc, isVideoMediaUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 
@@ -22,14 +23,10 @@ export function ProductLineImage({
   className,
   imgClassName,
 }: ProductLineImageProps) {
-  const [failed, setFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = normalizeMediaSrc(imageUrl ?? "");
   const isVideo = Boolean(src) && isVideoMediaUrl(src);
-  useEffect(() => {
-    setFailed(false);
-  }, [imageUrl]);
-
-  const showMedia = Boolean(src) && !failed;
+  const showMedia = Boolean(src) && failedSrc !== src;
   const letter = (fallbackLetter || "?").charAt(0).toUpperCase();
 
   return (
@@ -47,15 +44,17 @@ export function ProductLineImage({
             playsInline
             preload="metadata"
             className={cn("absolute inset-0 size-full object-cover", imgClassName)}
-            onError={() => setFailed(true)}
+            onError={() => setFailedSrc(src)}
             aria-label={alt}
           />
         ) : (
-          <img
+          <Image
+            width={160}
+            height={160}
             src={src}
             alt={alt}
             className={cn("absolute inset-0 size-full object-cover", imgClassName)}
-            onError={() => setFailed(true)}
+            onError={() => setFailedSrc(src)}
             loading="lazy"
           />
         )

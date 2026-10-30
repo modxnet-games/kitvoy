@@ -13,6 +13,7 @@ import type { CheckoutFormData } from "@/components/checkout";
 import { PayPalPayment } from "@/components/checkout/paypal-payment";
 import { placeOrder } from "@/lib/client/place-order";
 import { US_STATES } from "@/lib/us-address";
+import { useMounted } from "@/hooks/use-mounted";
 
 interface CheckoutClientProps {
   /** Public PayPal client id, or null when PayPal isn't configured */
@@ -29,6 +30,7 @@ type PendingOrder = { orderId: string; orderReference: string; cartKey: string }
 export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
   const { t } = useLanguage();
   const router = useRouter();
+  const mounted = useMounted();
   const items = useCartStore((s) => s.items);
   const clearCart = useCartStore((s) => s.clearCart);
   const [details, setDetails] = useState<CheckoutFormData | null>(null);
@@ -41,6 +43,8 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
   const pending = created && created.cartKey === cartKey ? created : null;
 
   const handleDetails = async (data: CheckoutFormData) => {
+    if (isSubmitting) return;
+    if (!paypalClientId) { setError(t("checkout.paymentUnavailable")); return; }
     setError(null);
     setIsSubmitting(true);
     const result = await placeOrder(data, items);
@@ -52,7 +56,7 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
     }
     setDetails(data);
     setCreated({ orderId: result.orderId, orderReference: result.orderReference, cartKey });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   };
 
   const handlePaid = () => {
@@ -60,6 +64,8 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
     clearCart();
     router.push(`/checkout/success?ref=${encodeURIComponent(pending.orderReference)}`);
   };
+
+  if (!mounted) return <div className="store-container py-16" role="status">Loading checkout…</div>;
 
   if (items.length === 0) {
     return (
@@ -81,7 +87,7 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
   const stateName = details ? US_STATES.find((s) => s.code === details.state)?.name ?? details.state : "";
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-12">
+    <div className="store-container checkout-page py-8 md:py-12">
       <Breadcrumbs
         items={[{ label: t("cart.title"), href: "/cart" }, { label: t("checkout.title") }]}
         className="mb-8"
@@ -89,6 +95,8 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
 
       <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("checkout.title")}</h1>
       <p className="mt-1 text-muted-foreground">{t("checkout.subtitle")}</p>
+      <div className="checkout-progress" aria-label="Checkout progress"><Link href="/cart" className="text-link">Cart</Link><span aria-hidden="true">/</span><strong aria-current={pending ? undefined : "step"}>Delivery details</strong><span aria-hidden="true">/</span><span aria-current={pending ? "step" : undefined}>Payment</span></div>
+      {!paypalClientId && <p className="mt-5 rounded-lg border bg-white p-4 text-sm text-muted-foreground" role="status">Online payment is temporarily unavailable. You can review your details, but no order will be created.</p>}
 
       {error && (
         <div
@@ -101,7 +109,7 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
 
       <div className="mt-8 grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <div className="checkout-form-card rounded-xl border bg-card p-6">
             {pending && details ? (
               <div className="space-y-6">
                 <div className="flex items-start justify-between gap-4 rounded-xl bg-muted/60 p-4 text-sm">
@@ -120,7 +128,7 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
                   <button
                     type="button"
                     onClick={() => setCreated(null)}
-                    className="text-sm font-semibold text-brand hover:underline"
+                    className="min-h-11 text-sm font-semibold text-brand hover:underline"
                   >
                     {t("checkout.edit")}
                   </button>
@@ -156,7 +164,7 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
       </div>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        <Link href="/cart" className="hover:text-foreground">
+        <Link href="/cart" className="checkout-back hover:text-foreground">
           {t("checkout.backToCart")}
         </Link>
       </p>

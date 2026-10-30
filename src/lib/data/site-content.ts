@@ -20,7 +20,7 @@ export interface HomepageContent {
 }
 
 export const HOMEPAGE_DEFAULTS: HomepageContent = {
-  announcementBar: "Free US shipping on every order · 30-day money-back guarantee",
+  announcementBar: "A little preparation for the road ahead.",
   announcementBarVisible: true,
 
   bannerImage: "",

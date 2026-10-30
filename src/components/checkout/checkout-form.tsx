@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock } from "lucide-react";
+import { Lock, Loader2 } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
 import {
@@ -68,12 +68,15 @@ export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, su
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     const formErrors = validateCheckoutDetails(values);
     setErrors(formErrors);
     setTouched(ALL_TOUCHED);
 
     if (Object.keys(formErrors).length === 0) {
       onSubmit(values);
+    } else {
+      document.getElementById(`checkout-${Object.keys(formErrors)[0]}`)?.focus();
     }
   };
 
@@ -88,12 +91,14 @@ export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, su
     onChange: handleChange(field),
     onBlur: handleBlur(field),
     error: showError(field),
+    disabled: isSubmitting,
   });
 
   const stateError = showError("state");
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-8">
+    <form onSubmit={handleSubmit} noValidate className="space-y-8" aria-busy={isSubmitting}>
+      {Object.keys(errors).some(key => touched[key as keyof CheckoutFormData] && errors[key as keyof CheckoutFormData]) && <p role="alert" className="rounded-lg bg-destructive/5 p-3 text-sm text-destructive">Please check the highlighted fields before continuing.</p>}
       <CheckoutSection title={t("checkout.contactTitle")}>
         <CheckoutField
           {...fieldProps("email")}
@@ -142,6 +147,9 @@ export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, su
             </label>
             <select
               id="checkout-state"
+              name="state"
+              required
+              disabled={isSubmitting}
               value={values.state}
               onChange={handleChange("state")}
               onBlur={handleBlur("state")}
@@ -149,7 +157,7 @@ export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, su
               aria-invalid={!!stateError}
               aria-describedby={stateError ? "checkout-state-error" : undefined}
               className={cn(
-                "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm",
+                "min-h-12 w-full rounded-lg border border-input bg-transparent px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
                 stateError && "border-destructive",
                 !values.state && "text-muted-foreground",
               )}
@@ -197,7 +205,7 @@ export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, su
         disabled={isSubmitting}
         className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
       >
-        {isSubmitting ? t("checkout.processing") : (submitLabel ?? t("checkout.placeOrder"))}
+        {isSubmitting ? <span className="inline-flex items-center gap-2" role="status"><Loader2 className="size-4 animate-spin" />{t("checkout.processing")}</span> : (submitLabel ?? t("checkout.placeOrder"))}
       </button>
     </form>
   );

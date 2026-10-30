@@ -8,7 +8,7 @@ import { useLanguage } from "@/contexts/language-context";
 import { Price, ProductLineImage } from "@/components/storefront";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { getLineTotal } from "@/lib/bundles";
+import { getLineTotal, getBundleSavings } from "@/lib/bundles";
 
 interface OrderSummaryProps {
   className?: string;
@@ -29,7 +29,8 @@ export function OrderSummary({ className }: OrderSummaryProps) {
         className,
       )}
     >
-      <h2 className="font-semibold">{t("cart.orderSummary")}</h2>
+      <Link href="/cart" className="text-link checkout-summary-edit">Edit cart</Link>
+      <h2 className="flex min-h-11 items-center font-semibold">{t("cart.orderSummary")}</h2>
 
       <ul className="mt-4 max-h-60 space-y-3 overflow-y-auto">
         {items.map((item: CartItem) => (
@@ -38,7 +39,8 @@ export function OrderSummary({ className }: OrderSummaryProps) {
             className="flex gap-3 text-sm"
           >
             <ProductLineImage
-              className="size-12"
+              className="size-16 rounded-lg bg-[#f0ede7]"
+              imgClassName="!object-contain mix-blend-multiply"
               imageUrl={item.product.images?.[0]}
               alt={item.product.name}
               fallbackLetter={item.product.category.name}
@@ -51,8 +53,9 @@ export function OrderSummary({ className }: OrderSummaryProps) {
                 {item.product.name}
               </Link>
               <p className="text-muted-foreground">
-                {t("cart.qty")} {item.quantity} × <Price value={item.product.price} />
+                {t("cart.qty")} {item.quantity}
               </p>
+              {getBundleSavings(item.product.price, item.quantity) > 0 && <p className="mt-1 text-xs text-muted-foreground">Bundle savings: <Price value={getBundleSavings(item.product.price, item.quantity)} /></p>}
             </div>
             <span className="shrink-0 font-medium">
               <Price value={getLineTotal(item.product.price, item.quantity)} />
@@ -73,19 +76,20 @@ export function OrderSummary({ className }: OrderSummaryProps) {
         <div className="flex justify-between">
           <span className="text-muted-foreground">{t("cart.shipping")}</span>
           <span>
-            <Price value={shipping} />
+            {shipping === 0 ? "Free" : <Price value={shipping} />}
           </span>
         </div>
       </div>
 
       <Separator className="my-4" />
 
-      <div className="flex justify-between font-semibold">
+      <div className="order-total flex justify-between font-semibold">
         <span>{t("cart.total")}</span>
         <span>
           <Price value={total} />
         </span>
       </div>
+      <p className="mt-4 text-xs text-muted-foreground">All totals in USD. Availability and prices are validated before payment.</p>
     </div>
   );
 }

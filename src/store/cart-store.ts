@@ -13,6 +13,8 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   addItem: (product: ProductDisplay, quantity?: number) => void;
+  setOffer: (product: ProductDisplay, quantity: number) => void;
+  refreshCatalog: (products: { id: string; price: number; stock: number; shippingTax: number }[]) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   incrementItem: (productId: string) => void;
@@ -25,9 +27,8 @@ interface CartState {
 
 /** Shipping is free everywhere (included in product prices). Kept for API compatibility. */
 export const SHIPPING_THRESHOLD = 0;
-const ESTIMATED_SHIPPING = 0;
-
-export function getShipping(_subtotal: number): number {
+export function getShipping(subtotal: number): number {
+  void subtotal; // Retained for callers of the legacy flat-shipping helper.
   return 0;
 }
 
@@ -48,6 +49,18 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+
+      refreshCatalog: (products) => set(state => ({ items: state.items.map(item => {
+        const current = products.find(product => product.id === item.product.id);
+        return { ...item, product: current ? { ...item.product, ...current } : { ...item.product, stock: 0 } };
+      }) })),
+
+      // Explicitly replace this product's quantity with the selected bundle.
+      // Never silently clamp an unavailable offer to a different quantity.
+      setOffer: (product, quantity) => {
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > product.stock) return;
+        set(state => ({ items: [...state.items.filter(i => i.product.id !== product.id), { product, quantity }] }));
+      },
 
       addItem: (product, quantity = 1) => {
         set((state) => {
@@ -86,7 +99,10 @@ export const useCartStore = create<CartState>()(
         set((state) => {
           const item = state.items.find((i) => i.product.id === productId);
           if (!item) return state;
-          const qty = Math.max(0, Math.min(quantity, item.product.stock));
+          if (!Number.isInteger(quantity)) return state;
+          // Let a customer reduce a now-unavailable quantity one at a time;
+          // do not jump from their current quantity straight to new stock.
+          const qty = Math.max(0, Math.min(quantity, Math.max(item.product.stock, item.quantity)));
           if (qty === 0) {
             return {
               items: state.items.filter((i) => i.product.id !== productId),
@@ -102,7 +118,7 @@ export const useCartStore = create<CartState>()(
 
       incrementItem: (productId) => {
         const item = get().items.find((i) => i.product.id === productId);
-        if (!item) return;
+        if (!item || item.quantity >= item.product.stock) return;
         get().updateQuantity(
           productId,
           Math.min(item.quantity + 1, item.product.stock),

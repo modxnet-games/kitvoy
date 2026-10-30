@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1",
     "lint": "eslint",
+    "test:commerce": "node --import tsx --test tests/commerce.test.ts",
+    "test:browser": "playwright test",
+    "preview:seed": "node scripts/seed-kitvoy-preview.mjs",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -48,6 +51,8 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",

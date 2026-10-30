@@ -29,6 +29,8 @@ export function CheckoutField({
       </label>
       <Input
         id={inputId}
+        name={inputId.replace("checkout-", "")}
+        required={required}
         aria-invalid={!!error}
         aria-describedby={error ? `${inputId}-error` : undefined}
         className={error ? "border-destructive" : undefined}

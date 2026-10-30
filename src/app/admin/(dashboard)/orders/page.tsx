@@ -3,6 +3,7 @@ import { formatOrderReference, getAllOrders } from "@/lib/data/admin-orders";
 import { formatPrice } from "@/lib/formatters";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { DeleteOrderButton } from "./delete-order-button";
+import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
 
 export default async function AdminOrdersPage() {
   const orders = await getAllOrders();
@@ -39,6 +40,7 @@ export default async function AdminOrdersPage() {
                 <th className="px-4 py-3.5">Items</th>
                 <th className="px-4 py-3.5">Total</th>
                 <th className="px-4 py-3.5">Payment</th>
+                <th className="px-4 py-3.5">Fulfillment</th>
                 <th className="px-4 py-3.5">Status</th>
                 <th className="px-4 py-3.5">Date</th>
                 <th className="px-4 py-3.5" />
@@ -84,6 +86,13 @@ export default async function AdminOrdersPage() {
                       >
                         Unpaid
                       </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {order.paymentStatus === "paid" ? (
+                      <FulfillmentBadge status={order.fulfillmentStatus} />
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3.5">

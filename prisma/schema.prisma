@@ -42,27 +42,27 @@ model Category {
 }
 
 model Product {
-  id              String        @id @default(cuid())
-  name            String
-  slug            String        @unique
+  id               String         @id @default(cuid())
+  name             String
+  slug             String         @unique
   shortDescription String
-  description     String
-  details         String
-  price           Float
-  shippingTax     Float         @default(0)
-  compareAtPrice  Float?
-  badge           String?
-  rating          Float
-  reviewCount     Int
-  stock           Int
-  sku             String
-  isFeatured      Boolean       @default(false)
-  categoryId      String
-  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  images          ProductImage[]
-  reviews         Review[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  description      String
+  details          String
+  price            Float
+  shippingTax      Float          @default(0)
+  compareAtPrice   Float?
+  badge            String?
+  rating           Float
+  reviewCount      Int
+  stock            Int
+  sku              String
+  isFeatured       Boolean        @default(false)
+  categoryId       String
+  category         Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  images           ProductImage[]
+  reviews          Review[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@index([categoryId])
   @@index([slug])
@@ -90,12 +90,12 @@ model Review {
 }
 
 model ProductImage {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   url       String
   alt       String?
-  order     Int      @default(0)
+  order     Int     @default(0)
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@map("product_images")
@@ -110,53 +110,64 @@ enum OrderStatus {
   CANCELED
 }
 
+/// Manual fulfillment (Zendrop has no order API for custom stores)
+enum FulfillmentStatus {
+  UNFULFILLED
+  SHIPPED
+  DELIVERED
+}
+
 model Order {
-  id           String      @id @default(cuid())
-  customerName    String
-  email           String?
-  phone           String
+  id                String            @id @default(cuid())
+  customerName      String
+  email             String?
+  phone             String
   /// One-line address ("street, city, STATE ZIP") for admin, emails and packing slips
-  location        String
+  location          String
   /// Structured US address { address1, address2, city, state, zip, country } for fulfillment
-  shippingAddress Json?
-  status          OrderStatus @default(PENDING)
-  subtotal        Float
-  shippingCost    Float
-  total           Float
-  currency        String      @default("USD")
-  locale          String      @default("en")
+  shippingAddress   Json?
+  status            OrderStatus       @default(PENDING)
+  subtotal          Float
+  shippingCost      Float
+  total             Float
+  currency          String            @default("USD")
+  locale            String            @default("en")
   /// "card" (Stripe) | "paypal"
-  paymentMethod   String?
+  paymentMethod     String?
   /// "unpaid" | "paid" | "refunded" | "failed"
-  paymentStatus   String      @default("unpaid")
+  paymentStatus     String            @default("unpaid")
   /// Stripe PaymentIntent id or PayPal order id
-  paymentRef      String?
+  paymentRef        String?
   /// Zendrop order id once fulfillment has been triggered
-  fulfillmentRef  String?
-  userId       String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  items        OrderItem[]
+  fulfillmentRef    String?
+  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
+  trackingNumber    String?
+  shippedAt         DateTime?
+  userId            String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  user              User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items             OrderItem[]
 
   @@index([status])
   @@index([createdAt])
   @@index([userId])
   @@index([paymentRef])
+  @@index([fulfillmentStatus])
   @@map("orders")
 }
 
 model OrderItem {
-  id         String   @id @default(cuid())
-  orderId    String
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId  String?
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String?
   productName String
   productSlug String
-  unitPrice  Float
-  quantity   Int
-  lineTotal  Float
-  createdAt  DateTime @default(now())
+  unitPrice   Float
+  quantity    Int
+  lineTotal   Float
+  createdAt   DateTime @default(now())
 
   @@index([orderId])
   @@map("order_items")

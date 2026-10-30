@@ -6,6 +6,9 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { OrderStatusForm } from "./order-status-form";
 import { DeleteOrderButton } from "../delete-order-button";
 import { PrintOrderButton } from "./print-order-button";
+import { FulfillmentCard } from "./fulfillment-card";
+import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
+import type { ShippingAddress } from "@/lib/us-address";
 
 interface OrderPageProps {
   params: Promise<{ id: string }>;
@@ -18,6 +21,8 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
   if (!order) notFound();
 
   const orderReference = formatOrderReference(order.id);
+  const isPaid = order.paymentStatus === "paid";
+  const address = order.shippingAddress as unknown as ShippingAddress | null;
 
   return (
     <div>
@@ -37,6 +42,16 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={
+              isPaid
+                ? "rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800"
+                : "rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+            }
+          >
+            {isPaid ? "Paid" : "Unpaid"}
+          </span>
+          <FulfillmentBadge status={order.fulfillmentStatus} />
           <StatusBadge status={order.status} />
           <OrderStatusForm
             orderId={order.id}
@@ -109,7 +124,16 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
           </div>
         </div>
 
-        <div>
+        <div className="space-y-6">
+          <FulfillmentCard
+            orderId={order.id}
+            isPaid={isPaid}
+            isCanceled={order.status === "CANCELED"}
+            fulfillmentStatus={order.fulfillmentStatus}
+            trackingNumber={order.trackingNumber}
+            shippedAt={order.shippedAt ? order.shippedAt.toISOString() : null}
+          />
+
           <div className="rounded-xl border bg-card p-6">
             <h2 className="font-semibold">Customer</h2>
             <dl className="mt-4 space-y-3 text-sm">
@@ -125,9 +149,44 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
                   </a>
                 </dd>
               </div>
+              {order.email && (
+                <div>
+                  <dt className="text-muted-foreground">Email</dt>
+                  <dd>
+                    <a href={`mailto:${order.email}`} className="text-primary hover:underline">
+                      {order.email}
+                    </a>
+                  </dd>
+                </div>
+              )}
               <div>
-                <dt className="text-muted-foreground">Location</dt>
-                <dd className="text-muted-foreground">{order.location}</dd>
+                <dt className="text-muted-foreground">Ship to</dt>
+                <dd className="select-all">
+                  {address ? (
+                    <>
+                      {address.address1}
+                      {address.address2 && <>, {address.address2}</>}
+                      <br />
+                      {address.city}, {address.state} {address.zip}
+                      <br />
+                      United States
+                    </>
+                  ) : (
+                    order.location
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Payment</dt>
+                <dd>
+                  {isPaid ? "Paid" : "Unpaid"}
+                  {order.paymentMethod && <> · {order.paymentMethod === "paypal" ? "PayPal" : order.paymentMethod}</>}
+                </dd>
+                {isPaid && order.paymentRef && (
+                  <dd className="mt-0.5 font-mono text-xs text-muted-foreground" title="PayPal capture ID (use it to refund)">
+                    {order.paymentRef}
+                  </dd>
+                )}
               </div>
             </dl>
           </div>

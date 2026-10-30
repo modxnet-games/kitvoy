@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useLanguage } from "@/contexts/language-context";
 import { useMemo, useState } from "react";
-import { formatPrice } from "@/lib/formatters";
+import { formatDate, formatDateTime, formatPrice } from "@/lib/formatters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { OrderStatus } from "@prisma/client";
 import type { CustomerOrderDetail } from "@/lib/data/customer-orders";
 import { CancelOrderModal } from "@/components/account/cancel-order-modal";
+import { trackingUrl } from "@/lib/tracking";
+import { ExternalLink, PackageCheck, Truck } from "lucide-react";
 
 const STATUS_KEYS: Record<OrderStatus, string> = {
   PENDING: "account.orders.statusPending",
@@ -52,7 +54,7 @@ export function AccountOrderDetailClient({ order }: AccountOrderDetailClientProp
             {t("account.orders.orderDetails")} {order.reference}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {new Date(order.createdAt).toLocaleString("en-US")}
+            {formatDateTime(order.createdAt)}
           </p>
           <div className="mt-2">
             <Badge
@@ -143,6 +145,53 @@ export function AccountOrderDetailClient({ order }: AccountOrderDetailClientProp
             </div>
           </div>
         </div>
+
+        {order.paymentStatus === "paid" && order.status !== "CANCELED" && (
+          <div className="rounded-lg border bg-card p-5">
+            <h2 className="flex items-center gap-2 font-semibold">
+              {order.fulfillmentStatus === "DELIVERED" ? (
+                <PackageCheck className="size-5 text-emerald-600" />
+              ) : (
+                <Truck className="size-5 text-brand" />
+              )}
+              {t("account.orders.shippingTitle")}
+            </h2>
+
+            {order.fulfillmentStatus !== "UNFULFILLED" && order.trackingNumber ? (
+              <div className="mt-4 space-y-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">{t("account.orders.trackingNumber")}</p>
+                  <p className="mt-0.5 select-all font-mono text-base font-semibold">{order.trackingNumber}</p>
+                </div>
+                <a
+                  href={trackingUrl(order.trackingNumber)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-ink transition hover:bg-brand/90"
+                >
+                  {t("account.orders.trackPackage")}
+                  <ExternalLink className="size-4" />
+                </a>
+                <p className="text-muted-foreground">
+                  {order.fulfillmentStatus === "DELIVERED"
+                    ? t("account.orders.deliveredNote")
+                    : t("account.orders.trackingDelayNote")}
+                  {order.shippedAt && (
+                    <>
+                      {" "}
+                      {t("account.orders.shippedOn", {
+                        date: formatDate(order.shippedAt),
+                      })}
+                      .
+                    </>
+                  )}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">{t("account.orders.preparingNote")}</p>
+            )}
+          </div>
+        )}
 
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/30">
           <p className="font-medium text-amber-900 dark:text-amber-100">

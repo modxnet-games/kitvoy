@@ -89,7 +89,11 @@ function orderStatusFor(fulfillment: FulfillmentStatus, current: OrderStatus): O
 }
 
 export type FulfillmentUpdateResult =
-  | { ok: true; order: Awaited<ReturnType<typeof prisma.order.update>> }
+  | {
+      ok: true;
+      order: Awaited<ReturnType<typeof prisma.order.update>>;
+      previous: { fulfillmentStatus: FulfillmentStatus; trackingNumber: string | null };
+    }
   | { ok: false; error: string; status: number };
 
 /**
@@ -142,7 +146,11 @@ export async function updateOrderFulfillment(
       shippedAt: next === "UNFULFILLED" ? null : (order.shippedAt ?? new Date()),
     },
   });
-  return { ok: true, order: updated };
+  return {
+    ok: true,
+    order: updated,
+    previous: { fulfillmentStatus: order.fulfillmentStatus, trackingNumber: order.trackingNumber },
+  };
 }
 
 const DEFAULT_STATS = {

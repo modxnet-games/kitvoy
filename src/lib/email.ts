@@ -9,20 +9,15 @@ const SMTP_USER = process.env.SMTP_USER?.trim();
 const SMTP_PASS = process.env.SMTP_PASS?.trim();
 const SMTP_SECURE = process.env.SMTP_SECURE === "true";
 
-function isEmailConfigured(): boolean {
-  return !!(
-    NOTIFY_EMAIL &&
-    SMTP_HOST &&
-    SMTP_PORT &&
-    SMTP_USER &&
-    SMTP_PASS
-  );
+/** SMTP is enough for customer emails; owner notifications also need NOTIFY_EMAIL. */
+function isSmtpConfigured(): boolean {
+  return !!(SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS);
 }
 
 let cachedTransport: nodemailer.Transporter | null = null;
 
 function getTransport(): nodemailer.Transporter | null {
-  if (!isEmailConfigured()) return null;
+  if (!isSmtpConfigured()) return null;
   if (cachedTransport) return cachedTransport;
   try {
     const port = Number(SMTP_PORT);
@@ -220,7 +215,7 @@ ${order.items
 export async function sendOrderNotification(
   order: OrderNotificationPayload
 ): Promise<{ sent: true } | { sent: false; reason: string }> {
-  const transport = getTransport();
+  const transport = NOTIFY_EMAIL ? getTransport() : null;
   if (!transport) {
     const reason = "Email not configured (missing NOTIFY_EMAIL or SMTP_* env vars)";
     if (process.env.NODE_ENV === "development") {
@@ -301,4 +296,119 @@ export async function sendOrderNotification(
     console.error("[email] Failed to send order notification:", message);
     return { sent: false, reason: message };
   }
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Customer shipping confirmation                                     */
+/* ------------------------------------------------------------------ */
+
+export interface ShippingConfirmationPayload {
+  to: string;
+  customerName: string;
+  orderReference: string;
+  trackingNumber: string;
+  trackingUrl: string;
+  shipTo: string[];
+  items: { productName: string; quantity: number }[];
+  /** True when the tracking number changed after the first "shipped" email */
+  isUpdate?: boolean;
+}
+
+/**
+ * Emails the customer that their order shipped, with the tracking link.
+ * Needs SMTP_* only (not NOTIFY_EMAIL). Never throws.
+ */
+export async function sendShippingConfirmation(
+  p: ShippingConfirmationPayload,
+): Promise<{ sent: true } | { sent: false; reason: string }> {
+  const transport = getTransport();
+  if (!transport) return { sent: false, reason: "SMTP is not configured (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)" };
+
+  const { subject, text, html } = buildShippingEmail(p);
+  try {
+    await transport.sendMail({
+      from: process.env.SMTP_FROM?.trim() || SMTP_USER,
+      to: p.to,
+      subject,
+      text,
+      html,
+    });
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[email] Failed to send shipping confirmation:", message);
+    return { sent: false, reason: message };
+  }
+}
+
+/** Subject, plain text and HTML for the shipping email (no sending). */
+export function buildShippingEmail(p: ShippingConfirmationPayload): { subject: string; text: string; html: string } {
+  const storeName = "Kitvoy";
+  const firstName = p.customerName.trim().split(/\s+/)[0] || "there";
+  const headline = p.isUpdate ? "Your tracking number was updated" : "Your order is on its way";
+  const subject = p.isUpdate
+    ? `Updated tracking for your ${storeName} order ${p.orderReference}`
+    : `Your ${storeName} order ${p.orderReference} has shipped`;
+
+  const text = [
+    `Hi ${firstName},`,
+    "",
+    p.isUpdate
+      ? `The tracking number for your order ${p.orderReference} was updated.`
+      : `Good news: your order ${p.orderReference} has shipped.`,
+    "",
+    `Tracking number: ${p.trackingNumber}`,
+    `Track your package: ${p.trackingUrl}`,
+    "",
+    "Shipping to:",
+    ...p.shipTo.map((l) => `  ${l}`),
+    "",
+    "In this shipment:",
+    ...p.items.map((i) => `  ${i.quantity} × ${i.productName}`),
+    "",
+    "Tracking can take a day or two to show the first scan.",
+    "Questions? Just reply to this email.",
+    "",
+    `— ${storeName}`,
+  ].join("\n");
+
+  const ink = "#0B0B0F";
+  const orange = "#FF7A1A";
+  const muted = "#5A5A66";
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background:#F4F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
+        <tr><td style="background:${ink};padding:20px 28px;color:#FFFFFF;font-size:20px;font-weight:800;">${storeName}</td></tr>
+        <tr><td style="padding:28px;">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:800;">${escapeHtml(headline)}</p>
+          <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:${muted};">Hi ${escapeHtml(firstName)}, ${
+            p.isUpdate ? "here’s the new tracking number for" : "your package is with the carrier. Here’s how to follow"
+          } order <strong style="color:${ink};">${escapeHtml(p.orderReference)}</strong>.</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;border-radius:10px;">
+            <tr><td style="padding:16px 18px;">
+              <p style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${muted};">Tracking number</p>
+              <p style="margin:4px 0 0;font-size:18px;font-weight:700;font-family:Consolas,Monaco,monospace;">${escapeHtml(p.trackingNumber)}</p>
+            </td></tr>
+          </table>
+          <p style="margin:20px 0;"><a href="${escapeHtml(p.trackingUrl)}" style="display:inline-block;background:${orange};color:${ink};text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:10px;">Track your package</a></p>
+          <p style="margin:0 0 6px;font-size:13px;font-weight:700;">Shipping to</p>
+          <p style="margin:0 0 18px;font-size:14px;line-height:1.5;color:${muted};">${p.shipTo.map(escapeHtml).join("<br>")}</p>
+          <p style="margin:0 0 6px;font-size:13px;font-weight:700;">In this shipment</p>
+          <p style="margin:0 0 18px;font-size:14px;line-height:1.5;color:${muted};">${p.items
+            .map((i) => `${i.quantity} × ${escapeHtml(i.productName)}`)
+            .join("<br>")}</p>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:${muted};">Tracking can take a day or two to show the first scan. Questions? Just reply to this email.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject, text, html };
 }

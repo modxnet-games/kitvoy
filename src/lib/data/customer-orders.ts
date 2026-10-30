@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import type { OrderStatus } from "@prisma/client";
+import type { FulfillmentStatus, OrderStatus } from "@prisma/client";
 
 const ORDER_REFERENCE_PREFIX = "KTV-";
 
@@ -46,6 +46,10 @@ export type CustomerOrderDetail = {
   phone: string;
   location: string;
   status: OrderStatus;
+  paymentStatus: string;
+  fulfillmentStatus: FulfillmentStatus;
+  trackingNumber: string | null;
+  shippedAt: Date | null;
   subtotal: number;
   shippingCost: number;
   total: number;

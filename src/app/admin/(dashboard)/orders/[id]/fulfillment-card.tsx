@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { FulfillmentStatus } from "@prisma/client";
-import { CheckCircle2, Loader2, PackageCheck, Truck } from "lucide-react";
+import { CheckCircle2, ExternalLink, Loader2, Mail, PackageCheck, Truck } from "lucide-react";
 
 import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
 import { Input } from "@/components/ui/input";
+import { trackingUrl } from "@/lib/tracking";
 
 interface FulfillmentCardProps {
   orderId: string;
@@ -29,11 +30,13 @@ export function FulfillmentCard({
   const router = useRouter();
   const [tracking, setTracking] = useState(trackingNumber ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [emailNotice, setEmailNotice] = useState<{ sent: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState<FulfillmentStatus | "tracking" | null>(null);
   const [isRefreshing, startRefresh] = useTransition();
 
   const update = async (body: { fulfillmentStatus?: FulfillmentStatus; trackingNumber?: string }, action: typeof saving) => {
     setError(null);
+    setEmailNotice(null);
     setSaving(action);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}`, {
@@ -45,6 +48,14 @@ export function FulfillmentCard({
       if (!res.ok) {
         setError(typeof json?.error === "string" ? json.error : "Couldn’t update fulfillment");
         return;
+      }
+      const email = json?.customerEmail as { sent: boolean; reason?: string } | null | undefined;
+      if (email) {
+        setEmailNotice(
+          email.sent
+            ? { sent: true, text: "Shipping email sent to the customer." }
+            : { sent: false, text: `Customer wasn’t emailed: ${email.reason ?? "unknown error"}` },
+        );
       }
       startRefresh(() => router.refresh());
     } catch {
@@ -143,6 +154,18 @@ export function FulfillmentCard({
             </p>
           )}
 
+          {trackingNumber && fulfillmentStatus !== "UNFULFILLED" && (
+            <a
+              href={trackingUrl(trackingNumber)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              Track package
+              <ExternalLink className="size-3.5" />
+            </a>
+          )}
+
           {shippedAt && (
             <p className="text-xs text-muted-foreground">
               Shipped {new Date(shippedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
@@ -164,6 +187,19 @@ export function FulfillmentCard({
             </button>
           )}
         </div>
+      )}
+
+      {emailNotice && (
+        <p
+          className={
+            emailNotice.sent
+              ? "mt-4 flex items-start gap-2 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800"
+              : "mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          }
+        >
+          <Mail className="mt-0.5 size-4 shrink-0" />
+          {emailNotice.text}
+        </p>
       )}
 
       {error && (

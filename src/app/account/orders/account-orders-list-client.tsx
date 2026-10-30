@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/contexts/language-context";
-import { formatPrice } from "@/lib/formatters";
+import { formatDate, formatPrice } from "@/lib/formatters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { OrderStatus } from "@prisma/client";
@@ -103,7 +103,7 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
                       {order.reference}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleDateString("en-US")}
+                      {formatDate(order.createdAt)}
                     </td>
                     <td className="px-4 py-3">
                       <OrderStatusBadge status={order.status} t={t} />

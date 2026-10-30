@@ -256,6 +256,13 @@ export const en = {
       statusShipped: "Shipped",
       statusDelivered: "Delivered",
       statusCanceled: "Canceled",
+      shippingTitle: "Shipping",
+      trackingNumber: "Tracking number",
+      trackPackage: "Track your package",
+      shippedOn: "Shipped {date}",
+      deliveredNote: "Delivered. We hope you love it.",
+      preparingNote: "We're preparing your order. You'll get an email with tracking as soon as it ships.",
+      trackingDelayNote: "Tracking can take a day or two to show the first scan.",
     },
   },
   reviews: {

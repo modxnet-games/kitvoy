@@ -13,7 +13,7 @@ export const landingConfig = {
 
   /** Shown only when no matching product exists in the database yet. */
   fallback: {
-    name: "Kitvoy Cordless Tire Inflator",
+    name: "Cordless Tire Inflator",
     price: 59.99,
     compareAtPrice: 99.99,
   },
@@ -22,8 +22,8 @@ export const landingConfig = {
     eyebrow: "The cordless tire inflator",
     title: "Low tire? Fix it from your glovebox.",
     subtitle:
-      "Kitvoy is a rechargeable air pump that lives in your car. Set the PSI on the screen, press start, and it stops by itself when the tire hits your number.",
-    cta: "Get My Kitvoy",
+      "A rechargeable air pump that lives in your car. Set the PSI on the screen, press start, and it stops by itself when the tire hits your number.",
+    cta: "Get My Inflator",
     scrollHint: "Scroll to see it work",
   },
 
@@ -64,7 +64,7 @@ export const landingConfig = {
   ],
 
   benefits: {
-    eyebrow: "Why Kitvoy",
+    eyebrow: "Why it works",
     title: "Why it earns a spot in the car",
     items: [
       {
@@ -95,7 +95,7 @@ export const landingConfig = {
 
   ugc: {
     eyebrow: "On the road",
-    title: "Kitvoy on the road",
+    title: "See it on the road",
     subtitle: "Post your clip and tag @kitvoy to get featured here.",
     /**
      * Replace with real customer videos (with their permission). Tiles with an
@@ -138,7 +138,7 @@ export const landingConfig = {
   finalCta: {
     title: "Keep one in the car before the tire light comes on.",
     subtitle: "Try it for 30 days. If it doesn't earn its glovebox spot, we'll refund you.",
-    cta: "Get My Kitvoy",
+    cta: "Get My Inflator",
   },
 } as const;
 

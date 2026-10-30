@@ -6,29 +6,38 @@ import { AnimatePresence, motion } from "motion/react";
 import { landingConfig } from "@/config/landing";
 import { Price } from "@/components/storefront";
 import type { ProductDisplay } from "@/types/product";
-import { useBuyBundle } from "./use-buy-bundle";
+import { getAvailability, useBuyBundle } from "./use-buy-bundle";
 
 /** Slides up once the hero CTA has scrolled out of view. */
 export function StickyBuyBar({ product }: { product: ProductDisplay | null }) {
-  const [visible, setVisible] = useState(false);
+  const [pastHero, setPastHero] = useState(false);
+  const [atFooter, setAtFooter] = useState(false);
   const buy = useBuyBundle(product);
   const price = product?.price ?? landingConfig.fallback.price;
   const name = product?.name ?? landingConfig.fallback.name;
-  const soldOut = product !== null && product.stock <= 0;
+  const { canBuy } = getAvailability(product);
 
   useEffect(() => {
     const cta = document.getElementById("hero-cta");
-    if (!cta) return;
-    const io = new IntersectionObserver(([entry]) => {
-      setVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0);
+    const footer = document.querySelector("footer");
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === cta) {
+          setPastHero(!entry.isIntersecting && entry.boundingClientRect.top < 0);
+        } else {
+          // The footer sits under the bar; the closing CTA above it has its own button
+          setAtFooter(entry.isIntersecting);
+        }
+      }
     });
-    io.observe(cta);
+    if (cta) io.observe(cta);
+    if (footer) io.observe(footer);
     return () => io.disconnect();
   }, []);
 
   return (
     <AnimatePresence>
-      {visible && !soldOut && (
+      {pastHero && !atFooter && canBuy && (
         <motion.div
           initial={{ y: "110%" }}
           animate={{ y: 0 }}

@@ -103,7 +103,7 @@ export function AccountOrderDetailClient({ order }: AccountOrderDetailClientProp
                   <tr key={item.id} className="border-b last:border-0">
                     <td className="py-3">
                       <Link
-                        href={`/shop/${item.productSlug}`}
+                        href="/"
                         className="font-medium text-primary hover:underline"
                       >
                         {item.productName}

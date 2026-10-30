@@ -1,10 +1,10 @@
 export const siteConfig = {
   name: "Kitvoy",
   description:
-    "Kitvoy — The cordless tire inflator that lives in your glovebox. Free US shipping, secure checkout and a 30-day money-back guarantee.",
+    "Shop the cordless tire inflator at Kitvoy. Free US shipping, secure checkout and a 30-day money-back guarantee.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ogImage: "/og.png",
-  // Favicon / app icon in /public
+  // Logo mark used in the header/footer (browser favicons live in src/app: icon.svg, favicon.ico, apple-icon.png)
   icon: "/kitvoy-icon.svg",
   links: {
     twitter: "https://twitter.com/kitvoy",

@@ -2,17 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
-import { ChevronRight, Menu, Search, ShoppingBag, User } from "lucide-react";
+import { ChevronRight, Menu, ShoppingBag } from "lucide-react";
 
 import { siteConfig } from "@/config/site";
 import { useLanguage } from "@/contexts/language-context";
 import { useCartStore } from "@/store/cart-store";
 import { useMounted } from "@/hooks/use-mounted";
 import { BrandLogo } from "@/components/layout/brand-logo";
-import { SearchDialog } from "@/components/layout/search-dialog";
 import { CartDrawer } from "@/components/layout/cart-drawer";
-import { SignInModal } from "@/components/layout/sign-in-modal";
-import { normalizeMediaSrc } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -22,41 +19,28 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-/** Landing-page sections (ids on the homepage) plus the full catalog. */
+/** Single-product store: every link points at a section of the sales page. */
 const NAV_LINKS = [
   { label: "How it works", href: "/#how" },
   { label: "Bundles", href: "/#bundles" },
   { label: "FAQ", href: "/#faq" },
-  { label: "Shop all", href: "/shop" },
 ];
 
 interface NavbarProps {
   announcementText?: string;
   announcementVisible?: boolean;
-  categories?: { name: string; slug: string }[];
-  isLoggedIn?: boolean;
-  customerImageUrl?: string | null;
 }
 
 const iconButton =
   "relative inline-flex size-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function Navbar({
-  announcementText,
-  announcementVisible = true,
-  categories = [],
-  isLoggedIn = false,
-  customerImageUrl = null,
-}: NavbarProps) {
+export function Navbar({ announcementText, announcementVisible = true }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [signInOpen, setSignInOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useLanguage();
   const mounted = useMounted();
   const itemCount = useCartStore((s) => s.getItemCount());
-  const avatar = normalizeMediaSrc(customerImageUrl);
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 8);
@@ -67,8 +51,6 @@ export function Navbar({
 
   const openCart = useCallback(() => setCartOpen(true), []);
   const closeCart = useCallback(() => setCartOpen(false), []);
-  const openSearch = useCallback(() => setSearchOpen(true), []);
-  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   useEffect(() => {
     const unsubscribe = useCartStore.subscribe((state, prevState) => {
@@ -91,7 +73,7 @@ export function Navbar({
       >
         {/* Announcement bar */}
         {announcementVisible && (
-          <div className="bg-ink text-[#FFFFFF]">
+          <div className="bg-ink text-white">
             <p className="container mx-auto flex h-8 items-center justify-center gap-2 px-4 text-center text-[11px] font-semibold uppercase tracking-[0.18em] sm:h-9 sm:text-xs">
               <span className="hidden size-1.5 shrink-0 rounded-full bg-brand sm:inline-block" />
               <span className="truncate">{announcementText || t("nav.announcement")}</span>
@@ -129,47 +111,8 @@ export function Navbar({
                       <ChevronRight className="size-4 text-muted-foreground" />
                     </Link>
                   ))}
-                  {categories.length > 0 && (
-                    <>
-                      <p className="mt-6 px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {t("nav.categories")}
-                      </p>
-                      {categories.map((cat) => (
-                        <Link
-                          key={cat.slug}
-                          href={`/shop?category=${cat.slug}`}
-                          onClick={() => setMenuOpen(false)}
-                          className="rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
-                        >
-                          {cat.name}
-                        </Link>
-                      ))}
-                    </>
-                  )}
                 </nav>
-                <div className="mt-auto space-y-2 p-4">
-                  {isLoggedIn ? (
-                    <Link
-                      href="/account"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold"
-                    >
-                      <User className="size-4" />
-                      {t("nav.account")}
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setSignInOpen(true);
-                      }}
-                      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold"
-                    >
-                      <User className="size-4" />
-                      Sign in
-                    </button>
-                  )}
+                <div className="mt-auto p-4">
                   <Link
                     href="/#bundles"
                     onClick={() => setMenuOpen(false)}
@@ -203,30 +146,7 @@ export function Navbar({
           </ul>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-            <button type="button" onClick={openSearch} className={iconButton} aria-label={t("nav.search")}>
-              <Search className="size-[19px]" />
-            </button>
-
-            {isLoggedIn ? (
-              <Link href="/account" className={cn(iconButton, "hidden sm:inline-flex")} aria-label={t("nav.account")}>
-                {avatar ? (
-                  <img src={avatar} alt="" className="size-[22px] rounded-full object-cover" />
-                ) : (
-                  <User className="size-[19px]" />
-                )}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSignInOpen(true)}
-                className={cn(iconButton, "hidden sm:inline-flex")}
-                aria-label="Sign in"
-              >
-                <User className="size-[19px]" />
-              </button>
-            )}
-
+          <div className="flex items-center justify-end gap-1">
             <button type="button" onClick={openCart} className={iconButton} aria-label={t("nav.cart")}>
               <ShoppingBag className="size-[19px]" />
               {mounted && itemCount > 0 && (
@@ -238,7 +158,7 @@ export function Navbar({
 
             <Link
               href="/#bundles"
-              className="ml-2 hidden h-10 items-center rounded-full bg-ink px-5 text-sm font-bold text-[#FFFFFF] transition-colors hover:bg-ink-soft lg:inline-flex"
+              className="ml-1 hidden h-10 items-center rounded-full bg-ink px-5 text-sm font-bold text-white transition-colors hover:bg-ink-soft lg:inline-flex"
             >
               Buy now
             </Link>
@@ -246,15 +166,7 @@ export function Navbar({
         </nav>
       </header>
 
-      <SearchDialog open={searchOpen} onClose={closeSearch} />
       <CartDrawer open={cartOpen} onClose={closeCart} />
-      {!isLoggedIn && (
-        <SignInModal
-          open={signInOpen}
-          onClose={() => setSignInOpen(false)}
-          redirectUrl="/shop"
-        />
-      )}
     </>
   );
 }

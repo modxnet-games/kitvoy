@@ -99,7 +99,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               <p className="text-sm text-muted-foreground">
                 {t("empty.cartTitle")}
               </p>
-              <Link href="/shop" onClick={onClose}>
+              <Link href="/" onClick={onClose}>
                 <Button variant="outline" size="sm">
                   {t("empty.continueShopping")}
                 </Button>
@@ -117,7 +117,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   />
                   <div className="min-w-0 flex-1">
                     <Link
-                      href={`/shop/${item.product.slug}`}
+                      href="/"
                       onClick={onClose}
                       className="text-[15px] font-medium hover:underline line-clamp-2 leading-snug"
                     >

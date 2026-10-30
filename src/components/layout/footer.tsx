@@ -1,44 +1,24 @@
-/* eslint-disable react/jsx-no-target-blank */
 "use client";
 
 import Link from "next/link";
-import {
-  Facebook,
-  Instagram,
-  MessageCircle,
-  Music2,
-} from "lucide-react";
+import { Facebook, Instagram, MessageCircle, Music2, RotateCcw, ShieldCheck, Truck } from "lucide-react";
 
 import { siteConfig } from "@/config/site";
-import { useLanguage } from "@/contexts/language-context";
-import { Separator } from "@/components/ui/separator";
 import { BrandLogo } from "@/components/layout/brand-logo";
 
-const footerLinks = {
-  shop: [
-    { key: "newArrivals", href: "/new-arrivals" },
-    { key: "bestSellers", href: "/best-sellers" },
-    { key: "sale", href: "/sale" },
-    { key: "collections", href: "/collections" },
-  ],
-  company: [
-    { key: "aboutUs", href: "/about" },
-    { key: "careers", href: "/careers" },
-    { key: "press", href: "/press" },
-    { key: "blog", href: "/blog" },
-  ],
-  support: [
-    { key: "contactUs", href: "/contact" },
-    { key: "shippingReturns", href: "/shipping" },
-    { key: "faq", href: "/faq" },
-    { key: "sizeGuide", href: "/size-guide" },
-  ],
-  legal: [
-    { key: "privacyPolicy", href: "/privacy" },
-    { key: "termsOfService", href: "/terms" },
-    { key: "cookiePolicy", href: "/cookies" },
-  ],
-};
+/** Only pages that exist: sections of the sales page plus order tracking. */
+const FOOTER_LINKS = [
+  { label: "How it works", href: "/#how" },
+  { label: "Bundles", href: "/#bundles" },
+  { label: "FAQ", href: "/#faq" },
+  { label: "Track my order", href: "/account/orders" },
+];
+
+const GUARANTEES = [
+  { icon: Truck, label: "Free US shipping" },
+  { icon: ShieldCheck, label: "Secure checkout" },
+  { icon: RotateCcw, label: "30-day money-back guarantee" },
+];
 
 type FooterSocialProps = {
   whatsappEnabled: boolean;
@@ -65,163 +45,80 @@ function buildWhatsappHref(link?: string, number?: string): string | null {
 }
 
 export function Footer({ social }: FooterProps) {
-  const { t } = useLanguage();
-
   const whatsappHref =
     social && social.whatsappEnabled
       ? buildWhatsappHref(social.whatsappLink, social.whatsappNumber)
       : null;
 
+  const socials = [
+    social?.facebookEnabled && social.facebookUrl && { href: social.facebookUrl, label: "Facebook", icon: Facebook },
+    social?.instagramEnabled && social.instagramUrl && { href: social.instagramUrl, label: "Instagram", icon: Instagram },
+    social?.tiktokEnabled && social.tiktokUrl && { href: social.tiktokUrl, label: "TikTok", icon: Music2 },
+    whatsappHref && { href: whatsappHref, label: "WhatsApp", icon: MessageCircle },
+  ].filter(Boolean) as { href: string; label: string; icon: typeof Facebook }[];
+
   return (
-    <footer className="border-t bg-muted/30">
-      <div className="container mx-auto px-4 py-12 md:py-16">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
-          {/* Brand */}
-          <div className="col-span-2 md:col-span-4 lg:col-span-1">
-            <Link href="/" className="inline-block">
+    <footer className="border-t bg-background">
+      <div className="container mx-auto px-4 py-12 md:py-14">
+        <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-xs">
+            <Link href="/" aria-label={`${siteConfig.name} home`}>
               <BrandLogo />
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              {siteConfig.description}
-            </p>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{siteConfig.description}</p>
           </div>
 
-          {/* Links */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider">
-              {t("footer.shop")}
-            </h3>
-            <ul className="mt-4 space-y-2.5">
-              {footerLinks.shop.map((link) => (
-                <li key={link.key}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {t(`footer.${link.key}`)}
+          <nav aria-label="Footer">
+            <ul className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm font-medium sm:flex sm:gap-8">
+              {FOOTER_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="text-foreground/75 transition-colors hover:text-foreground">
+                    {link.label}
                   </Link>
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider">
-              {t("footer.company")}
-            </h3>
-            <ul className="mt-4 space-y-2.5">
-              {footerLinks.company.map((link) => (
-                <li key={link.key}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {t(`footer.${link.key}`)}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider">
-              {t("footer.support")}
-            </h3>
-            <ul className="mt-4 space-y-2.5">
-              {footerLinks.support.map((link) => (
-                <li key={link.key}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {t(`footer.${link.key}`)}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          </nav>
         </div>
 
-        <Separator className="my-8" />
+        <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2 border-t pt-6 text-xs text-muted-foreground">
+          {GUARANTEES.map(({ icon: Icon, label }) => (
+            <li key={label} className="flex items-center gap-1.5">
+              <Icon className="size-4 text-brand" />
+              {label}
+            </li>
+          ))}
+        </ul>
 
-        <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+        <div className="mt-6 flex flex-col-reverse items-start justify-between gap-4 sm:flex-row sm:items-center">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} {siteConfig.name}.{" "}
-            {t("footer.allRightsReserved")}
+            &copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+            <span className="mx-2">·</span>
+            <a
+              href="https://oussamahitte.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-foreground"
+            >
+              Designed &amp; developed by oussamahitte.com
+            </a>
           </p>
-          <div className="flex items-center gap-6">
-            {/* Social icons */}
+          {socials.length > 0 && (
             <div className="flex items-center gap-3">
-              {social?.facebookEnabled && social.facebookUrl && (
-                <Link
-                  href={social.facebookUrl}
+              {socials.map(({ href, label, icon: Icon }) => (
+                <a
+                  key={label}
+                  href={href}
                   target="_blank"
                   rel="noreferrer"
-                  aria-label="Facebook"
+                  aria-label={label}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  <Facebook className="size-5" />
-                </Link>
-              )}
-              {social?.instagramEnabled && social.instagramUrl && (
-                <Link
-                  href={social.instagramUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Instagram"
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Instagram className="size-5" />
-                </Link>
-              )}
-              {social?.tiktokEnabled && social.tiktokUrl && (
-                <Link
-                  href={social.tiktokUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="TikTok"
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Music2 className="size-5" />
-                </Link>
-              )}
-              {whatsappHref && (
-                <Link
-                  href={whatsappHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="WhatsApp"
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <MessageCircle className="size-5" />
-                </Link>
-              )}
-            </div>
-
-            {/* Legal links */}
-            <div className="flex gap-4">
-              {footerLinks.legal.map((link) => (
-                <Link
-                  key={link.key}
-                  href={link.href}
-                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {t(`footer.${link.key}`)}
-                </Link>
+                  <Icon className="size-5" />
+                </a>
               ))}
             </div>
-          </div>
-
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          <a
-            href="https://oussamahitte.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="transition-colors hover:text-foreground"
-          >
-            Designed &amp; Developed by oussamahitte.com
-          </a>
-        </p>
+          )}
         </div>
       </div>
     </footer>

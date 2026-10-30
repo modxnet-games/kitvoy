@@ -15,7 +15,7 @@ import type { ProductDisplay } from "@/types/product";
 import type { ProgressRef } from "./scene/inflator-model";
 import { CountdownTimer } from "./countdown-timer";
 import { MagneticButton } from "./magnetic-button";
-import { useBuyBundle } from "./use-buy-bundle";
+import { getAvailability, useBuyBundle } from "./use-buy-bundle";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
@@ -53,6 +53,9 @@ const STEP_SPAN = (1 - STEPS_START) / 3;
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 const stepAt = (p: number) => (p < 0.5 ? 0 : p < 5 / 6 ? 1 : 2);
 
+/** A single early review reads as weak proof, so the rating waits for a few. */
+const MIN_REVIEWS_TO_SHOW = 5;
+
 interface ProductStoryProps {
   product: ProductDisplay | null;
 }
@@ -78,7 +81,7 @@ export function ProductStory({ product }: ProductStoryProps) {
 
   const price = product?.price ?? fallback.price;
   const compareAt = product ? product.compareAtPrice : fallback.compareAtPrice;
-  const soldOut = product !== null && product.stock <= 0;
+  const { canBuy, unavailableLabel } = getAvailability(product);
 
   // The pinned stage starts below the sticky site header, whose height differs per breakpoint
   useEffect(() => {
@@ -290,7 +293,7 @@ export function ProductStory({ product }: ProductStoryProps) {
               {hero.subtitle}
             </p>
 
-            {product && product.reviewCount > 0 && (
+            {product && product.reviewCount >= MIN_REVIEWS_TO_SHOW && (
               <div data-hero-item className="flex items-center gap-2 text-sm">
                 <span className="flex text-amber-400" aria-hidden>
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -315,8 +318,8 @@ export function ProductStory({ product }: ProductStoryProps) {
             </div>
 
             <div data-hero-item id="hero-cta" className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <MagneticButton onClick={() => buy(1)} disabled={soldOut} className="shrink-0 whitespace-nowrap sm:w-auto">
-                {soldOut ? "Sold out" : hero.cta}
+              <MagneticButton onClick={() => buy(1)} disabled={!canBuy} className="shrink-0 whitespace-nowrap sm:w-auto">
+                {canBuy ? hero.cta : unavailableLabel}
               </MagneticButton>
               <CountdownTimer label={countdown.label} endsAt={countdown.endsAt} tone="dark" />
             </div>

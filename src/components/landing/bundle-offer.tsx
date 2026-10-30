@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import type { ProductDisplay } from "@/types/product";
 import { LandingHeading } from "./landing-heading";
 import { MagneticButton } from "./magnetic-button";
-import { useBuyBundle } from "./use-buy-bundle";
+import { getAvailability, useBuyBundle } from "./use-buy-bundle";
 
 interface BundleOfferProps {
   product: ProductDisplay | null;
@@ -25,6 +25,7 @@ export function BundleOffer({ product }: BundleOfferProps) {
   const unitPrice = product?.price ?? fallback.price;
   const maxQty = product?.stock ?? Infinity;
   const total = getLineTotal(unitPrice, selected);
+  const { canBuy, unavailableLabel } = getAvailability(product);
 
   return (
     <section id="bundles" className="relative scroll-mt-24 overflow-hidden bg-ink py-16 text-white md:py-28">
@@ -100,21 +101,25 @@ export function BundleOffer({ product }: BundleOfferProps) {
         </div>
 
         <div data-reveal className="mx-auto mt-10 max-w-md">
-          <MagneticButton onClick={() => buy(selected)} disabled={selected > maxQty}>
-            <span className="inline-flex items-center gap-2">
-              {bundle.cta} ·
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={total}
-                  initial={{ y: 14, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -14, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Price value={total} />
-                </motion.span>
-              </AnimatePresence>
-            </span>
+          <MagneticButton onClick={() => buy(selected)} disabled={!canBuy || selected > maxQty}>
+            {!canBuy ? (
+              unavailableLabel
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                {bundle.cta} ·
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={total}
+                    initial={{ y: 14, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -14, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Price value={total} />
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+            )}
           </MagneticButton>
           <p className="mt-3 text-center text-xs text-zinc-500">
             Free US shipping on every bundle · 30-day money-back guarantee

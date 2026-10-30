@@ -9,7 +9,7 @@ import type { ProductDisplay } from "@/types/product";
 import { MagneticButton } from "./magnetic-button";
 import { LandingHeading } from "./landing-heading";
 import { TiltCard } from "./tilt-card";
-import { useBuyBundle } from "./use-buy-bundle";
+import { getAvailability, useBuyBundle } from "./use-buy-bundle";
 
 const BENEFIT_ICONS = [Gauge, Package, BatteryCharging, Flashlight];
 
@@ -96,7 +96,7 @@ export function Faq() {
 export function FinalCta({ product }: { product: ProductDisplay | null }) {
   const { finalCta } = landingConfig;
   const buy = useBuyBundle(product);
-  const soldOut = product !== null && product.stock <= 0;
+  const { canBuy, unavailableLabel } = getAvailability(product);
   return (
     <section className="relative overflow-hidden bg-ink-deep py-20 text-white md:py-32">
       <div className="pointer-events-none absolute left-1/2 top-1/2 size-[50vmax] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/20 blur-[140px] animate-glow" />
@@ -108,8 +108,8 @@ export function FinalCta({ product }: { product: ProductDisplay | null }) {
           {finalCta.subtitle}
         </p>
         <div data-reveal className="mx-auto mt-10 max-w-sm">
-          <MagneticButton onClick={() => buy(1)} disabled={soldOut}>
-            {soldOut ? "Sold out" : finalCta.cta}
+          <MagneticButton onClick={() => buy(1)} disabled={!canBuy}>
+            {canBuy ? finalCta.cta : unavailableLabel}
           </MagneticButton>
         </div>
         <p data-reveal className="mt-5 flex items-center justify-center gap-2 text-sm text-zinc-400">

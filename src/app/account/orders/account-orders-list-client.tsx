@@ -74,7 +74,7 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
           <div className="rounded-xl border bg-card p-12 text-center">
             <p className="text-muted-foreground">{t("account.orders.noOrders")}</p>
             <Link
-              href="/shop"
+              href="/"
               className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
             >
               {t("account.orders.continueShopping")}

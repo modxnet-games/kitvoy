@@ -42,7 +42,7 @@ function SuccessContent() {
         )}
         <div className="mt-8 flex justify-center">
           <Link
-            href="/shop"
+            href="/"
             className={buttonVariants({ size: "lg" })}
           >
             {t("order.continueShopping")}

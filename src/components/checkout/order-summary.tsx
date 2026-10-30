@@ -45,7 +45,7 @@ export function OrderSummary({ className }: OrderSummaryProps) {
             />
             <div className="min-w-0 flex-1">
               <Link
-                href={`/shop/${item.product.slug}`}
+                href="/"
                 className="font-medium hover:underline"
               >
                 {item.product.name}

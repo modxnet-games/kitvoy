@@ -50,7 +50,7 @@ function CartItemRow({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <Link
-              href={`/shop/${item.product.slug}`}
+              href="/"
               className="font-medium hover:underline"
             >
               {item.product.name}
@@ -131,7 +131,7 @@ export default function CartPage() {
           icon={ShoppingBag}
           title={t("empty.cartTitle")}
           description={t("empty.cartDescription")}
-          action={{ label: t("empty.continueShopping"), href: "/shop" }}
+          action={{ label: t("empty.continueShopping"), href: "/" }}
         />
       </div>
     );
@@ -216,7 +216,7 @@ export default function CartPage() {
               {t("cart.checkout")}
             </Link>
             <Link
-              href="/shop"
+              href="/"
               className={cn(
                 "mt-3 block text-center text-sm text-muted-foreground hover:text-foreground",
               )}

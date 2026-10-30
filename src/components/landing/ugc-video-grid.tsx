@@ -5,6 +5,9 @@ import { LandingHeading } from "./landing-heading";
 
 export function UgcVideoGrid() {
   const { ugc } = landingConfig;
+  const videos = ugc.videos.filter((v) => v.videoSrc);
+  // Hidden until real customer clips are added in config/landing.ts
+  if (videos.length === 0) return null;
 
   return (
     <section className="py-16 md:py-28">
@@ -14,7 +17,7 @@ export function UgcVideoGrid() {
 
       {/* Mobile: swipeable row. md+: staggered grid */}
       <div className="container mx-auto mt-10 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:mt-14 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden">
-        {ugc.videos.map((video, i) => (
+        {videos.map((video, i) => (
           <figure
             key={video.caption}
             data-reveal

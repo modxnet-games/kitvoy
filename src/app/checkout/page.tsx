@@ -56,7 +56,7 @@ export default function CheckoutPage() {
           icon={ShoppingBag}
           title={t("empty.checkoutTitle")}
           description={t("empty.checkoutDescription")}
-          action={{ label: t("empty.continueShopping"), href: "/shop" }}
+          action={{ label: t("empty.continueShopping"), href: "/" }}
         />
       </div>
     );

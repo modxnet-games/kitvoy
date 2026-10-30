@@ -33,6 +33,8 @@ export function AccountOrderDetailClient({ order }: AccountOrderDetailClientProp
 
   function canCancelOrder() {
     if (order.status === "CANCELED" || order.status === "DELIVERED") return false;
+    // Paid orders need a PayPal refund, so only the store can cancel them
+    if (order.paymentStatus === "paid") return false;
     if (order.status !== "PENDING" && order.status !== "CONFIRMED") return false;
     const createdAtMs = new Date(order.createdAt).getTime();
     if (!Number.isFinite(createdAtMs)) return false;
@@ -85,6 +87,10 @@ export function AccountOrderDetailClient({ order }: AccountOrderDetailClientProp
                   "You can cancel within the first 5 hours."}
               </span>
             </div>
+          )}
+
+          {order.paymentStatus === "paid" && order.fulfillmentStatus === "UNFULFILLED" && order.status !== "CANCELED" && (
+            <p className="mt-4 text-sm text-muted-foreground">{t("account.orders.cancel.paidNote")}</p>
           )}
         </div>
 

@@ -15,6 +15,7 @@ export function formatOrderReference(orderId: string): string {
 export type CustomerOrderListItem = {
   id: string;
   status: OrderStatus;
+  paymentStatus: string;
   total: number;
   currency: string;
   locale: string;

@@ -23,6 +23,7 @@ export type OrderRow = {
   reference: string;
   createdAt: Date;
   status: OrderStatus;
+  paymentStatus: string;
   total: number;
   itemCount: number;
 };
@@ -47,6 +48,8 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
 
   function canCancelOrder(order: OrderRow) {
     if (order.status === "CANCELED" || order.status === "DELIVERED") return false;
+    // Paid orders need a PayPal refund, so only the store can cancel them
+    if (order.paymentStatus === "paid") return false;
     if (order.status !== "PENDING" && order.status !== "CONFIRMED") return false;
 
     const createdAtMs = new Date(order.createdAt).getTime();

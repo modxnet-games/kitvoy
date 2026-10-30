@@ -226,6 +226,7 @@ export const en = {
         title: "Cancel order",
         short: "Cancel",
         withinFiveHours: "You can cancel within the first 5 hours after placing the order.",
+        paidNote: "Need to cancel? Paid orders can’t be canceled online. Contact us through your PayPal receipt and we’ll arrange a refund.",
         reference: "Order",
         message:
           "Cancellation is allowed only within the first 5 hours. After that, the order may already be processed.",
@@ -238,6 +239,7 @@ export const en = {
           ORDER_NOT_FOUND: "Order not found.",
           TOO_LATE: "Sorry, the cancellation window has passed.",
           NOT_ALLOWED: "This order can’t be canceled at this stage.",
+          PAID: "This order is already paid, so it can’t be canceled online. Contact us and we’ll arrange a refund.",
           ALREADY_CANCELED: "This order is already canceled.",
           CANCEL_FAILED: "Failed to cancel the order. Please try again.",
         },

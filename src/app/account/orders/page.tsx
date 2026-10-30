@@ -24,6 +24,7 @@ export default async function AccountOrdersPage() {
         reference: formatOrderReference(o.id),
         createdAt: o.createdAt,
         status: o.status,
+        paymentStatus: o.paymentStatus,
         total: o.total,
         itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
       }))}

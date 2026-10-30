@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
     const order = await prisma.order.findFirst({
       where: { id: orderId, userId: customer.userId },
-      select: { id: true, status: true, createdAt: true },
+      select: { id: true, status: true, createdAt: true, paymentStatus: true },
     });
 
     if (!order) {
@@ -44,6 +44,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Self-cancel doesn't refund PayPal, so paid orders go through the store owner
+    if (order.paymentStatus === "paid") {
+      return NextResponse.json({ error: "PAID" }, { status: 409 });
+    }
+
     if (!isCancellableStatus(order.status)) {
       return NextResponse.json(
         { error: "NOT_ALLOWED" },
@@ -51,10 +56,19 @@ export async function POST(request: Request) {
       );
     }
 
-    await prisma.order.update({
-      where: { id: order.id },
+    // Conditional update so a payment captured at the same moment can't be canceled
+    const { count } = await prisma.order.updateMany({
+      where: {
+        id: order.id,
+        userId: customer.userId,
+        paymentStatus: { not: "paid" },
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
       data: { status: "CANCELED" },
     });
+    if (count === 0) {
+      return NextResponse.json({ error: "PAID" }, { status: 409 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

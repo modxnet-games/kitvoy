@@ -29,7 +29,7 @@ function MainMedia({
         src={url}
         controls
         playsInline
-        className="size-full object-cover"
+        className="size-full object-contain p-2"
         preload="metadata"
         onError={onError}
       />
@@ -39,7 +39,7 @@ function MainMedia({
     <img
       src={url}
       alt={productName}
-      className="size-full object-cover"
+      className="size-full object-contain p-2"
       onError={onError}
       fetchPriority="high"
     />
@@ -64,7 +64,7 @@ function ThumbMedia({
         muted
         playsInline
         preload="metadata"
-        className="pointer-events-none size-full object-cover"
+        className="pointer-events-none size-full object-contain p-2"
         aria-hidden
       />
     );
@@ -73,7 +73,7 @@ function ThumbMedia({
     <img
       src={url}
       alt={`${productName} - image ${index + 1}`}
-      className="size-full object-cover"
+      className="size-full object-contain p-2"
     />
   );
 }

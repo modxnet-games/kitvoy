@@ -10,13 +10,9 @@ The brief intentionally supplies the warm palette, orange accents, and large hea
 
 Public product record read from https://kitvoy.com on October 30, 2026: cordless-tire-inflator, SKU INF-001, price $59.99, shippingTax $0, current stock 9. This is a dated reference, not a live inventory feed. Production rendering continues to read the database by slug. A missing product is unavailable; it no longer substitutes an unrelated featured clothing product.
 
-Authentic source images copied locally:
+Product photos come from CJdropshipping for the variant that ships (SKU CJYD218658003CX, vid 2411080301261619100, "Wired Wireless Black"), read through the CJ API on October 30, 2026. The product record holds three images in gallery order: the full kit photo, a detail of its display and controls, and a detail of its air hose and adapters (the details are cut from the same 800×800 supplier photo, upscaled 2×). `/kitvoy/inflator.jpg` is the same kit photo, used only when the product has no images.
 
-- `/kitvoy/inflator-front.png`: https://kitvoy.com/uploads/products/product-1793327823741-nqw5v8nj.png
-- `/kitvoy/inflator-detail.png`: https://kitvoy.com/uploads/products/product-1793327827741-advdzp7z.png
-- `/kitvoy/inflator-kit.png`: https://kitvoy.com/uploads/products/product-1793327831990-kd7g539e.png
-
-Only the first is displayed. The other supplier graphics have unsupported universal-compatibility and popularity claims embedded in them. Gallery detail views are CSS crops of the real first image, labeled as details; they are not new angles. No image generation was needed. Higher-resolution authentic photography and a clean real usage shot would improve the gallery.
+The earlier uploads (a different-looking inflator plus supplier graphics with embedded claims) are still on disk under /var/www/kitvoy-uploads/products but no longer linked. CJ's other photos carry marketing text or show the silver variant, so they aren't used. Images always display uncropped (object-fit: contain) on a tinted background, whatever their shape.
 
 ## Content decisions and outstanding business details
 

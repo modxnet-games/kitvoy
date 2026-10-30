@@ -20,7 +20,7 @@ try {
       details: "Digital pressure display\nFront-facing controls\nAir hose",
       price: 59.99, shippingTax: 0, compareAtPrice: null, rating: 0, reviewCount: 0,
       stock: 9, sku: "INF-PREVIEW", isFeatured: true, categoryId: category.id,
-      images: { create: [{ url: "/kitvoy/inflator-front.png", order: 0, alt: "Cordless tire inflator" }] },
+      images: { create: [{ url: "/kitvoy/inflator.jpg", order: 0, alt: "Cordless tire inflator" }] },
     } });
     console.log("Created kitvoy-local-preview in the local database. Existing products unchanged; no orders created.");
   }

@@ -49,14 +49,14 @@ export function ProductCard({ product, className }: ProductCardProps) {
               muted
               playsInline
               preload="metadata"
-              className="size-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
+              className="size-full object-contain p-2 transition-transform duration-700 ease-in-out group-hover:scale-105"
               aria-label={product.name}
             />
           ) : (
             <img
               src={primaryImageSrc}
               alt={product.name}
-              className="size-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
+              className="size-full object-contain p-2 transition-transform duration-700 ease-in-out group-hover:scale-105"
             />
           )
         ) : (

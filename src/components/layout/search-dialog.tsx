@@ -144,7 +144,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                             <img
                               src={r.image}
                               alt={r.name}
-                              className="size-full object-cover"
+                              className="size-full object-contain p-2"
                             />
                           ) : (
                             <div className="flex size-full items-center justify-center text-lg font-medium text-muted-foreground/40">

@@ -73,14 +73,14 @@ function MediaThumbnail({
             muted
             playsInline
             preload="metadata"
-            className="size-full object-cover"
+            className="size-full object-contain p-2"
             onError={() => setError(true)}
           />
         ) : (
           <img
             src={src}
             alt=""
-            className="size-full object-cover"
+            className="size-full object-contain p-2"
             onError={() => setError(true)}
           />
         )

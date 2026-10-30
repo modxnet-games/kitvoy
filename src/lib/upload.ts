@@ -4,7 +4,8 @@ import path from "path";
 /**
  * Uploads are stored on local disk under UPLOAD_DIR and served at /uploads/...
  * In production nginx serves UPLOAD_DIR directly (Next.js does not serve files
- * added to public/ after the build). Defaults to public/uploads for local dev.
+ * added to public/ after the build), and app/uploads/[...path] serves the same
+ * files to Next's image optimizer. Defaults to public/uploads for local dev.
  */
 const UPLOAD_DIR = path.resolve(
   process.env.UPLOAD_DIR?.trim() || path.join(process.cwd(), "public", "uploads"),
@@ -147,7 +148,7 @@ async function uploadToStorage(
 }
 
 /** Map a stored /uploads/... URL to its file on disk, or null if it isn't one. */
-function toUploadFilePath(fileUrl: string): string | null {
+export function toUploadFilePath(fileUrl: string): string | null {
   let pathname = fileUrl;
   try {
     pathname = new URL(fileUrl, "http://localhost").pathname;

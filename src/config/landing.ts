@@ -5,8 +5,9 @@
  * `productSlug` (falls back to the first featured product). Everything else on
  * the landing page is edited here.
  *
- * Product facts below (auto shut-off, USB-C, LED, included adapters, delivery
- * window) must match the supplier's spec sheet before you run traffic.
+ * Product facts must match the supplier-verified specs in config/seo.ts
+ * (80 W, ABS, digital pressure gauge, integrated LED, USB charging cable,
+ * 610 g) and policy terms must match config/policies.ts.
  */
 export const landingConfig = {
   productSlug: "cordless-tire-inflator",
@@ -22,7 +23,7 @@ export const landingConfig = {
     eyebrow: "The cordless tire inflator",
     title: "Low tire? Fix it from your glovebox.",
     subtitle:
-      "A rechargeable air pump that lives in your car. Set the PSI on the screen, press start, and it stops by itself when the tire hits your number.",
+      "A compact cordless inflator that lives in your car, with a digital pressure gauge, an integrated LED light and USB charging.",
     cta: "Get My Inflator",
     scrollHint: "Scroll to see it work",
   },
@@ -32,7 +33,7 @@ export const landingConfig = {
     {
       kicker: "Step 1",
       title: "Twist the hose onto the valve",
-      text: "The chuck threads onto any car, bike or motorcycle valve. Presta and ball-needle adapters ride in the case.",
+      text: "Attach the hose to a compatible tire valve, following the product instructions.",
     },
     {
       kicker: "Step 2",
@@ -41,8 +42,8 @@ export const landingConfig = {
     },
     {
       kicker: "Step 3",
-      title: "Press start, then watch it stop",
-      text: "It fills to your number and shuts itself off, so you can't overinflate the tire.",
+      title: "Press start and watch the gauge",
+      text: "The digital gauge shows the pressure as it climbs. Stop when it reaches your tire's recommended PSI.",
     },
   ],
 
@@ -58,9 +59,9 @@ export const landingConfig = {
 
   trust: [
     "Free US shipping on every order",
-    "30-day money-back guarantee",
-    "Secure checkout with card or PayPal",
-    "Tracked delivery to all 50 states",
+    "30-day returns on unused items",
+    "Secure checkout with PayPal",
+    "Tracked delivery to all 50 states and DC",
   ],
 
   benefits: {
@@ -68,8 +69,8 @@ export const landingConfig = {
     title: "Why it earns a spot in the car",
     items: [
       {
-        title: "Stops at your number",
-        text: "Dial in the PSI from your door sticker. The pump shuts off when the tire reaches it.",
+        title: "Pressure at a glance",
+        text: "The digital gauge shows the reading while you inflate, so you can match the PSI on your door sticker.",
       },
       {
         title: "Rides in the glovebox",
@@ -77,11 +78,11 @@ export const landingConfig = {
       },
       {
         title: "Charges like your phone",
-        text: "Top it up from the car, a laptop or a wall adapter with the USB-C cable in the box.",
+        text: "Recharge it with the included USB charging cable.",
       },
       {
         title: "Lights up roadside stops",
-        text: "The built-in LED has an SOS flash mode for a low tire after dark.",
+        text: "The integrated LED light helps with a low tire after dark.",
       },
     ],
   },
@@ -119,25 +120,25 @@ export const landingConfig = {
   faq: [
     {
       q: "How long does shipping take?",
-      a: "Every order ships free with tracking to all 50 states. Most arrive in 5–9 business days.",
+      a: "Every order ships free with tracking to all 50 states and DC. Orders process in 1–2 business days and arrive 4–9 business days after they ship.",
     },
     {
       q: "What if it doesn't work for my car?",
-      a: "You have 30 days to try it. If it doesn't fit your needs, contact support and we'll refund you.",
+      a: "Return unused items in their original packaging within 30 days of delivery for a refund. Damaged or defective items are replaced or fully refunded.",
     },
     {
       q: "Which valves does it fit?",
-      a: "Car and motorcycle (Schrader) valves out of the box. Presta and ball-needle adapters are included for bikes and sports balls.",
+      a: "Check your tire's valve type against the product manual before use. Email support@kitvoy.com if you need a particular adapter.",
     },
     {
       q: "Is checkout secure?",
-      a: "Payments go through Stripe and PayPal over an encrypted connection. Your card details never touch our servers.",
+      a: "Payments go through PayPal over an encrypted connection. Your card details never touch our servers.",
     },
   ],
 
   finalCta: {
     title: "Keep one in the car before the tire light comes on.",
-    subtitle: "Try it for 30 days. If it doesn't earn its glovebox spot, we'll refund you.",
+    subtitle: "Free US shipping, and 30-day returns on unused items.",
     cta: "Get My Inflator",
   },
 } as const;

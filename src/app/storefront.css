@@ -185,6 +185,15 @@
 .support-page section { border-top: 1px solid #e7e5df; padding-block: 28px; }
 .support-page h2 { font-weight: 650; font-size: 22px; }
 .support-page section p { color: #666a67; font-size: 14px; line-height: 1.8; margin-top: 15px; }
+.support-page section ul, .support-page section ol { color: #666a67; font-size: 14px; line-height: 1.8; margin-top: 15px; padding-left: 20px; }
+.support-page section ul { list-style: disc; }
+.support-page section ol { list-style: decimal; }
+.support-page section li + li { margin-top: 6px; }
+.support-page section strong { color: #171918; font-weight: 650; }
+.policy-updated { color: #666a67; font-size: 13px; margin-top: 12px; }
+.policy-page .support-intro { margin-top: 14px; }
+.policy-nav, .support-policy-links { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 18px; font-size: 14px; }
+.policy-nav { border-top: 1px solid #e7e5df; padding-top: 24px; }
 .checkout-page { max-width: 1120px; }
 .checkout-page h1 { font-size: 38px; letter-spacing: -.045em; }
 .checkout-progress { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 22px; color: #666a67; font-size: 12px; }

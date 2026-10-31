@@ -1,8 +1,10 @@
+import { storePolicies } from "@/config/policies";
 import { productSeo } from "@/config/seo";
 import { siteConfig } from "@/config/site";
 import type { ProductDisplay } from "@/types/product";
 
 const absolute = (path: string) => new URL(path, siteConfig.url).toString();
+const { shipping } = storePolicies;
 
 /** Brand entity: name, logo and (when published in Store settings) the support email. */
 export function organizationSchema(supportEmail?: string) {
@@ -12,6 +14,7 @@ export function organizationSchema(supportEmail?: string) {
     name: siteConfig.name,
     url: absolute("/"),
     logo: absolute("/apple-icon.png"),
+    hasMerchantReturnPolicy: returnPolicySchema(),
     ...(supportEmail
       ? {
           email: supportEmail,
@@ -62,16 +65,32 @@ export function productSchema(product: ProductDisplay) {
       availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
       seller: { "@id": absolute("/#organization") },
-      ...(freeShipping
-        ? {
-            shippingDetails: {
-              "@type": "OfferShippingDetails",
-              shippingRate: { "@type": "MonetaryAmount", value: 0, currency: siteConfig.currency },
-              shippingDestination: { "@type": "DefinedRegion", addressCountry: "US" },
-            },
-          }
-        : {}),
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        ...(freeShipping ? { shippingRate: { "@type": "MonetaryAmount", value: 0, currency: siteConfig.currency } } : {}),
+        shippingDestination: { "@type": "DefinedRegion", addressCountry: "US" },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          handlingTime: { "@type": "QuantitativeValue", minValue: shipping.processingDays.min, maxValue: shipping.processingDays.max, unitCode: "DAY" },
+          transitTime: { "@type": "QuantitativeValue", minValue: shipping.deliveryDays.min, maxValue: shipping.deliveryDays.max, unitCode: "DAY" },
+        },
+      },
+      hasMerchantReturnPolicy: returnPolicySchema(),
     },
+  };
+}
+
+/** The 30-day policy at /returns: unused items by mail; change-of-mind return shipping is the customer's. */
+export function returnPolicySchema() {
+  return {
+    "@type": "MerchantReturnPolicy",
+    url: absolute("/returns"),
+    applicableCountry: "US",
+    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+    merchantReturnDays: storePolicies.returns.windowDays,
+    returnMethod: "https://schema.org/ReturnByMail",
+    returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+    refundType: "https://schema.org/FullRefund",
   };
 }
 

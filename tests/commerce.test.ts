@@ -210,3 +210,23 @@ test("profit is confirmed only when every order has recorded costs, and empty da
   assert.equal(empty.today.revenue, 0);
   assert.deepEqual(empty.month.profit, { amount: 0, estimated: false, ordersWithEstimates: 0, productCost: 0, shippingCost: 0, paymentFees: 0, refundCosts: 0 });
 });
+
+test("FAQ, structured data and product copy state the published policies and only verified specs", async () => {
+  const { storefrontFaqs } = await import("../src/lib/storefront-faq");
+  const { productSchema, returnPolicySchema } = await import("../src/lib/seo/structured-data");
+  const { productSeo, verifiedProductCopy } = await import("../src/config/seo");
+  const faqs = storefrontFaqs(true).map(f => f.a).join(" ");
+  assert.match(faqs, /1–2 business days/);
+  assert.match(faqs, /4–9 business days/);
+  assert.match(faqs, /within 30 days of delivery/);
+  assert.match(faqs, /support@kitvoy\.com/);
+  assert.doesNotMatch(faqs, /not yet (been )?published/);
+
+  const offer = productSchema({ ...product, slug: "cordless-tire-inflator", sku: "INF-001", images: ["/uploads/a.jpg"] }).offers;
+  assert.deepEqual([offer.shippingDetails.deliveryTime.handlingTime.minValue, offer.shippingDetails.deliveryTime.handlingTime.maxValue], [1, 2]);
+  assert.deepEqual([offer.shippingDetails.deliveryTime.transitTime.minValue, offer.shippingDetails.deliveryTime.transitTime.maxValue], [4, 9]);
+  assert.equal(returnPolicySchema().merchantReturnDays, 30);
+
+  const unverified = /usb-c|\bsos\b|shut(s)? (itself )?off|stops by itself|auto(matic)?[ -]?(shut|stop)|presta|ball-needle/i;
+  for (const text of [productSeo.summary, productSeo.description, ...Object.values(verifiedProductCopy)]) assert.doesNotMatch(text, unverified);
+});

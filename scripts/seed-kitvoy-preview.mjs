@@ -15,9 +15,10 @@ try {
     const category = await prisma.category.upsert({ where: { slug: "car-accessories" }, create: { slug: "car-accessories", name: "Car Accessories" }, update: {} });
     await prisma.product.create({ data: {
       id: "kitvoy-local-preview", slug: "cordless-tire-inflator", name: "Cordless Tire Inflator",
-      shortDescription: "A cordless inflator with a digital display and air hose.",
-      description: "Local review fixture based on the public Kitvoy product listing retrieved October 30, 2026. Not a production stock record.",
-      details: "Digital pressure display\nFront-facing controls\nAir hose",
+      // Same verified copy as src/config/seo.ts (verifiedProductCopy)
+      shortDescription: "A compact cordless tire inflator with a digital pressure gauge, an integrated LED light and USB charging.",
+      description: "Keep a compact tire inflator in the car for low-pressure mornings. The digital pressure gauge shows the reading while you inflate, the integrated LED light helps at night, and it recharges with the included USB charging cable. 80 W of power in an ABS housing that weighs just 610 g.",
+      details: "• 80 W power\n• ABS housing\n• Digital pressure gauge\n• Integrated LED light\n• USB charging cable\n• Compact 610 g weight",
       price: 59.99, shippingTax: 0, compareAtPrice: null, rating: 0, reviewCount: 0,
       stock: 9, sku: "INF-PREVIEW", isFeatured: true, categoryId: category.id,
       images: { create: [{ url: "/kitvoy/inflator.jpg", order: 0, alt: "Cordless tire inflator" }] },

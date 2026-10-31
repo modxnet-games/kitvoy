@@ -1,4 +1,5 @@
 import { landingConfig } from "@/config/landing";
+import { deliveryText, processingText, storePolicies } from "@/config/policies";
 import { productSeo } from "@/config/seo";
 import { siteConfig } from "@/config/site";
 import { getBundleSavings, getLineTotal } from "@/lib/bundles";
@@ -41,9 +42,21 @@ export async function GET() {
     );
   }
 
-  lines.push("## Help", "", `- [Help, shipping & contact](${url("/support")})`);
-  if (settings?.supportEmail) lines.push(`- Support email: ${settings.supportEmail}`);
-  lines.push("");
+  const { shipping, returns } = storePolicies;
+  lines.push(
+    "## Policies",
+    "",
+    `- [Shipping policy](${url("/shipping")}): free to ${shipping.destinations}; processed in ${processingText}; delivered ${deliveryText} after shipping (${shipping.carrier}, tracked)`,
+    `- [Returns & refunds](${url("/returns")}): unused items in original packaging within ${returns.windowDays} days of delivery; damaged or defective items replaced or fully refunded`,
+    `- [Privacy policy](${url("/privacy")})`,
+    `- [Terms of service](${url("/terms")})`,
+    "",
+    "## Help",
+    "",
+    `- [Help & information](${url("/support")})`,
+    `- Support email: ${settings?.supportEmail || storePolicies.supportEmail}`,
+    "",
+  );
 
   return new Response(lines.join("\n"), {
     headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" },

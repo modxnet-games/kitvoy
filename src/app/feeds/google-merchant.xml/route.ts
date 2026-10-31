@@ -1,10 +1,12 @@
 import { landingConfig } from "@/config/landing";
+import { storePolicies } from "@/config/policies";
 import { productSeo } from "@/config/seo";
 import { siteConfig } from "@/config/site";
 import { getProductBySlug } from "@/lib/data/products";
 
 export const dynamic = "force-dynamic";
 
+const { shipping } = storePolicies;
 const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /**
@@ -33,6 +35,10 @@ ${product.images.slice(1, 10).map((src) => `      <g:additional_image_link>${xml
       <g:shipping>
         <g:country>US</g:country>
         <g:price>${(product.shippingTax ?? 0).toFixed(2)} ${siteConfig.currency}</g:price>
+        <g:min_handling_time>${shipping.processingDays.min}</g:min_handling_time>
+        <g:max_handling_time>${shipping.processingDays.max}</g:max_handling_time>
+        <g:min_transit_time>${shipping.deliveryDays.min}</g:min_transit_time>
+        <g:max_transit_time>${shipping.deliveryDays.max}</g:max_transit_time>
       </g:shipping>
     </item>`
     : "";

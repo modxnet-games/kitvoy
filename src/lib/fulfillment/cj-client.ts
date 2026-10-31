@@ -107,6 +107,20 @@ export interface CjOrderDetail {
   orderStatus?: string;
   trackNumber?: string | null;
   logisticName?: string | null;
+  /** What CJ charges, in USD */
+  productAmount?: number | null;
+  postageAmount?: number | null;
+}
+
+/** CJ's charges from an order detail, as Order fields; empty when CJ didn't report them. */
+export function cjCostFields(detail: CjOrderDetail | null | undefined) {
+  const amount = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined);
+  const product = amount(detail?.productAmount);
+  const shipping = amount(detail?.postageAmount);
+  return {
+    ...(product !== undefined ? { supplierProductCost: product } : {}),
+    ...(shipping !== undefined ? { supplierShippingCost: shipping } : {}),
+  };
 }
 
 /** Looks an order up by CJ order id or by our own order number. */

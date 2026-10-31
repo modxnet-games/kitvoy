@@ -138,10 +138,15 @@ model Order {
   paymentStatus     String            @default("unpaid")
   /// Stripe PaymentIntent id or PayPal order id
   paymentRef        String?
+  /// The payment provider's fee for this order (PayPal capture fee); null until recorded
+  paymentFee        Float?
   /// Supplier (CJdropshipping) order id once fulfillment has been triggered
   fulfillmentRef    String?
   /// Supplier's own order status, e.g. CJ's CREATED, UNPAID, UNSHIPPED, SHIPPED
   supplierStatus    String?
+  /// What CJ charges for the goods and for shipping this order; null until recorded
+  supplierProductCost  Float?
+  supplierShippingCost Float?
   /// Why automatic fulfillment needs attention (shown in admin); null when fine
   fulfillmentError  String?
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)

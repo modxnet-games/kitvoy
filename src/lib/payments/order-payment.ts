@@ -45,11 +45,11 @@ export async function orderHasStock(orderId: string): Promise<boolean> {
  * false when it was already paid (duplicate capture or webhook), so callers
  * only notify and fulfill once.
  */
-export async function completePaidOrder(orderId: string, paymentRef: string): Promise<boolean> {
+export async function completePaidOrder(orderId: string, paymentRef: string, paymentFee?: number): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
     const { count } = await tx.order.updateMany({
       where: { id: orderId, paymentStatus: { not: "paid" } },
-      data: { paymentStatus: "paid", paymentRef, status: "CONFIRMED" },
+      data: { paymentStatus: "paid", paymentRef, status: "CONFIRMED", ...(paymentFee !== undefined ? { paymentFee } : {}) },
     });
     if (count === 0) return false;
 

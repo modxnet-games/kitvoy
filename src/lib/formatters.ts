@@ -15,7 +15,7 @@ export function formatPrice(price: number): string {
  * the browser agree; formatting in the viewer's local zone causes hydration
  * mismatches and shifts dates across midnight.
  */
-const STORE_TIME_ZONE = "America/New_York";
+export const STORE_TIME_ZONE = "America/New_York";
 
 /** Format a date for US display (e.g. "Oct 29, 2026") */
 export function formatDate(date: Date | string): string {

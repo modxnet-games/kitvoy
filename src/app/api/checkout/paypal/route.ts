@@ -10,7 +10,13 @@ import {
 } from "@/lib/payments/order-payment";
 import { getPayPal, paypal } from "@/lib/payments/paypal";
 
-type PayPalCapture = { id?: string; status?: string; amount?: { value?: string; currency_code?: string } };
+type PayPalMoney = { value?: string; currency_code?: string };
+type PayPalCapture = {
+  id?: string;
+  status?: string;
+  amount?: PayPalMoney;
+  seller_receivable_breakdown?: { paypal_fee?: PayPalMoney };
+};
 type PayPalOrderResult = {
   id?: string;
   status?: string;
@@ -126,8 +132,9 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "PAYMENT_NOT_COMPLETED" }, { status: 402 });
     }
 
-    // Store the capture id: it's what a refund in PayPal needs
-    if (await completePaidOrder(order.id, capture.id ?? paypalOrderId)) {
+    // Store the capture id: it's what a refund in PayPal needs. The fee feeds the profit figures.
+    const fee = Number(capture.seller_receivable_breakdown?.paypal_fee?.value);
+    if (await completePaidOrder(order.id, capture.id ?? paypalOrderId, Number.isFinite(fee) ? fee : undefined)) {
       // Don't make the customer wait on email/push; the server keeps running
       void afterOrderPaid(order.id);
     }

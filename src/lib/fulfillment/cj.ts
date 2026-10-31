@@ -4,7 +4,7 @@ import { isCjSandbox } from "@/config/fulfillment";
 import { formatOrderReference, updateOrderFulfillment } from "@/lib/data/admin-orders";
 import { prisma } from "@/lib/db";
 import type { ShippingAddress } from "@/lib/us-address";
-import { CJ_CODES, CjError, cjRequest, describeCjError, getCjBalance, getCjOrder, payCjOrder } from "./cj-client";
+import { CJ_CODES, CjError, cjCostFields, cjRequest, describeCjError, getCjBalance, getCjOrder, payCjOrder } from "./cj-client";
 import { buildCjOrderPayload, CJ_PAID_STATUSES, CJ_UNPAID_STATUSES } from "./cj-order";
 import { emailCustomerIfShipped, type CustomerEmailResult } from "./shipping-email";
 
@@ -35,6 +35,7 @@ export async function sendOrderToCj(orderId: string): Promise<CjSendResult> {
   try {
     let cjOrderId = order.fulfillmentRef;
     let status = order.supplierStatus ?? "CREATED";
+    let costs: ReturnType<typeof cjCostFields> = {};
 
     if (!cjOrderId) {
       // With no balance, only create the order so it's waiting in CJ to be paid
@@ -67,6 +68,7 @@ export async function sendOrderToCj(orderId: string): Promise<CjSendResult> {
         const detail = await getCjOrder(created.orderId).catch(() => null);
         cjOrderId = detail?.orderId ?? created.orderId;
         status = detail?.orderStatus ?? created.orderStatus ?? status;
+        costs = cjCostFields(detail);
       } catch (err) {
         // Already created (a retry after a timeout, or created but not paid):
         // pick the existing CJ order up by our order number
@@ -76,11 +78,13 @@ export async function sendOrderToCj(orderId: string): Promise<CjSendResult> {
         if (!existing) throw err;
         cjOrderId = existing.orderId;
         status = existing.orderStatus ?? status;
+        costs = cjCostFields(existing);
       }
       await saveState(order.id, {
         fulfillmentRef: cjOrderId,
         supplierStatus: sandbox ? CJ_SANDBOX_STATUS : status,
         fulfillmentError: null,
+        ...costs,
       });
     }
 
@@ -146,6 +150,7 @@ export async function syncCjOrder(orderId: string): Promise<CjSyncOrderResult> {
     await saveState(order.id, {
       supplierStatus: status ?? null,
       fulfillmentError,
+      ...cjCostFields(detail),
       ...(status && CJ_PAID_STATUSES.has(status) && order.status === "CONFIRMED" ? { status: "PREPARING" } : {}),
     });
 

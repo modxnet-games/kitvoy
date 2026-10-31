@@ -16,6 +16,23 @@ export async function registerAdminDevice(token: unknown, platform: unknown) {
   return { ok: true as const, device: { id: device.id, platform: device.platform, lastSeenAt: device.lastSeenAt } };
 }
 
+/** Whether this phone's token is registered, and how many phones get sale pushes. */
+export async function getAdminDeviceStatus(token: unknown) {
+  const device =
+    typeof token === "string" && TOKEN_RE.test(token)
+      ? await prisma.adminDevice.findUnique({
+          where: { token },
+          select: { platform: true, createdAt: true, lastSeenAt: true },
+        })
+      : null;
+  return {
+    registered: Boolean(device),
+    device,
+    devices: await prisma.adminDevice.count(),
+    pushConfigured: isFcmConfigured(),
+  };
+}
+
 export async function removeAdminDevice(token: unknown) {
   if (typeof token !== "string") return 0;
   return (await prisma.adminDevice.deleteMany({ where: { token } })).count;

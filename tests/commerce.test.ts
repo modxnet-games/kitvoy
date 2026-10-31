@@ -10,6 +10,7 @@ import { buildCustomerMessageEmail } from "../src/lib/email";
 import { validateAdminEmail } from "../src/lib/data/sent-emails";
 import { buildSaleMessage } from "../src/lib/push/fcm";
 import { salePush } from "../src/lib/push/admin-devices";
+import { computeSalesOverview, type SalesOrder } from "../src/lib/data/sales-overview";
 
 const product: ProductDisplay = { id: "unit-test", slug: "inflator", name: "Inflator", shortDescription: "", description: "", details: "", price: 59.99, shippingTax: 0, rating: 0, reviewCount: 0, stock: 9, sku: "TEST", isFeatured: false, category: { id: "test", slug: "test", name: "Test" }, images: [] };
 const valid: CheckoutDetails = { email: "test@example.com", fullName: "Test Customer", phone: "2025550143", address1: "123 Test St", address2: "", city: "Washington", state: "DC", zip: "20001", paymentMethod: "paypal" };
@@ -153,4 +154,59 @@ test("sale push rings the kitvoy_sales channel with the custom sound at high pri
   assert.equal(message.apns.payload.aps.sound, "notification.wav");
   assert.ok(Object.values(message.data).every(v => typeof v === "string"));
   assert.equal(salePush({ id: "x", reference: "KTV-1", customerName: "A", total: 59.99, itemCount: 1 }).body, "KTV-1 · A · 1 item");
+});
+
+// Saturday Oct 31 2026, noon in New York
+const salesNow = new Date("2026-10-31T16:00:00Z");
+const sale = (o: Partial<SalesOrder> & { createdAt: Date }): SalesOrder => ({
+  total: 59.99, status: "CONFIRMED", paymentStatus: "paid", paymentFee: null, supplierStatus: null,
+  supplierProductCost: null, supplierShippingCost: null, items: [{ productSlug: "cordless-tire-inflator", quantity: 1 }], ...o,
+});
+
+test("sales overview uses store days, the Mon–Sun week, same-day comparison and paid orders only", () => {
+  const overview = computeSalesOverview([
+    sale({ createdAt: new Date("2026-10-31T14:00:00Z"), paymentFee: 2.58, supplierProductCost: 12.94, supplierShippingCost: 15.32 }),
+    // 23:30 Wednesday in New York, already Thursday in UTC
+    sale({ createdAt: new Date("2026-10-29T03:30:00Z"), total: 101.98, items: [{ productSlug: "cordless-tire-inflator", quantity: 2 }] }),
+    sale({ createdAt: new Date("2026-10-26T12:00:00Z"), status: "CANCELED" }),
+    sale({ createdAt: new Date("2026-10-27T12:00:00Z"), paymentStatus: "refunded", paymentFee: 2.58, supplierStatus: "UNSHIPPED", supplierProductCost: 12.94, supplierShippingCost: 15.32 }),
+    sale({ createdAt: new Date("2026-10-30T12:00:00Z"), paymentStatus: "unpaid" }),
+    sale({ createdAt: new Date("2026-10-20T15:00:00Z") }),
+    // Last Sunday: in the month, but not one of the days compared so far this week
+    sale({ createdAt: new Date("2026-10-25T15:00:00Z") }),
+    sale({ createdAt: new Date("2026-09-30T15:00:00Z") }),
+  ], salesNow);
+
+  assert.deepEqual(overview.today, { date: "2026-10-31", revenue: 59.99, orders: 1 });
+  assert.equal(overview.week.start, "2026-10-26");
+  assert.equal(overview.week.end, "2026-11-01");
+  assert.deepEqual(overview.week.days.map(d => d.revenue), [0, 0, 101.98, 0, 0, 59.99, null]);
+  assert.deepEqual(overview.week.days.map(d => d.label), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+  assert.equal(overview.week.revenue, 161.97);
+  assert.equal(overview.week.orders, 2);
+  assert.equal(overview.week.previousRevenue, 59.99);
+  assert.ok(Math.abs(overview.week.changePercent! - 170) <= 0.1);
+
+  assert.equal(overview.month.label, "October 2026");
+  assert.equal(overview.month.revenue, 281.95);
+  assert.equal(overview.month.orders, 4);
+  // 5 units at $12.94; shipping 15.32 recorded + 28.24 (2 units) + 2 × 15.32 estimated; fees 2.58 recorded + 4.05 + 2.58 + 2.58
+  assert.deepEqual(overview.month.profit, {
+    amount: 100.42, estimated: true, ordersWithEstimates: 3,
+    productCost: 64.7, shippingCost: 74.2, paymentFees: 11.79, refundCosts: 30.84,
+  });
+});
+
+test("profit is confirmed only when every order has recorded costs, and empty data is all zeros", () => {
+  const recorded = computeSalesOverview([
+    sale({ createdAt: new Date("2026-10-31T14:00:00Z"), paymentFee: 2.39, supplierProductCost: 12.94, supplierShippingCost: 15.32 }),
+  ], salesNow);
+  assert.equal(recorded.month.profit.estimated, false);
+  assert.equal(recorded.month.profit.amount, 29.34);
+
+  const empty = computeSalesOverview([], salesNow);
+  assert.deepEqual(empty.week.days.map(d => d.revenue), [0, 0, 0, 0, 0, 0, null]);
+  assert.equal(empty.week.changePercent, null);
+  assert.equal(empty.today.revenue, 0);
+  assert.deepEqual(empty.month.profit, { amount: 0, estimated: false, ordersWithEstimates: 0, productCost: 0, shippingCost: 0, paymentFees: 0, refundCosts: 0 });
 });

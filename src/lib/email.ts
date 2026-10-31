@@ -1,4 +1,6 @@
-import { formatPrice } from "@/lib/formatters";
+import { ADMIN_SENDERS } from "@/config/mail-senders";
+import { deliveryText, processingText, storePolicies } from "@/config/policies";
+import { formatPrice, STORE_TIME_ZONE } from "@/lib/formatters";
 import nodemailer from "nodemailer";
 
 /** Recipient for new order notifications. */
@@ -340,6 +342,133 @@ export async function sendShippingConfirmation(
     console.error("[email] Failed to send shipping confirmation:", message);
     return { sent: false, reason: message };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Customer order confirmation (sent once the payment is captured)    */
+/* ------------------------------------------------------------------ */
+
+export interface OrderConfirmationPayload {
+  to: string;
+  customerName: string;
+  orderReference: string;
+  orderDate: Date;
+  items: { productName: string; quantity: number; lineTotal: number }[];
+  subtotal: number;
+  shippingCost: number;
+  total: number;
+  paymentMethod?: string | null;
+  shipTo: string[];
+}
+
+/**
+ * Emails the customer their receipt from orders@kitvoy.com, with replies going
+ * to support. Needs SMTP_* only. Never throws.
+ */
+export async function sendOrderConfirmation(
+  p: OrderConfirmationPayload,
+): Promise<{ sent: true } | { sent: false; reason: string }> {
+  const transport = getTransport();
+  if (!transport) return { sent: false, reason: "SMTP is not configured (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)" };
+
+  const { subject, text, html } = buildOrderConfirmationEmail(p);
+  try {
+    await transport.sendMail({
+      from: { name: ADMIN_SENDERS.orders.name, address: ADMIN_SENDERS.orders.email },
+      replyTo: { name: ADMIN_SENDERS.support.name, address: ADMIN_SENDERS.support.email },
+      to: p.to,
+      subject,
+      text,
+      html,
+    });
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[email] Failed to send order confirmation:", message);
+    return { sent: false, reason: message };
+  }
+}
+
+/** Subject, plain text and HTML for the order confirmation (no sending). */
+export function buildOrderConfirmationEmail(p: OrderConfirmationPayload): { subject: string; text: string; html: string } {
+  const storeName = "Kitvoy";
+  const firstName = p.customerName.trim().split(/\s+/)[0] || "there";
+  const subject = `Your ${storeName} order ${p.orderReference} is confirmed`;
+  const shipping = p.shippingCost > 0 ? formatPrice(p.shippingCost) : "Free";
+  const { carrier } = storePolicies.shipping;
+  const timeline = `We'll process your order within ${processingText}. Once it ships, delivery usually takes ${deliveryText} with ${carrier}, and we'll email you the tracking number.`;
+  const date = p.orderDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: STORE_TIME_ZONE });
+
+  const text = [
+    `Hi ${firstName},`,
+    "",
+    `Thanks for your order. Your payment went through and order ${p.orderReference} is confirmed.`,
+    "",
+    `Order: ${p.orderReference}`,
+    `Date: ${date}`,
+    "",
+    "Items:",
+    ...p.items.map((i) => `  ${i.quantity} × ${i.productName}  ${formatPrice(i.lineTotal)}`),
+    "",
+    `Subtotal: ${formatPrice(p.subtotal)}`,
+    `Shipping: ${shipping}`,
+    `Total paid: ${formatPrice(p.total)} (${paymentLabel(p.paymentMethod)})`,
+    "",
+    "Shipping to:",
+    ...p.shipTo.map((l) => `  ${l}`),
+    "",
+    "What happens next",
+    timeline,
+    "",
+    `Questions, or need to change something? Reply to this email or write to ${storePolicies.supportEmail}.`,
+    "",
+    `— ${storeName}`,
+  ].join("\n");
+
+  const ink = "#0B0B0F";
+  const muted = "#5A5A66";
+  const line = "#E7E7EC";
+  const cell = `padding:10px 0;border-bottom:1px solid ${line};font-size:14px;`;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background:#F4F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
+        <tr><td style="background:${ink};padding:20px 28px;color:#FFFFFF;font-size:20px;font-weight:800;">${storeName}</td></tr>
+        <tr><td style="padding:28px;">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:800;">Thanks for your order</p>
+          <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:${muted};">Hi ${escapeHtml(firstName)}, your payment went through and your order is confirmed.</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;border-radius:10px;">
+            <tr><td style="padding:16px 18px;">
+              <p style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${muted};">Order</p>
+              <p style="margin:4px 0 0;font-size:18px;font-weight:700;font-family:Consolas,Monaco,monospace;">${escapeHtml(p.orderReference)}</p>
+              <p style="margin:4px 0 0;font-size:13px;color:${muted};">${escapeHtml(date)}</p>
+            </td></tr>
+          </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0;">
+${p.items
+  .map((i) => `            <tr><td style="${cell}">${i.quantity} × ${escapeHtml(i.productName)}</td><td align="right" style="${cell}white-space:nowrap;">${formatPrice(i.lineTotal)}</td></tr>`)
+  .join("\n")}
+            <tr><td style="${cell}color:${muted};">Subtotal</td><td align="right" style="${cell}">${formatPrice(p.subtotal)}</td></tr>
+            <tr><td style="${cell}color:${muted};">Shipping</td><td align="right" style="${cell}">${escapeHtml(shipping)}</td></tr>
+            <tr><td style="padding:12px 0 0;font-size:16px;font-weight:800;">Total paid</td><td align="right" style="padding:12px 0 0;font-size:16px;font-weight:800;white-space:nowrap;">${formatPrice(p.total)}</td></tr>
+            <tr><td colspan="2" style="padding:4px 0 0;font-size:12px;color:${muted};">Paid with ${escapeHtml(paymentLabel(p.paymentMethod))}</td></tr>
+          </table>
+          <p style="margin:24px 0 6px;font-size:13px;font-weight:700;">Shipping to</p>
+          <p style="margin:0 0 18px;font-size:14px;line-height:1.5;color:${muted};">${p.shipTo.map(escapeHtml).join("<br>")}</p>
+          <p style="margin:0 0 6px;font-size:13px;font-weight:700;">What happens next</p>
+          <p style="margin:0 0 18px;font-size:14px;line-height:1.5;color:${muted};">${escapeHtml(timeline)}</p>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:${muted};">Questions, or need to change something? Reply to this email or write to <a href="mailto:${storePolicies.supportEmail}" style="color:${ink};">${storePolicies.supportEmail}</a>.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject, text, html };
 }
 
 /* ------------------------------------------------------------------ */

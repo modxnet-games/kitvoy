@@ -140,6 +140,8 @@ model Order {
   paymentRef        String?
   /// The payment provider's fee for this order (PayPal capture fee); null until recorded
   paymentFee        Float?
+  /// When the customer's order confirmation email was claimed for sending; set once, so it never goes out twice
+  confirmationEmailSentAt DateTime?
   /// Supplier (CJdropshipping) order id once fulfillment has been triggered
   fulfillmentRef    String?
   /// Supplier's own order status, e.g. CJ's CREATED, UNPAID, UNSHIPPED, SHIPPED

@@ -3,6 +3,7 @@ import { sendOrderNotification } from "@/lib/email";
 import { isCjConfigured } from "@/config/fulfillment";
 import { sendOrderToCj } from "@/lib/fulfillment/cj";
 import { recordFulfillment, sendOrderToZendrop } from "@/lib/fulfillment/zendrop";
+import { deliverOrderConfirmation } from "@/lib/order-confirmation";
 import { notifyAdminDevices } from "@/lib/push/admin-devices";
 import { validateStockForCheckout } from "@/lib/stock";
 
@@ -66,14 +67,19 @@ export async function completePaidOrder(orderId: string, paymentRef: string, pay
 }
 
 /**
- * Everything that happens once money is in: owner email, admin push, and the
- * fulfillment hand-off. Each step is best-effort and never throws, because the
- * customer has already paid.
+ * Everything that happens once money is in: customer confirmation, owner
+ * email, admin push, and the fulfillment hand-off. Each step is best-effort
+ * and never throws, because the customer has already paid.
  */
 export async function afterOrderPaid(orderId: string): Promise<void> {
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return;
   const reference = orderReference(order.id);
+
+  // Runs alongside the rest so its SMTP retries never hold up the push or CJ
+  void deliverOrderConfirmation(order.id).then((r) => {
+    if (!r.sent) console.warn(`[orders] ${reference} confirmation email not sent: ${r.reason}`);
+  });
 
   try {
     const email = await sendOrderNotification({

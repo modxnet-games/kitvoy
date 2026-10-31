@@ -230,3 +230,78 @@ test("FAQ, structured data and product copy state the published policies and onl
   const unverified = /usb-c|\bsos\b|shut(s)? (itself )?off|stops by itself|auto(matic)?[ -]?(shut|stop)|presta|ball-needle/i;
   for (const text of [productSeo.summary, productSeo.description, ...Object.values(verifiedProductCopy)]) assert.doesNotMatch(text, unverified);
 });
+
+const confirmationPayload = {
+  to: "sam@example.com", customerName: "Sam <script>Lee</script>", orderReference: "KTV-ABCD1234",
+  orderDate: new Date("2026-11-01T15:00:00Z"),
+  items: [{ productName: "Cordless Tire Inflator", quantity: 2, lineTotal: 101.98 }],
+  subtotal: 101.98, shippingCost: 0, total: 101.98, paymentMethod: "paypal",
+  shipTo: ["Sam Lee", "123 Test St, Apt 4", "Washington, DC 20001"],
+};
+
+test("order confirmation email shows the reference, items, total, address and delivery timeline, escaped", async () => {
+  const { buildOrderConfirmationEmail } = await import("../src/lib/email");
+  const { subject, text, html } = buildOrderConfirmationEmail(confirmationPayload);
+  assert.equal(subject, "Your Kitvoy order KTV-ABCD1234 is confirmed");
+  for (const body of [text, html]) {
+    assert.match(body, /KTV-ABCD1234/);
+    assert.match(body, /2 × Cordless Tire Inflator/);
+    assert.match(body, /\$101\.98/);
+    assert.match(body, /Washington, DC 20001/);
+    assert.match(body, /1–2 business days/);
+    assert.match(body, /4–9 business days with CJPacket/);
+    assert.match(body, /support@kitvoy\.com/);
+    assert.match(body, /November 1, 2026/);
+  }
+  assert.ok(!html.includes("<script>"), "customer name must be escaped");
+  assert.match(html, /Sam/);
+});
+
+function fakeConfirmationDeps(sendResults: { sent: boolean; reason?: string }[]) {
+  let claimed = false;
+  const calls = { sends: 0, waits: [] as number[], records: [] as boolean[], releases: 0 };
+  const deps = {
+    claim: async () => { if (claimed) return false; claimed = true; return true; },
+    release: async () => { claimed = false; calls.releases++; },
+    load: async () => confirmationPayload,
+    send: async () => (sendResults[calls.sends++] ?? sendResults[sendResults.length - 1]) as { sent: true } | { sent: false; reason: string },
+    record: async (_id: string, _p: unknown, r: { sent: boolean }) => { calls.records.push(r.sent); },
+    wait: async (ms: number) => { calls.waits.push(ms); },
+  };
+  return { deps, calls };
+}
+
+test("order confirmation is sent once per order, retries a failed send, and frees the claim if it gives up", async () => {
+  const { deliverOrderConfirmation, RETRY_DELAYS_MS } = await import("../src/lib/order-confirmation");
+
+  const ok = fakeConfirmationDeps([{ sent: true }]);
+  assert.deepEqual(await deliverOrderConfirmation("o1", ok.deps), { sent: true });
+  const again = await deliverOrderConfirmation("o1", ok.deps);
+  assert.equal(again.sent, false, "a second call must not send");
+  assert.equal(ok.calls.sends, 1);
+  assert.deepEqual(ok.calls.records, [true]);
+  assert.equal(ok.calls.releases, 0);
+
+  const flaky = fakeConfirmationDeps([{ sent: false, reason: "SMTP timeout" }, { sent: true }]);
+  assert.deepEqual(await deliverOrderConfirmation("o2", flaky.deps), { sent: true });
+  assert.equal(flaky.calls.sends, 2);
+  assert.deepEqual(flaky.calls.waits, [RETRY_DELAYS_MS[0]]);
+  assert.deepEqual(flaky.calls.records, [true]);
+
+  const down = fakeConfirmationDeps([{ sent: false, reason: "SMTP down" }]);
+  const failed = await deliverOrderConfirmation("o3", down.deps);
+  assert.equal(failed.sent, false);
+  assert.equal(down.calls.sends, 1 + RETRY_DELAYS_MS.length);
+  assert.deepEqual(down.calls.records, [false], "the failure is logged once");
+  assert.equal(down.calls.releases, 1, "the claim is released so it can be retried");
+
+  const broken = fakeConfirmationDeps([{ sent: true }]);
+  broken.deps.load = async () => { throw new Error("database unavailable"); };
+  assert.equal((await deliverOrderConfirmation("o4", broken.deps)).sent, false, "errors are returned, never thrown");
+  assert.equal(broken.calls.releases, 1, "a claim taken before an error is released");
+});
+
+test("terms name New Mexico as the governing law", async () => {
+  const { storePolicies } = await import("../src/config/policies");
+  assert.equal(storePolicies.governingLaw, "the State of New Mexico, United States");
+});

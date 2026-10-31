@@ -4,6 +4,7 @@
  * every place that states it follows.
  */
 export const storePolicies = {
+  /** Shown on every policy page; update it whenever a policy's wording changes */
   effectiveDate: "November 1, 2026",
   supportEmail: "support@kitvoy.com",
   shipping: {
@@ -15,6 +16,8 @@ export const storePolicies = {
     destinations: "all 50 US states and Washington, DC",
   },
   returns: { windowDays: 30 },
+  /** Jurisdiction named in the terms of service */
+  governingLaw: "the State of New Mexico, United States",
 } as const;
 
 export const policyLinks = [

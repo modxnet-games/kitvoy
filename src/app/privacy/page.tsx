@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
       <section aria-labelledby="use">
         <h2 id="use">How we use it</h2>
         <ul>
-          <li>To process, ship and track your order, and to email you shipping updates.</li>
+          <li>To process, ship and track your order: we email you an order confirmation when you buy, and a shipping confirmation with your tracking number once it ships.</li>
           <li>To handle returns, refunds and support requests.</li>
           <li>To run your account, if you have one.</li>
           <li>To prevent fraud, keep the store secure, and meet legal and tax obligations.</li>
@@ -40,7 +40,7 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li><strong>PayPal</strong> processes your payment under its own privacy policy.</li>
           <li><strong>Our fulfillment partner (CJdropshipping)</strong> receives your name, delivery address, phone number and order items to pack and ship your order.</li>
-          <li><strong>Email and notification providers</strong> (Brevo, and Google Firebase for our team&apos;s order alerts) deliver shipping and support emails and notify us of new orders.</li>
+          <li><strong>Email and notification providers</strong> (Brevo, and Google Firebase for our team&apos;s order alerts) deliver order confirmation, shipping and support emails and notify us of new orders.</li>
           <li><strong>Hosting and security providers</strong> (including Cloudflare) host the site and protect it from abuse.</li>
           <li><strong>Google</strong>, if you choose to sign in with Google.</li>
         </ul>

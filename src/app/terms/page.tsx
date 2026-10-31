@@ -27,7 +27,7 @@ export default function TermsPage() {
       </section>
       <section aria-labelledby="orders">
         <h2 id="orders">Orders</h2>
-        <p>Your order is confirmed once payment is complete and the confirmation page appears, and we email you its tracking number when it ships. We may cancel an order and refund it in full if an item is unavailable, a price was shown in error, or we suspect fraud.</p>
+        <p>Your order is confirmed once payment is complete. We email you an order confirmation right away, and a shipping confirmation with your tracking number once it ships. We may cancel an order and refund it in full if an item is unavailable, a price was shown in error, or we suspect fraud.</p>
       </section>
       <section aria-labelledby="shipping-returns">
         <h2 id="shipping-returns">Shipping and returns</h2>
@@ -48,6 +48,10 @@ export default function TermsPage() {
       <section aria-labelledby="content">
         <h2 id="content">Site content</h2>
         <p>The Kitvoy name, logo, text and images on this site belong to Kitvoy or its licensors and may not be copied for commercial use without permission.</p>
+      </section>
+      <section aria-labelledby="governing-law">
+        <h2 id="governing-law">Governing law</h2>
+        <p>These terms are governed by the laws of {storePolicies.governingLaw}, without regard to its conflict-of-law rules. This doesn&apos;t take away any consumer protections you have under the law where you live.</p>
       </section>
       <section aria-labelledby="changes">
         <h2 id="changes">Changes to these terms</h2>

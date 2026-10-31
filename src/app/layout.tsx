@@ -34,12 +34,13 @@ export const metadata: Metadata = {
     title: siteConfig.name,
     description: siteConfig.description,
     siteName: siteConfig.name,
+    images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: "Kitvoy cordless tire inflator" }],
   },
   twitter: {
     card: "summary_large_image",
     title: siteConfig.name,
     description: siteConfig.description,
-    creator: "@kitvoy",
+    images: [siteConfig.ogImage],
   },
   robots: {
     index: true,

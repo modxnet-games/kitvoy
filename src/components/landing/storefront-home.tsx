@@ -8,6 +8,7 @@ import type { ProductDisplay } from "@/types/product";
 import { BUNDLE_TIERS, getBundleSavings, getLineTotal } from "@/lib/bundles";
 import { formatPrice } from "@/lib/formatters";
 import { isVideoMediaUrl } from "@/lib/media-url";
+import { storefrontFaqs } from "@/lib/storefront-faq";
 import { useCartStore } from "@/store/cart-store";
 import { useStorefrontUI } from "@/store/storefront-ui";
 import { usePointerTilt } from "@/hooks/use-pointer-tilt";
@@ -79,7 +80,7 @@ function ProductGallery({ product }: { product: ProductDisplay | null }) {
       <div className="gallery-arrows"><button className="icon-button" aria-label="Previous product image" onClick={() => select(active - 1, -1)}><ChevronLeft /></button><button className="icon-button" aria-label="Next product image" onClick={() => select(active + 1, 1)}><ChevronRight /></button></div>
     </div>
     <div className="gallery-thumbnails" aria-label="Choose a product image">
-      {slides.map((item, i) => <button key={`${item.label}-${i}`} className="gallery-thumbnail" aria-label={`Show ${item.label.toLowerCase()}`} aria-pressed={active === i} onClick={() => select(i)}><span className="thumbnail-image"><Image width={800} height={800} src={item.src} alt="" sizes="160px" /></span><span>{item.label}</span></button>)}
+      {slides.map((item, i) => <button key={`${item.label}-${i}`} className="gallery-thumbnail" aria-label={`Show ${item.label.toLowerCase()}`} aria-pressed={active === i} onClick={() => select(i)}><span className="thumbnail-image"><Image width={800} height={800} src={item.src} alt={`${product?.name ?? "Cordless Tire Inflator"} — ${item.label}`} sizes="160px" /></span><span>{item.label}</span></button>)}
     </div>
   </div>;
 }
@@ -116,13 +117,7 @@ export function StorefrontHome({ product }: { product: ProductDisplay | null }) 
     openCart();
   }
 
-  const faqs = [
-    { q: "How much is shipping?", a: freeShipping ? "US shipping is included for this product. Your cart shows the shipping cost and total for your selection. Delivery estimates have not yet been published; check with support before ordering if you need it by a particular date." : "Shipping is shown in your cart before checkout. For delivery timing, check the shipping information or contact support." },
-    { q: "Will it work with my tires?", a: "Check your tire’s valve type and required pressure against the product manual before use. Compatibility and pressure limits need confirmation for your particular tires. Do not use an inflator as a repair for a damaged tire." },
-    { q: "What comes with my order?", a: "Choose one, two, or three cordless tire inflators. The product photograph shows the inflator and air hose. A verified packing list for cables and adapters is not yet available; contact support if you need a particular accessory." },
-    { q: "How do the bundle savings work?", a: "Two inflators receive 15% off their combined price. Three or more receive 25% off. The price for your chosen quantity and the savings are shown before you add it to your cart." },
-    { q: "What is the return policy?", a: "A confirmed return window and eligibility terms have not yet been published. Please check shipping & returns or contact support before you buy." },
-  ];
+  const faqs = storefrontFaqs(freeShipping);
 
   return <div ref={page} className="kitvoy-home">
     <section className="store-container hero" aria-labelledby="hero-heading">

@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/auth/customer-session";
 import { RegisterPageClient } from "./register-page-client";
+
+export const metadata: Metadata = { title: "Create account", robots: { index: false, follow: true } };
 
 const DEFAULT_REDIRECT = "/shop";
 

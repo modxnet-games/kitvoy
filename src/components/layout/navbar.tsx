@@ -37,7 +37,7 @@ export function Navbar({ announcementText, announcementVisible = true }: { annou
   return <>
     <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="store-header">
-      {announcementVisible && <div className="announcement">{announcementText || "A little preparation for the road ahead."}</div>}
+      {announcementVisible && <div className="announcement">{announcementText || "Free U.S. Shipping on Every Order"}</div>}
       <nav className="store-container header-nav" aria-label="Main navigation">
         <Link href="/" aria-label="Kitvoy home"><BrandLogo /></Link>
         <ul className="desktop-nav">{LINKS.map(link => <li key={link.href}><Link href={link.href}>{link.label}</Link></li>)}</ul>

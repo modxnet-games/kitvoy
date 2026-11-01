@@ -228,7 +228,7 @@ test("FAQ, structured data and product copy state the published policies and onl
   assert.equal(returnPolicySchema().merchantReturnDays, 30);
 
   const unverified = /usb-c|\bsos\b|shut(s)? (itself )?off|stops by itself|auto(matic)?[ -]?(shut|stop)|presta|ball-needle/i;
-  for (const text of [productSeo.summary, productSeo.description, ...Object.values(verifiedProductCopy)]) assert.doesNotMatch(text, unverified);
+  for (const text of [productSeo.summary, productSeo.description, faqs, ...Object.values(verifiedProductCopy)]) assert.doesNotMatch(text, unverified);
 });
 
 const confirmationPayload = {

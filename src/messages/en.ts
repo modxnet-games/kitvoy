@@ -8,7 +8,7 @@ export const en = {
     searchPlaceholder: "Search products…",
     account: "Account",
     cart: "Cart",
-    announcement: "A little preparation for the road ahead.",
+    announcement: "Free U.S. Shipping on Every Order",
     allProducts: "All Products",
     categories: "Categories",
   },

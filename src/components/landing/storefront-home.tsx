@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Check, ChevronLeft, ChevronRight, CircleHelp, Gauge, LockKeyhole, Package, Plus, SlidersHorizontal, Truck } from "lucide-react";
 import type { ProductDisplay } from "@/types/product";
+import { processingText, storePolicies } from "@/config/policies";
 import { BUNDLE_TIERS, getBundleSavings, getLineTotal } from "@/lib/bundles";
 import { formatPrice } from "@/lib/formatters";
 import { isVideoMediaUrl } from "@/lib/media-url";
@@ -105,7 +106,9 @@ export function StorefrontHome({ product }: { product: ProductDisplay | null }) 
     const main = mainPurchase.current;
     const bundle = bundlePurchase.current;
     if (!main || !bundle) return;
-    const mainObserver = new IntersectionObserver(([entry]) => setPastPurchase(!entry.isIntersecting && entry.boundingClientRect.bottom < 0));
+    // The tall bottom margin counts "still below the fold" as intersecting, so a
+    // jump past the button (an anchor link) still registers as leaving the top
+    const mainObserver = new IntersectionObserver(([entry]) => setPastPurchase(!entry.isIntersecting && entry.boundingClientRect.bottom < 0), { rootMargin: "0px 0px 100000px 0px" });
     const bundleObserver = new IntersectionObserver(([entry]) => setBundlesVisible(entry.isIntersecting));
     mainObserver.observe(main); bundleObserver.observe(bundle);
     return () => { mainObserver.disconnect(); bundleObserver.disconnect(); };
@@ -122,31 +125,31 @@ export function StorefrontHome({ product }: { product: ProductDisplay | null }) 
   return <div ref={page} className="kitvoy-home">
     <section className="store-container hero" aria-labelledby="hero-heading">
       <div className="hero-copy">
-        <p className="eyebrow">The cordless tire inflator</p>
-        <h1 id="hero-heading">Low tire?{" "}<br />You&apos;re ready.</h1>
-        <p className="hero-description">A little preparation.{" "}<br />A smoother start to your day.</p>
-        <p className="hero-note">Your tire-care essential, ready to go.</p>
+        <p className="eyebrow">Cordless digital tire inflator</p>
+        <h1 id="hero-heading">Low tire pressure?{" "}<br />Take care of it yourself.</h1>
+        <p className="hero-description">Skip the gas station air pump. Keep a compact, rechargeable tire inflator ready for convenient tire top-ups at home or on the road.</p>
+        <p className="hero-note">Digital pressure display. Easy-to-use controls. Cordless convenience.</p>
       </div>
       <ProductGallery product={product} />
       <div className="hero-purchase">
         <div className="hero-price">{price == null ? <span className="price-unavailable">Currently unavailable</span> : <><strong>{formatPrice(price)}</strong><span>1 inflator · USD</span></>}</div>
         <a ref={mainPurchase} id="hero-cta" className="primary-button hero-cta" href="#bundles">Choose my bundle <ArrowRight size={19} /></a>
         <a className="text-link hero-how" href="#how">See how it works</a>
-        <div className="purchase-notes"><span><Truck />{freeShipping ? "Free US shipping" : "Shipping shown in cart"}</span><span><LockKeyhole />Payment at checkout</span></div>
+        <div className="purchase-notes"><span><Truck />{freeShipping ? "Free U.S. Shipping" : "Shipping shown in cart"}</span><span><LockKeyhole />Secure Checkout</span></div>
       </div>
     </section>
 
-    <div className="store-container"><div className="service-strip"><div><Truck /><span><strong>{freeShipping ? "US shipping included" : "Clear order totals"}</strong><small>{freeShipping ? "On every inflator bundle" : "Review before checkout"}</small></span></div><div><Package /><span><strong>Your kit. Your choice.</strong><small>One, two, or three inflators</small></span></div><Link href="/support"><CircleHelp /><span><strong>A question before you buy?</strong><small>Visit our help & information page</small></span><ArrowRight className="service-arrow" /></Link></div></div>
+    <div className="store-container"><div className="service-strip"><div><Truck /><span><strong>Ships in {processingText}</strong><small>Tracked delivery to all 50 states and DC</small></span></div><div><Package /><span><strong>{storePolicies.returns.windowDays}-day returns</strong><small>On unused items in original packaging</small></span></div><Link href="/support"><CircleHelp /><span><strong>A question before you buy?</strong><small>Get answers on our support page</small></span><ArrowRight className="service-arrow" /></Link></div></div>
 
     <section id="how" className="store-container how-section" aria-labelledby="how-heading">
-      <div className="how-visual"><Image width={800} height={800} src={photo} sizes="(max-width: 639px) 90vw, 45vw" alt="Kitvoy inflator with digital display, controls and air hose" loading="lazy" /><div><span className="eyebrow">A closer look</span><p>Small kit.<br />Everyday readiness.</p></div></div>
-      <div className="how-copy"><p className="eyebrow">How it works</p><h2 id="how-heading">Ready in three<br className="desktop-break" /> simple steps.</h2><ol className="steps"><li data-reveal="" style={{ "--i": 0 } as CSSProperties}><span>1</span><div><h3>Connect the hose</h3><p>Attach the hose to a compatible tire valve, following the product instructions.</p></div></li><li data-reveal="" style={{ "--i": 1 } as CSSProperties}><span>2</span><div><h3>Set your pressure</h3><p>Use the controls to select the pressure recommended for your tires.</p></div></li><li data-reveal="" style={{ "--i": 2 } as CSSProperties}><span>3</span><div><h3>Start inflating</h3><p>Press start and monitor the pressure. Follow the manual for safe use.</p></div></li></ol><p className="how-tip"><Gauge />For car tires, check the pressure label on your vehicle&apos;s door frame.</p></div>
+      <div className="how-visual"><Image width={800} height={800} src={photo} sizes="(max-width: 639px) 90vw, 45vw" alt="Cordless tire inflator with digital display, controls and air hose" loading="lazy" /><div><span className="eyebrow">A closer look</span><p>Compact design.<br />Everyday convenience.</p></div></div>
+      <div className="how-copy"><p className="eyebrow">How it works</p><h2 id="how-heading">Tire top-ups in three<br className="desktop-break" /> simple steps.</h2><ol className="steps"><li data-reveal="" style={{ "--i": 0 } as CSSProperties}><span>1</span><div><h3>Connect</h3><p>Attach the air hose to your tire valve.</p></div></li><li data-reveal="" style={{ "--i": 1 } as CSSProperties}><span>2</span><div><h3>Set your pressure</h3><p>Use the digital controls to select the recommended PSI for your tire.</p></div></li><li data-reveal="" style={{ "--i": 2 } as CSSProperties}><span>3</span><div><h3>Start inflating</h3><p>Press start and monitor your tire pressure on the digital display. Stay with the inflator while it runs.</p></div></li></ol><p className="how-tip"><Gauge />Always use the pressure your vehicle&apos;s manufacturer recommends. You&apos;ll find it on the sticker inside the driver&apos;s door or in your owner&apos;s manual. Read the product instructions before first use.</p></div>
     </section>
 
-    <section className="store-container benefits" aria-label="Product features"><article data-reveal="" style={{ "--i": 0 } as CSSProperties}><Gauge /><h3>Pressure at a glance</h3><p>A digital display keeps the pressure reading in view.</p></article><article data-reveal="" style={{ "--i": 1 } as CSSProperties}><Package /><h3>A cordless format</h3><p>A standalone inflator and hose, together in one portable kit.</p></article><article data-reveal="" style={{ "--i": 2 } as CSSProperties}><SlidersHorizontal /><h3>Controls within reach</h3><p>Front-facing buttons put the settings right where you need them.</p></article></section>
+    <section className="store-container benefits" aria-label="Product features"><article data-reveal="" style={{ "--i": 0 } as CSSProperties}><Gauge /><h3>Know your pressure at a glance.</h3><p>The digital display shows your tire pressure as it fills, so you can see the moment you reach the number on your door sticker.</p></article><article data-reveal="" style={{ "--i": 1 } as CSSProperties}><Package /><h3>Less hassle. More flexibility.</h3><p>It runs on a rechargeable battery, so you can top up a tire wherever you&apos;re parked. It recharges over USB and weighs about 1.3 lb, so it&apos;s easy to keep in the car.</p></article><article data-reveal="" style={{ "--i": 2 } as CSSProperties}><SlidersHorizontal /><h3>Simple controls when you need them.</h3><p>Set your target pressure with the + and − buttons, then press start. The built-in LED light helps when you&apos;re checking a tire after dark.</p></article></section>
 
     <section id="bundles" className="bundle-section" aria-labelledby="bundle-heading"><div className="store-container bundle-layout">
-      <div className="bundle-intro"><p className="eyebrow">Bundle & save</p><h2 id="bundle-heading">One for every<br />car in the driveway.</h2><p>A kit for you. Another for someone you care about. Choose the quantity that fits your day.</p><div className="bundle-photo"><Image width={800} height={800} src={photo} sizes="40vw" alt="Cordless tire inflator" loading="lazy" /></div><p className="bundle-caption">The same inflator. More ways to be ready.</p></div>
+      <div className="bundle-intro"><p className="eyebrow">Bundle & save</p><h2 id="bundle-heading">One for every<br />car in the driveway.</h2><p>Keep one in each car so it&apos;s always where the low tire is, or give one to a new driver in the family. Two inflators save 15%, and three save 25%.</p><div className="bundle-photo"><Image width={800} height={800} src={photo} sizes="40vw" alt="Cordless tire inflator" loading="lazy" /></div><p className="bundle-caption">The same inflator, one for each car.</p></div>
       <div className="bundle-options"><fieldset><legend className="sr-only">Choose your inflator bundle</legend>{BUNDLE_TIERS.map((tier, _, tiers) => {
         // "Best value" is factual: the tier with the lowest price per unit
         const bestValue = tier.discount > 0 && tier.discount === Math.max(...tiers.map(t => t.discount));
@@ -154,10 +157,10 @@ export function StorefrontHome({ product }: { product: ProductDisplay | null }) 
         const savings = price == null ? 0 : getBundleSavings(price, tier.quantity);
         const unavailable = !product || product.stock < tier.quantity;
         return <label key={tier.quantity} className={`bundle-option ${quantity === tier.quantity ? "is-selected" : ""} ${unavailable ? "is-unavailable" : ""}`}><input type="radio" name="bundle" value={tier.quantity} checked={quantity === tier.quantity} disabled={unavailable} onChange={() => setQuantity(tier.quantity)} /><span className="bundle-thumb"><Image width={800} height={800} src={photo} alt="" sizes="96px" loading="lazy" /></span><span className="bundle-option-copy">{bestValue && <em className="bundle-badge">Best value</em>}<strong>{tier.quantity} {tier.quantity === 1 ? "inflator" : "inflators"}</strong><b>{lineTotal == null ? "Unavailable" : formatPrice(lineTotal)} <small>total</small></b><span>{unavailable ? "Currently unavailable" : savings > 0 ? `${formatPrice(lineTotal! / tier.quantity)} each · Save ${formatPrice(savings)}` : "For your daily drive."}</span></span><span className="radio-indicator" aria-hidden="true">{quantity === tier.quantity && <Check size={14} />}</span></label>;
-      })}</fieldset><div ref={bundlePurchase} className="bundle-action"><button className="primary-button" disabled={!canBuy} onClick={addBundle}>{canBuy ? `Add ${quantity} to cart · ${formatPrice(total!)}` : product ? "Unavailable in this quantity" : "Currently unavailable"}<ArrowRight size={18} /></button><p className="bundle-selection-note">Your selected quantity becomes this product&apos;s cart quantity.</p></div><div className="bundle-footer-note"><Truck size={20} /><span>{freeShipping ? "Free US shipping included" : "Shipping calculated in your cart"}</span></div><Link className="text-link" href="/support#shipping-returns">Shipping & returns information</Link></div>
+      })}</fieldset><div ref={bundlePurchase} className="bundle-action"><button className="primary-button" disabled={!canBuy} onClick={addBundle}>{canBuy ? `Add ${quantity} to cart · ${formatPrice(total!)}` : product ? "Unavailable in this quantity" : "Currently unavailable"}<ArrowRight size={18} /></button></div><div className="bundle-footer-note"><Truck size={20} /><span>{freeShipping ? "Free U.S. shipping on every bundle" : "Shipping calculated in your cart"}</span></div><Link className="text-link" href="/support#shipping-returns">Shipping & returns information</Link></div>
     </div></section>
 
-    <section id="faq" className="store-container faq-section" aria-labelledby="faq-heading"><div><p className="eyebrow">Good to know</p><h2 id="faq-heading">A few things<br />before you go.</h2><p>More questions?<br /><Link className="text-link" href="/support#contact">Visit support <ArrowRight size={15} /></Link></p></div><div className="faq-list">{faqs.map(faq => <details key={faq.q}><summary>{faq.q}<Plus size={19} /></summary><p>{faq.a}</p></details>)}</div></section>
+    <section id="faq" className="store-container faq-section" aria-labelledby="faq-heading"><div><p className="eyebrow">Good to know</p><h2 id="faq-heading">Questions?<br />We&apos;ve got answers.</h2><p>More questions?{" "}<Link className="text-link" href="/support#contact">Visit support <ArrowRight size={15} /></Link></p></div><div className="faq-list">{faqs.map(faq => <details key={faq.q}><summary>{faq.q}<Plus size={19} /></summary><p>{faq.a}</p></details>)}</div></section>
 
     {pastPurchase && !bundlesVisible && !overlay && <aside className="mobile-buy-bar" aria-label="Quick purchase"><div><strong>{total == null ? "Unavailable" : formatPrice(total)}</strong><span>{quantity} {quantity === 1 ? "inflator" : "inflators"}</span></div><a href="#bundles" className="primary-button">Choose bundle <ArrowRight size={17} /></a></aside>}
   </div>;

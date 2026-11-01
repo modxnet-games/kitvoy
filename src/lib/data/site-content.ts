@@ -20,7 +20,7 @@ export interface HomepageContent {
 }
 
 export const HOMEPAGE_DEFAULTS: HomepageContent = {
-  announcementBar: "A little preparation for the road ahead.",
+  announcementBar: "Free U.S. Shipping on Every Order",
   announcementBarVisible: true,
 
   bannerImage: "",

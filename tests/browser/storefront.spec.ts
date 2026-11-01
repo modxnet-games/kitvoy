@@ -24,7 +24,7 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/orders", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "order.errorGeneric" }) }));
   await page.route("**/api/checkout/**", route => route.abort());
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Low tire? You're ready." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Low tire pressure? Take care of it yourself." })).toBeVisible();
 });
 
 for (const width of [360, 390, 768, 1440]) {
@@ -91,7 +91,7 @@ test("mobile navigation, sticky bar and modal keyboard containment", async ({ pa
   await expect(page.getByRole("button", { name: "Add 3 to cart · $134.98" })).toBeFocused();
   await page.locator("#faq").scrollIntoViewIfNeeded();
   await page.getByText("How do the bundle savings work?", { exact: true }).click();
-  await expect(page.getByText(/Two inflators receive 15%/)).toBeVisible();
+  await expect(page.getByText(/Buy two inflators and save 15%/)).toBeVisible();
   await noOverflow(page);
 });
 

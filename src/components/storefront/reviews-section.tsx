@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/language-context";
 import { ReviewForm } from "./review-form";
 import { ReviewsList } from "./reviews-list";
-import type { ReviewWithUser } from "@/lib/data/reviews";
+import type { PublicReview } from "@/lib/reviews";
 import { SignInModal } from "@/components/layout/sign-in-modal";
 import { useState } from "react";
 
@@ -17,7 +17,7 @@ interface Customer {
 interface ReviewsSectionProps {
   productId: string;
   productSlug: string;
-  reviews: ReviewWithUser[];
+  reviews: PublicReview[];
   customer: Customer | null;
   hasReviewed: boolean;
 }
@@ -58,7 +58,8 @@ export function ReviewsSection({
         </div>
       ) : (
         <div className="mt-6">
-          <h3 className="mb-4 text-sm font-medium">{t("reviews.writeReview")}</h3>
+          <h3 className="mb-1 text-sm font-medium">{t("reviews.writeReview")}</h3>
+          <p className="mb-4 text-xs text-muted-foreground">{t("reviews.pendingNotice")}</p>
           <ReviewForm productId={productId} productSlug={productSlug} />
         </div>
       )}

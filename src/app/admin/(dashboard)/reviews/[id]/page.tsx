@@ -3,8 +3,11 @@ import Link from "next/link";
 import { Star } from "lucide-react";
 import { getAdminReviewById } from "@/lib/data/admin-reviews";
 import { normalizeMediaSrc } from "@/lib/media-url";
-import { Badge } from "@/components/ui/badge";
+import { ReviewStateBadge } from "../review-state-badge";
 import { ReviewDetailActions } from "./review-detail-actions";
+
+// New reviews arrive from the storefront and emailed links; always show the current list
+export const dynamic = "force-dynamic";
 
 interface ReviewDetailPageProps {
   params: Promise<{ id: string }>;
@@ -46,14 +49,7 @@ export default async function AdminReviewDetailPage({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge
-            variant={review.isVisible ? "default" : "secondary"}
-            className={
-              review.isVisible ? "bg-emerald-600 hover:bg-emerald-700" : ""
-            }
-          >
-            {review.isVisible ? "Visible" : "Hidden"}
-          </Badge>
+          <ReviewStateBadge state={review.state} />
           <ReviewDetailActions
             reviewId={review.id}
             isVisible={review.isVisible}
@@ -131,15 +127,29 @@ export default async function AdminReviewDetailPage({
                 <dt className="text-muted-foreground">Name</dt>
                 <dd className="font-medium">{review.user.fullName}</dd>
               </div>
+              {review.user.email && (
+                <div>
+                  <dt className="text-muted-foreground">Email</dt>
+                  <dd>
+                    <a
+                      href={`mailto:${review.user.email}`}
+                      className="text-primary hover:underline"
+                    >
+                      {review.user.email}
+                    </a>
+                  </dd>
+                </div>
+              )}
               <div>
-                <dt className="text-muted-foreground">Email</dt>
+                <dt className="text-muted-foreground">Purchase</dt>
                 <dd>
-                  <a
-                    href={`mailto:${review.user.email}`}
-                    className="text-primary hover:underline"
-                  >
-                    {review.user.email}
-                  </a>
+                  {review.orderId ? (
+                    <Link href={`/admin/orders/${review.orderId}`} className="text-primary hover:underline">
+                      {review.verified ? "Verified Buyer · view order" : "View order (not paid)"}
+                    </Link>
+                  ) : (
+                    "No order linked, so no Verified Buyer badge"
+                  )}
                 </dd>
               </div>
             </dl>

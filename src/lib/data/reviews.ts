@@ -1,4 +1,13 @@
 import { prisma } from "@/lib/db";
+import {
+  isVerifiedPurchase,
+  REVIEWS_LOADED,
+  reviewerName,
+  storeDate,
+  summarizeRatings,
+  type PublicReview,
+  type ReviewSummary,
+} from "@/lib/reviews";
 
 function getReviewDelegate() {
   try {
@@ -9,30 +18,77 @@ function getReviewDelegate() {
   }
 }
 
-export type ReviewWithUser = {
+/** Approved reviews only: new reviews wait for an admin (isVisible starts false). */
+const APPROVED = { isVisible: true } as const;
+
+const publicSelect = {
+  id: true,
+  rating: true,
+  comment: true,
+  images: true,
+  authorName: true,
+  createdAt: true,
+  user: { select: { fullName: true } },
+  order: { select: { paymentStatus: true, status: true } },
+} as const;
+
+function toPublicReview(r: {
   id: string;
   rating: number;
   comment: string;
   images: string[];
+  authorName: string | null;
   createdAt: Date;
-  user: { fullName: string };
-};
+  user: { fullName: string } | null;
+  order: { paymentStatus: string; status: string } | null;
+}): PublicReview {
+  return {
+    id: r.id,
+    rating: r.rating,
+    comment: r.comment,
+    images: r.images,
+    author: reviewerName(r.authorName ?? r.user?.fullName),
+    verified: isVerifiedPurchase(r.order),
+    createdAt: r.createdAt.toISOString(),
+    publishedOn: storeDate(r.createdAt),
+  };
+}
 
-export async function getReviewsByProductId(
-  productId: string
-): Promise<ReviewWithUser[]> {
+export async function getReviewsByProductId(productId: string): Promise<PublicReview[]> {
   const review = getReviewDelegate();
   if (!review) return [];
 
   try {
     const reviews = await review.findMany({
-      where: { productId, isVisible: true },
-      include: { user: { select: { fullName: true } } },
+      where: { productId, ...APPROVED },
+      select: publicSelect,
       orderBy: { createdAt: "desc" },
     });
-    return reviews as ReviewWithUser[];
+    return reviews.map(toPublicReview);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Count, average and star breakdown over every approved review, plus the newest
+ * ones to show. Null when there are none, so nothing about ratings is rendered.
+ */
+export async function getProductReviewSummary(productId: string): Promise<ReviewSummary | null> {
+  const review = getReviewDelegate();
+  if (!review) return null;
+
+  try {
+    const [groups, latest] = await Promise.all([
+      review.groupBy({ by: ["rating"], where: { productId, ...APPROVED }, _count: { _all: true } }),
+      review.findMany({ where: { productId, ...APPROVED }, select: publicSelect, orderBy: { createdAt: "desc" }, take: REVIEWS_LOADED }),
+    ]);
+    const stats = summarizeRatings(groups.map((g) => ({ rating: g.rating, count: g._count._all })));
+    if (stats.count === 0) return null;
+    return { ...stats, reviews: latest.map(toPublicReview) };
+  } catch (err) {
+    console.error("[reviews] Couldn't load the review summary:", err);
+    return null;
   }
 }
 
@@ -54,9 +110,29 @@ export async function findReviewByUserAndProduct(
   }
 }
 
+/**
+ * The customer's most recent paid order that contains this product, matched by
+ * account or by the email they checked out with as a guest.
+ */
+export async function findPurchaseForReview(customer: { userId: string; email: string }, productId: string) {
+  return prisma.order.findFirst({
+    where: {
+      paymentStatus: { in: ["paid", "refunded"] },
+      status: { not: "CANCELED" },
+      items: { some: { productId } },
+      OR: [{ userId: customer.userId }, { email: { equals: customer.email, mode: "insensitive" } }],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, reviews: { where: { productId }, select: { id: true } } },
+  });
+}
+
+/** Saves a review for moderation; it stays off the storefront until an admin approves it. */
 export async function createReview(data: {
-  userId: string;
+  userId?: string | null;
+  orderId?: string | null;
   productId: string;
+  authorName: string;
   rating: number;
   comment: string;
   images: string[];
@@ -64,31 +140,34 @@ export async function createReview(data: {
   const review = getReviewDelegate();
   if (!review) throw new Error("Review data layer unavailable");
 
-  const { images, ...rest } = data;
-  const cleanImages = images.filter((u): u is string => Boolean(u && typeof u === "string"));
-
-  return prisma.$transaction(async (tx) => {
-    const created = await tx.review.create({
-      data: { ...rest, images: cleanImages },
-    });
-
-    const stats = await tx.review.aggregate({
-      where: { productId: data.productId, isVisible: true },
-      _count: true,
-      _avg: { rating: true },
-    });
-
-    const avgRating = stats._avg.rating ?? 0;
-    const reviewCount = stats._count;
-
-    await tx.product.update({
-      where: { id: data.productId },
-      data: {
-        rating: Math.round(avgRating * 10) / 10,
-        reviewCount,
-      },
-    });
-
-    return created;
+  const cleanImages = data.images.filter((u): u is string => Boolean(u && typeof u === "string"));
+  return review.create({
+    data: { ...data, images: cleanImages, isVisible: false },
   });
+}
+
+/** A paid order the emailed review link points to, with what can still be reviewed. */
+export async function getOrderForReview(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      customerName: true,
+      paymentStatus: true,
+      status: true,
+      userId: true,
+      items: { select: { productId: true, productName: true } },
+      reviews: { select: { productId: true } },
+    },
+  });
+  if (!order || !isVerifiedPurchase(order)) return null;
+
+  const reviewed = new Set(order.reviews.map((r) => r.productId));
+  const products = new Map<string, { productId: string; productName: string; reviewed: boolean }>();
+  for (const item of order.items) {
+    if (item.productId && !products.has(item.productId)) {
+      products.set(item.productId, { productId: item.productId, productName: item.productName, reviewed: reviewed.has(item.productId) });
+    }
+  }
+  return { id: order.id, customerName: order.customerName, userId: order.userId, products: [...products.values()] };
 }

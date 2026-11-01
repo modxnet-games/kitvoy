@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Trash2 } from "lucide-react";
+import { Check, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   toggleReviewVisibilityAction,
@@ -49,18 +49,19 @@ export function ReviewRowActions({
         View
       </Link>
       <Button
-        variant="ghost"
-        size="icon-sm"
+        variant={isVisible ? "ghost" : "outline"}
+        size="sm"
         onClick={handleToggle}
         disabled={isPending}
-        title={isVisible ? "Hide review" : "Show review"}
-        className="h-8 w-8"
+        title={isVisible ? "Hide from the storefront" : "Show on the storefront"}
+        className="h-8"
       >
         {isVisible ? (
-          <EyeOff className="size-4 text-muted-foreground" />
+          <EyeOff className="mr-1 size-4 text-muted-foreground" />
         ) : (
-          <Eye className="size-4 text-muted-foreground" />
+          <Check className="mr-1 size-4" />
         )}
+        {isVisible ? "Hide" : "Approve"}
       </Button>
       <Button
         variant="ghost"

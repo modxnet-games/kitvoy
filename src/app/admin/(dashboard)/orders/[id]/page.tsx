@@ -13,6 +13,8 @@ import { isCjConfigured } from "@/config/fulfillment";
 import { listSentEmails } from "@/lib/data/sent-emails";
 import { SentEmailList } from "@/components/admin/sent-email-list";
 import { EmailCustomerCard } from "./email-customer-card";
+import { reviewRequestStatus } from "@/lib/reviews";
+import { prisma } from "@/lib/db";
 
 interface OrderPageProps {
   params: Promise<{ id: string }>;
@@ -27,7 +29,10 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
   const orderReference = formatOrderReference(order.id);
   const isPaid = order.paymentStatus === "paid";
   const address = order.shippingAddress as unknown as ShippingAddress | null;
-  const sentEmails = await listSentEmails({ orderId: order.id }).catch(() => []);
+  const [sentEmails, reviewCount] = await Promise.all([
+    listSentEmails({ orderId: order.id }).catch(() => []),
+    prisma.review.count({ where: { orderId: order.id } }).catch(() => 0),
+  ]);
 
   return (
     <div>
@@ -137,6 +142,7 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
             fulfillmentStatus={order.fulfillmentStatus}
             trackingNumber={order.trackingNumber}
             shippedAt={order.shippedAt ? order.shippedAt.toISOString() : null}
+            reviewRequest={isPaid ? reviewRequestStatus({ deliveredAt: order.deliveredAt, reviewRequestSentAt: order.reviewRequestSentAt, hasReview: reviewCount > 0, hasEmail: !!order.email }) : null}
             cj={isCjConfigured() ? { orderId: order.fulfillmentRef, status: order.supplierStatus, error: order.fulfillmentError } : null}
           />
 

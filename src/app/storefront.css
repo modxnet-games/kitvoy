@@ -121,6 +121,60 @@
 .faq-list summary svg { flex-shrink: 0; }
 .faq-list details[open] summary svg { transform: rotate(45deg); }
 .faq-list details p { padding: 0 28px 22px 0; color: #666a67; font-size: 13px; line-height: 1.85; }
+
+/* Customer reviews (approved only; the section isn't rendered without any) */
+.stars { position: relative; display: inline-flex; flex-shrink: 0; color: #c94b16; line-height: 0; }
+.stars-row { display: inline-flex; gap: 2px; }
+.stars-fill { position: absolute; inset: 0 auto 0 0; overflow: hidden; white-space: nowrap; }
+.reviews-section { display: grid; grid-template-columns: 1fr 1.3fr; gap: 100px; padding-block: 80px; border-bottom: 1px solid #e7e5df; }
+#reviews { scroll-margin-top: 24px; }
+.reviews-overview h2 { margin-top: 14px; }
+.rating-score { display: flex; align-items: center; gap: 16px; margin-top: 28px; }
+.rating-score > strong { font-size: 56px; font-weight: 750; letter-spacing: -.05em; line-height: 1; }
+.rating-score > div { display: flex; flex-direction: column; gap: 6px; }
+.rating-score > div > span { color: #666a67; font-size: 12px; }
+.rating-bars { display: grid; gap: 8px; max-width: 340px; margin-top: 24px; }
+.rating-bars li { display: grid; grid-template-columns: 44px 1fr 28px; align-items: center; gap: 10px; color: #666a67; font-size: 12px; }
+.rating-bars li > span:last-child { text-align: right; }
+.rating-bar { height: 6px; border-radius: 6px; background: #e7e5df; overflow: hidden; }
+.rating-bar > span { display: block; height: 100%; border-radius: 6px; background: #c94b16; }
+.reviews-note { max-width: 340px; margin-top: 24px; color: #666a67; font-size: 11px; line-height: 1.7; }
+.reviews-list { display: grid; align-content: start; gap: 14px; }
+.review-card { padding: 22px 24px; background: #fff; border: 1px solid #e7e5df; border-radius: 11px; }
+.review-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.review-card-top time { color: #666a67; font-size: 11px; }
+.review-text { margin-top: 12px; font-size: 14px; line-height: 1.7; white-space: pre-line; overflow-wrap: anywhere; }
+.review-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.review-photos img { width: 72px; height: 72px; object-fit: cover; border: 1px solid #e7e5df; border-radius: 8px; }
+.review-card footer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 16px; font-size: 13px; }
+.verified-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 20px; background: #eef5ef; color: #22633a; font-size: 11px; font-weight: 650; }
+.reviews-more { justify-self: center; }
+
+/* Star choice on the review forms */
+.star-picker legend { font-size: 14px; font-weight: 650; margin-bottom: 10px; }
+.star-picker-row { display: flex; align-items: center; gap: 2px; }
+.star-picker label { position: relative; display: inline-flex; padding: 4px; color: #8f8c84; cursor: pointer; border-radius: 6px; }
+.star-picker label.is-on { color: #c94b16; }
+.star-picker input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.star-picker label:has(input:focus-visible) { outline: 3px solid #c94b16; outline-offset: 2px; }
+.star-picker-label { margin-left: 10px; color: #666a67; font-size: 13px; }
+
+/* Review page opened from the post-delivery email */
+.review-order-page { max-width: 720px; padding-block: 36px 80px; }
+.review-order-page .eyebrow { margin-top: 25px; }
+.review-order-page h1 { font-size: 44px; font-weight: 750; letter-spacing: -.055em; line-height: 1.06; margin-top: 16px; }
+.review-order-page .review-intro { color: #666a67; font-size: 15px; line-height: 1.7; margin-top: 16px; }
+.review-order-card { margin-top: 28px; padding: 26px; background: #fff; border: 1px solid #e7e5df; border-radius: 11px; }
+.review-order-card h2 { font-size: 20px; font-weight: 650; margin-bottom: 18px; }
+.review-order-card form { display: grid; gap: 22px; }
+.review-order-card label[for] { display: block; font-size: 14px; font-weight: 650; margin-bottom: 8px; }
+.review-order-card textarea { width: 100%; min-height: 150px; padding: 12px 14px; border: 1px solid #dcd9d0; border-radius: 9px; font-size: 15px; line-height: 1.6; resize: vertical; background: #fff; }
+.review-order-card textarea:focus-visible { outline: 3px solid #c94b16; outline-offset: 2px; }
+.review-order-card .field-hint { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: #666a67; font-size: 12px; }
+.review-order-card .form-error { padding: 12px 14px; border-radius: 9px; background: #fdf0ec; color: #8a2a0a; font-size: 13px; }
+.review-order-card .primary-button { justify-self: start; }
+.review-order-done p { color: #666a67; font-size: 14px; line-height: 1.7; }
+.review-order-done h2 { margin-bottom: 8px; }
 .store-footer { background: #fff; border-top: 1px solid #e7e5df; padding-top: 52px; }
 .footer-top { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 48px; padding-bottom: 45px; }
 .footer-brand p { margin-top: 17px; color: #666a67; font-size: 12px; line-height: 1.7; }
@@ -276,7 +330,7 @@
   .service-strip > * { padding-inline: 20px; gap: 12px; }
   .how-section { gap: 40px; }
   .how-visual { min-height: 490px; }
-  .bundle-layout, .faq-section { gap: 48px; }
+  .bundle-layout, .faq-section, .reviews-section { gap: 48px; }
   .bundle-thumb { flex-basis: 78px; height: 85px; }
   .bundle-option { gap: 13px; }
   .footer-top { gap: 24px; }
@@ -386,6 +440,15 @@
   .bundle-option-copy b { font-size: 22px; }
   .bundle-option-copy > span { font-size: 10px; }
   .bundle-footer-note { font-size: 11px; }
+  .reviews-section { grid-template-columns: 1fr; gap: 28px; padding-block: 42px; }
+  .rating-score { margin-top: 20px; }
+  .rating-score > strong { font-size: 46px; }
+  .rating-bars, .reviews-note { max-width: none; }
+  .review-card { padding: 18px; }
+  .review-text { font-size: 13px; }
+  .review-order-page { padding-block: 24px 44px; }
+  .review-order-page h1 { font-size: 34px; }
+  .review-order-card { padding: 18px; }
   .faq-section { grid-template-columns: 1fr; gap: 24px; padding-block: 42px; }
   .faq-section > div > p:not(.eyebrow) { margin-top: 16px; font-size: 12px; }
   .faq-section > div > p:not(.eyebrow) br { display: none; }

@@ -615,3 +615,111 @@ export function buildShippingEmail(p: ShippingConfirmationPayload): { subject: s
 
   return { subject, text, html };
 }
+
+/* ------------------------------------------------------------------ */
+/*  Customer review request (a few days after delivery)                */
+/* ------------------------------------------------------------------ */
+
+export interface ReviewRequestPayload {
+  to: string;
+  customerName: string;
+  orderReference: string;
+  productName: string;
+  deliveredAt: Date;
+  /** Signed link to the review form for this order */
+  reviewUrl: string;
+}
+
+/**
+ * Asks the customer, once per order, to review what they bought. Sent from
+ * orders@ with replies going to support. Needs SMTP_* only. Never throws.
+ */
+export async function sendReviewRequest(
+  p: ReviewRequestPayload,
+): Promise<{ sent: true } | { sent: false; reason: string }> {
+  const transport = getTransport();
+  if (!transport) return { sent: false, reason: "SMTP is not configured (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)" };
+
+  const { subject, text, html } = buildReviewRequestEmail(p);
+  try {
+    await transport.sendMail({
+      from: { name: ADMIN_SENDERS.orders.name, address: ADMIN_SENDERS.orders.email },
+      replyTo: { name: ADMIN_SENDERS.support.name, address: ADMIN_SENDERS.support.email },
+      to: p.to,
+      subject,
+      text,
+      html,
+    });
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[email] Failed to send review request:", message);
+    return { sent: false, reason: message };
+  }
+}
+
+/** Subject, plain text and HTML for the review request (no sending). */
+export function buildReviewRequestEmail(p: ReviewRequestPayload): { subject: string; text: string; html: string } {
+  const storeName = "Kitvoy";
+  const firstName = p.customerName.trim().split(/\s+/)[0] || "there";
+  const product = p.productName.trim().toLowerCase();
+  const subject = `How's your ${product} working?`;
+  const delivered = p.deliveredAt.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: STORE_TIME_ZONE });
+  const intro = `Your order ${p.orderReference} was delivered on ${delivered}. Once you've had a chance to use your ${product}, would you tell other drivers how it went? It takes about a minute.`;
+  const fairness = "We post every genuine review, good or bad, after checking it for spam and personal details.";
+  const help = `Something not right with your order? Reply to this email and we'll help. You can return unused items within ${storePolicies.returns.windowDays} days of delivery.`;
+  const footer = `You're getting this one-time email because you ordered from ${storeName}.`;
+
+  const text = [
+    `Hi ${firstName},`,
+    "",
+    intro,
+    "",
+    `Write your review: ${p.reviewUrl}`,
+    "",
+    fairness,
+    "",
+    help,
+    "",
+    `— ${storeName}`,
+    "",
+    footer,
+  ].join("\n");
+
+  const ink = "#0B0B0F";
+  const orange = "#FF7A1A";
+  const muted = "#5A5A66";
+  const starUrl = (n: number) => `${p.reviewUrl}?rating=${n}`;
+  const stars = [1, 2, 3, 4, 5]
+    .map((n) => `<a href="${escapeHtml(starUrl(n))}" title="${n} star${n === 1 ? "" : "s"}" style="color:#C94B16;text-decoration:none;font-size:34px;line-height:1;padding:0 3px;">&#9733;</a>`)
+    .join("");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background:#F4F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
+        <tr><td style="background:${ink};padding:20px 28px;color:#FFFFFF;font-size:20px;font-weight:800;">${storeName}</td></tr>
+        <tr><td style="padding:28px;">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:800;">How's it going, ${escapeHtml(firstName)}?</p>
+          <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:${muted};">${escapeHtml(intro)}</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;border-radius:10px;">
+            <tr><td align="center" style="padding:18px;">
+              <p style="margin:0 0 8px;font-size:13px;color:${muted};">Tap a star to start your review</p>
+              <p style="margin:0;">${stars}</p>
+            </td></tr>
+          </table>
+          <p style="margin:20px 0;"><a href="${escapeHtml(p.reviewUrl)}" style="display:inline-block;background:${orange};color:${ink};text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:10px;">Write a review</a></p>
+          <p style="margin:0 0 14px;font-size:13px;line-height:1.5;color:${muted};">${escapeHtml(fairness)}</p>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:${muted};">${escapeHtml(help)}</p>
+        </td></tr>
+      </table>
+      <p style="margin:14px 0 0;font-size:12px;color:${muted};">${escapeHtml(footer)}</p>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject, text, html };
+}

@@ -346,3 +346,120 @@ test("Google accounts need a verified email before they can sign in or link", as
   assert.equal(googleErrorCode("google_token_failed"), "google_failed");
   assert.equal(googleErrorCode("something_else"), undefined);
 });
+
+test("reviews show first name and last initial, and only paid, uncanceled orders count as verified", async () => {
+  const { reviewerName, isVerifiedPurchase, summarizeRatings, parseReviewInput, isReviewUpload } = await import("../src/lib/reviews");
+  assert.equal(reviewerName("sam lee"), "Sam L.");
+  assert.equal(reviewerName("  Maria  de la  Cruz "), "Maria C.");
+  assert.equal(reviewerName("Pat"), "Pat");
+  assert.equal(reviewerName(""), "Kitvoy customer");
+  assert.equal(isVerifiedPurchase({ paymentStatus: "paid", status: "DELIVERED" }), true);
+  assert.equal(isVerifiedPurchase({ paymentStatus: "refunded", status: "DELIVERED" }), true);
+  assert.equal(isVerifiedPurchase({ paymentStatus: "unpaid", status: "PENDING" }), false);
+  assert.equal(isVerifiedPurchase({ paymentStatus: "paid", status: "CANCELED" }), false);
+  assert.equal(isVerifiedPurchase(null), false);
+
+  assert.deepEqual(summarizeRatings([]), { count: 0, average: 0, distribution: [0, 0, 0, 0, 0] });
+  assert.deepEqual(summarizeRatings([{ rating: 5, count: 3 }, { rating: 4, count: 1 }, { rating: 2, count: 1 }]), { count: 5, average: 4.2, distribution: [3, 1, 0, 1, 0] });
+
+  const form = (rating: string, comment: string) => { const f = new FormData(); f.set("rating", rating); f.set("comment", comment); return f; };
+  assert.deepEqual(parseReviewInput(form("5", "  Works well. \r\n ")), { ok: true, rating: 5, comment: "Works well." });
+  assert.deepEqual(parseReviewInput(form("0", "ok")), { ok: false, error: "reviews.ratingRequired" });
+  assert.deepEqual(parseReviewInput(form("4.5", "ok")), { ok: false, error: "reviews.ratingRequired" });
+  assert.deepEqual(parseReviewInput(form("4", "   ")), { ok: false, error: "reviews.commentRequired" });
+  assert.deepEqual(parseReviewInput(form("4", "x".repeat(2001))), { ok: false, error: "reviews.commentTooLong" });
+  assert.ok(isReviewUpload("/uploads/reviews/review-123.jpg"));
+  for (const bad of ["https://evil.com/a.jpg", "/uploads/products/a.jpg", "/uploads/reviews/../x.jpg", "javascript:alert(1)"]) assert.ok(!isReviewUpload(bad), bad);
+});
+
+test("review links are signed per order and reject tampering", async () => {
+  const { createReviewToken, readReviewToken } = await import("../src/lib/review-links");
+  const secret = "s".repeat(40);
+  const orderId = "cmh1abcdefghijklmnopqrstu";
+  const token = createReviewToken(orderId, secret);
+  assert.equal(readReviewToken(token, secret), orderId);
+  assert.equal(readReviewToken(token, "t".repeat(40)), null, "another secret must not verify");
+  assert.equal(readReviewToken(token.replace(orderId, "cmh1abcdefghijklmnopqrstv"), secret), null, "the signature is bound to the order");
+  assert.equal(readReviewToken(`${token}x`, secret), null);
+  for (const bad of ["", ".", orderId, `${orderId}.`, "../x.y", null]) assert.equal(readReviewToken(bad, secret), null, String(bad));
+  assert.equal(readReviewToken(token, null), null, "no secret configured means no valid links");
+});
+
+test("rating markup appears only with approved reviews and leaves the offer untouched", async () => {
+  const { productSchema } = await import("../src/lib/seo/structured-data");
+  const { REVIEWS_SHOWN_FIRST } = await import("../src/lib/reviews");
+  const inflator = { ...product, slug: "cordless-tire-inflator", sku: "INF-001", images: ["/uploads/a.jpg"] };
+  const plain = productSchema(inflator) as Record<string, unknown>;
+  assert.ok(!("aggregateRating" in plain) && !("review" in plain));
+  assert.deepEqual(productSchema(inflator, null), plain);
+
+  const reviews = Array.from({ length: 8 }, (_, i) => ({
+    id: `r${i}`, rating: i === 0 ? 4 : 5, comment: `Review ${i}`, images: [], author: "Sam L.", verified: true,
+    createdAt: "2026-11-01T15:00:00.000Z", publishedOn: "2026-11-01",
+  }));
+  const withReviews = productSchema(inflator, { count: 8, average: 4.9, distribution: [7, 1, 0, 0, 0], reviews }) as Record<string, unknown>;
+  assert.deepEqual(withReviews.offers, plain.offers, "price, offer and shipping fields are unchanged");
+  assert.deepEqual(withReviews.aggregateRating, { "@type": "AggregateRating", ratingValue: 4.9, reviewCount: 8, bestRating: 5, worstRating: 1 });
+  const marked = withReviews.review as { author: { name: string }; datePublished: string; reviewBody: string; reviewRating: { ratingValue: number } }[];
+  assert.equal(marked.length, REVIEWS_SHOWN_FIRST, "markup lists the reviews shown before Show more");
+  assert.deepEqual([marked[0].author.name, marked[0].datePublished, marked[0].reviewBody, marked[0].reviewRating.ratingValue], ["Sam L.", "2026-11-01", "Review 0", 4]);
+});
+
+const reviewRequestPayload = {
+  to: "sam@example.com", customerName: "Sam <b>Lee</b>", orderReference: "KTV-ABCD1234", productName: "Cordless Tire Inflator",
+  deliveredAt: new Date("2026-11-02T18:00:00Z"), reviewUrl: "https://kitvoy.com/review/abc.def",
+};
+
+test("review request email links to the form, offers every star rating and asks for honest reviews", async () => {
+  const { buildReviewRequestEmail } = await import("../src/lib/email");
+  const { subject, text, html } = buildReviewRequestEmail(reviewRequestPayload);
+  assert.equal(subject, "How's your cordless tire inflator working?");
+  assert.match(text, /Write your review: https:\/\/kitvoy\.com\/review\/abc\.def/);
+  for (const body of [text, html]) {
+    assert.match(body, /KTV-ABCD1234/);
+    assert.match(body, /delivered on November 2/);
+    assert.match(body, /good or bad/);
+    assert.match(body, /within 30 days of delivery/);
+  }
+  for (const n of [1, 2, 3, 4, 5]) assert.ok(html.includes(`https://kitvoy.com/review/abc.def?rating=${n}`), `star ${n}`);
+  assert.ok(!html.includes("<b>Lee"), "customer name must be escaped");
+  assert.doesNotMatch(subject, /—/);
+});
+
+test("review requests go out once per order, a few days after delivery, and a failed send is retried later", async () => {
+  const { deliverReviewRequest, sendDueReviewRequests, reviewRequestWindow } = await import("../src/lib/review-requests");
+  const { REVIEW_REQUEST_DELAY_DAYS, REVIEW_REQUEST_MAX_LATE_DAYS, reviewRequestStatus } = await import("../src/lib/reviews");
+  const now = new Date("2026-11-20T16:00:00Z");
+  const window = reviewRequestWindow(now);
+  const day = 86_400_000;
+  assert.equal(now.getTime() - window.deliveredBy.getTime(), REVIEW_REQUEST_DELAY_DAYS * day);
+  assert.equal(now.getTime() - window.deliveredFrom.getTime(), (REVIEW_REQUEST_DELAY_DAYS + REVIEW_REQUEST_MAX_LATE_DAYS) * day);
+
+  const claimed = new Set<string>();
+  const calls = { sends: 0, records: [] as boolean[], releases: 0 };
+  let nextSend: { sent: true } | { sent: false; reason: string } = { sent: true };
+  const deps = {
+    dueOrderIds: async () => ["o1"],
+    claim: async (id: string) => { if (claimed.has(id)) return false; claimed.add(id); return true; },
+    release: async (id: string) => { claimed.delete(id); calls.releases++; },
+    load: async () => reviewRequestPayload,
+    send: async () => { calls.sends++; return nextSend; },
+    record: async (_id: string, _p: unknown, r: { sent: boolean }) => { calls.records.push(r.sent); },
+  };
+  assert.deepEqual(await sendDueReviewRequests(now, deps), { due: 1, sent: 1, failed: [] });
+  assert.equal((await deliverReviewRequest("o1", deps)).sent, false, "a second run must not email again");
+  assert.equal(calls.sends, 1);
+
+  nextSend = { sent: false, reason: "SMTP down" };
+  assert.equal((await deliverReviewRequest("o2", deps)).sent, false);
+  assert.equal(calls.releases, 1, "the claim is released so tomorrow's run retries");
+  assert.deepEqual(calls.records, [true, false]);
+  nextSend = { sent: true };
+  assert.equal((await deliverReviewRequest("o2", deps)).sent, true);
+
+  const delivered = new Date("2026-11-10T12:00:00Z");
+  assert.equal(reviewRequestStatus({ deliveredAt: null, reviewRequestSentAt: null, hasReview: false, hasEmail: true }, now), null);
+  assert.match(reviewRequestStatus({ deliveredAt: delivered, reviewRequestSentAt: null, hasReview: false, hasEmail: true }, new Date("2026-11-11T12:00:00Z"))!, /will be emailed on Nov 14, 2026/);
+  assert.match(reviewRequestStatus({ deliveredAt: delivered, reviewRequestSentAt: new Date("2026-11-14T16:00:00Z"), hasReview: false, hasEmail: true }, now)!, /emailed Nov 14, 2026/);
+  assert.match(reviewRequestStatus({ deliveredAt: new Date("2026-09-01T12:00:00Z"), reviewRequestSentAt: null, hasReview: false, hasEmail: true }, now)!, /too long ago/);
+});

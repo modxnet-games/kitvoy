@@ -16,6 +16,8 @@ interface FulfillmentCardProps {
   fulfillmentStatus: FulfillmentStatus;
   trackingNumber: string | null;
   shippedAt: string | null;
+  /** Where the post-delivery review request stands, or null before delivery */
+  reviewRequest?: string | null;
   /** CJdropshipping state; null when CJ isn't configured */
   cj: { orderId: string | null; status: string | null; error: string | null } | null;
 }
@@ -39,6 +41,7 @@ export function FulfillmentCard({
   fulfillmentStatus,
   trackingNumber,
   shippedAt,
+  reviewRequest,
   cj,
 }: FulfillmentCardProps) {
   const router = useRouter();
@@ -272,6 +275,8 @@ export function FulfillmentCard({
               Shipped {new Date(shippedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
             </p>
           )}
+
+          {reviewRequest && <p className="text-xs text-muted-foreground">{reviewRequest}</p>}
 
           {fulfillmentStatus !== "UNFULFILLED" && (
             <button

@@ -10,9 +10,11 @@ import { BUNDLE_TIERS, getBundleSavings, getLineTotal } from "@/lib/bundles";
 import { formatPrice } from "@/lib/formatters";
 import { isVideoMediaUrl } from "@/lib/media-url";
 import { storefrontFaqs } from "@/lib/storefront-faq";
+import type { ReviewSummary } from "@/lib/reviews";
 import { useCartStore } from "@/store/cart-store";
 import { useStorefrontUI } from "@/store/storefront-ui";
 import { usePointerTilt } from "@/hooks/use-pointer-tilt";
+import { CustomerReviews } from "./customer-reviews";
 
 const SOURCE_PHOTO = "/kitvoy/inflator.jpg";
 // Gallery labels follow the admin image order: the whole product, then its
@@ -86,7 +88,7 @@ function ProductGallery({ product }: { product: ProductDisplay | null }) {
   </div>;
 }
 
-export function StorefrontHome({ product }: { product: ProductDisplay | null }) {
+export function StorefrontHome({ product, reviews }: { product: ProductDisplay | null; reviews?: ReviewSummary | null }) {
   const [quantity, setQuantity] = useState(1);
   const [pastPurchase, setPastPurchase] = useState(false);
   const [bundlesVisible, setBundlesVisible] = useState(false);
@@ -159,6 +161,8 @@ export function StorefrontHome({ product }: { product: ProductDisplay | null }) 
         return <label key={tier.quantity} className={`bundle-option ${quantity === tier.quantity ? "is-selected" : ""} ${unavailable ? "is-unavailable" : ""}`}><input type="radio" name="bundle" value={tier.quantity} checked={quantity === tier.quantity} disabled={unavailable} onChange={() => setQuantity(tier.quantity)} /><span className="bundle-thumb"><Image width={800} height={800} src={photo} alt="" sizes="96px" loading="lazy" /></span><span className="bundle-option-copy">{bestValue && <em className="bundle-badge">Best value</em>}<strong>{tier.quantity} {tier.quantity === 1 ? "inflator" : "inflators"}</strong><b>{lineTotal == null ? "Unavailable" : formatPrice(lineTotal)} <small>total</small></b><span>{unavailable ? "Currently unavailable" : savings > 0 ? `${formatPrice(lineTotal! / tier.quantity)} each · Save ${formatPrice(savings)}` : "For your daily drive."}</span></span><span className="radio-indicator" aria-hidden="true">{quantity === tier.quantity && <Check size={14} />}</span></label>;
       })}</fieldset><div ref={bundlePurchase} className="bundle-action"><button className="primary-button" disabled={!canBuy} onClick={addBundle}>{canBuy ? `Add ${quantity} to cart · ${formatPrice(total!)}` : product ? "Unavailable in this quantity" : "Currently unavailable"}<ArrowRight size={18} /></button></div><div className="bundle-footer-note"><Truck size={20} /><span>{freeShipping ? "Free U.S. shipping on every bundle" : "Shipping calculated in your cart"}</span></div><Link className="text-link" href="/support#shipping-returns">Shipping & returns information</Link></div>
     </div></section>
+
+    {reviews && reviews.count > 0 && <CustomerReviews summary={reviews} />}
 
     <section id="faq" className="store-container faq-section" aria-labelledby="faq-heading"><div><p className="eyebrow">Good to know</p><h2 id="faq-heading">Questions?<br />We&apos;ve got answers.</h2><p>More questions?{" "}<Link className="text-link" href="/support#contact">Visit support <ArrowRight size={15} /></Link></p></div><div className="faq-list">{faqs.map(faq => <details key={faq.q}><summary>{faq.q}<Plus size={19} /></summary><p>{faq.a}</p></details>)}</div></section>
 

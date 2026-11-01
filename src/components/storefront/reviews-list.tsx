@@ -1,20 +1,22 @@
 "use client";
 
-import { Star } from "lucide-react";
+import { BadgeCheck, Star } from "lucide-react";
 import { useLanguage } from "@/contexts/language-context";
-import type { ReviewWithUser } from "@/lib/data/reviews";
+import type { PublicReview } from "@/lib/reviews";
+import { STORE_TIME_ZONE } from "@/lib/formatters";
 import { normalizeMediaSrc } from "@/lib/media-url";
 
 interface ReviewsListProps {
-  reviews: ReviewWithUser[];
+  reviews: PublicReview[];
 }
 
-function formatDate(date: Date) {
+function formatDate(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(new Date(date));
+    timeZone: STORE_TIME_ZONE,
+  }).format(new Date(iso));
 }
 
 export function ReviewsList({ reviews }: ReviewsListProps) {
@@ -30,7 +32,13 @@ export function ReviewsList({ reviews }: ReviewsListProps) {
         <div key={review.id} className="rounded-lg border bg-card p-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <p className="font-medium">{review.user.fullName}</p>
+              <p className="font-medium">{review.author}</p>
+              {review.verified && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                  <BadgeCheck className="size-3.5" aria-hidden="true" />
+                  {t("reviews.verifiedBuyer")}
+                </span>
+              )}
               <div className="flex items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map((value) => (
                   <Star

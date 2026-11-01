@@ -1,6 +1,7 @@
 import { storePolicies } from "@/config/policies";
 import { productSeo } from "@/config/seo";
 import { siteConfig } from "@/config/site";
+import { REVIEWS_SHOWN_FIRST, type ReviewSummary } from "@/lib/reviews";
 import type { ProductDisplay } from "@/types/product";
 
 const absolute = (path: string) => new URL(path, siteConfig.url).toString();
@@ -42,10 +43,11 @@ export function websiteSchema() {
 }
 
 /**
- * The inflator with its live price and stock. No rating markup: the store has
- * no reviews yet, and Google penalizes ratings that aren't backed by reviews.
+ * The inflator with its live price and stock. Rating markup is added only when
+ * approved reviews exist, from the same reviews the landing page shows; Google
+ * penalizes ratings that aren't backed by reviews on the page.
  */
-export function productSchema(product: ProductDisplay) {
+export function productSchema(product: ProductDisplay, reviews?: ReviewSummary | null) {
   const freeShipping = (product.shippingTax ?? 0) === 0;
   return {
     "@type": "Product",
@@ -77,6 +79,27 @@ export function productSchema(product: ProductDisplay) {
       },
       hasMerchantReturnPolicy: returnPolicySchema(),
     },
+    ...(reviews && reviews.count > 0 ? reviewSchema(reviews) : {}),
+  };
+}
+
+/** aggregateRating over every approved review, and the reviews shown first on the page. */
+export function reviewSchema(reviews: ReviewSummary) {
+  return {
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: reviews.average,
+      reviewCount: reviews.count,
+      bestRating: 5,
+      worstRating: 1,
+    },
+    review: reviews.reviews.slice(0, REVIEWS_SHOWN_FIRST).map((r) => ({
+      "@type": "Review",
+      author: { "@type": "Person", name: r.author },
+      datePublished: r.publishedOn,
+      reviewBody: r.comment,
+      reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5, worstRating: 1 },
+    })),
   };
 }
 

@@ -1,11 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { getCustomer } from "@/lib/auth/customer-session";
 import {
   createReview,
+  findPurchaseForReview,
   findReviewByUserAndProduct,
 } from "@/lib/data/reviews";
+import { isReviewUpload, parseReviewInput } from "@/lib/reviews";
 import { uploadReviewImage } from "@/lib/upload";
 
 export type SubmitReviewResult =
@@ -22,38 +25,36 @@ export async function submitReviewAction(
     return { success: false, error: "reviews.loginRequired" };
   }
 
-  const ratingRaw = formData.get("rating");
-  const rating = ratingRaw ? parseInt(String(ratingRaw), 10) : 0;
-  const comment = (formData.get("comment") as string)?.trim() ?? "";
-
-  if (rating < 1 || rating > 5) {
-    return { success: false, error: "reviews.ratingRequired" };
-  }
-  if (!comment) {
-    return { success: false, error: "reviews.commentRequired" };
-  }
+  const input = parseReviewInput(formData);
+  if (!input.ok) return { success: false, error: input.error };
 
   const existing = await findReviewByUserAndProduct(customer.userId, productId);
   if (existing) {
     return { success: false, error: "reviews.alreadyReviewed" };
   }
 
-  const imageUrls: string[] = [];
-  const rawUrls = formData.getAll("imageUrls") as string[];
-  for (const u of rawUrls) {
-    const url = u?.trim();
-    if (url) imageUrls.push(url);
+  // Linking the purchase is what earns the "Verified Buyer" badge
+  const purchase = await findPurchaseForReview(customer, productId).catch(() => null);
+  if (purchase?.reviews.length) {
+    return { success: false, error: "reviews.alreadyReviewed" };
   }
+
+  const images = (formData.getAll("imageUrls") as string[]).map((u) => u?.trim()).filter((u) => u && isReviewUpload(u)).slice(0, 4);
 
   try {
     await createReview({
       userId: customer.userId,
+      orderId: purchase?.id ?? null,
       productId,
-      rating,
-      comment,
-      images: imageUrls,
+      authorName: customer.fullName,
+      rating: input.rating,
+      comment: input.comment,
+      images,
     });
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { success: false, error: "reviews.alreadyReviewed" };
+    }
     const msg = e instanceof Error ? e.message : "";
     const isDataLayer = msg === "Review data layer unavailable";
     return {
@@ -62,9 +63,9 @@ export async function submitReviewAction(
     };
   }
 
+  // Nothing public changes until an admin approves it
   revalidatePath(`/shop/${productSlug}`);
-  revalidatePath("/shop");
-  revalidatePath("/");
+  revalidatePath("/admin/reviews");
   return { success: true };
 }
 

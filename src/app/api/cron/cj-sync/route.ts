@@ -1,22 +1,15 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { isCjConfigured } from "@/config/fulfillment";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { syncCjTracking } from "@/lib/fulfillment/cj";
-
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  const provided = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  if (!secret || provided.length !== secret.length) return false;
-  return timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
-}
 
 /**
  * GET /api/cron/cj-sync  (Authorization: Bearer $CRON_SECRET)
  * Run on a schedule to mark CJ orders shipped/delivered and email tracking.
  */
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
   if (!isCjConfigured()) {

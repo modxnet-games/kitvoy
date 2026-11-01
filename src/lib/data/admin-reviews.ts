@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { isVerifiedPurchase } from "@/lib/reviews";
 
 function getReviewDelegate() {
   try {
@@ -31,6 +32,13 @@ async function recalculateProductReviewStats(
   });
 }
 
+/** Pending: new and never moderated. Approved: shown on the storefront. Hidden: taken down by an admin. */
+export type ReviewState = "pending" | "approved" | "hidden";
+
+export function reviewState(r: { isVisible: boolean; moderatedAt: Date | null }): ReviewState {
+  return r.isVisible ? "approved" : r.moderatedAt ? "hidden" : "pending";
+}
+
 export type AdminReviewListItem = {
   id: string;
   rating: number;
@@ -39,9 +47,44 @@ export type AdminReviewListItem = {
   isVisible: boolean;
   moderatedAt: Date | null;
   createdAt: Date;
-  user: { fullName: string };
+  state: ReviewState;
+  /** Kept in this shape for the admin app; guests' reviews use the order's name and email */
+  user: { fullName: string; email: string | null };
+  /** The order the review is about, when there is one */
+  orderId: string | null;
+  verified: boolean;
   product: { id: string; name: string; slug: string };
 };
+
+export type AdminReviewDetail = AdminReviewListItem;
+
+const adminInclude = {
+  user: { select: { fullName: true, email: true } },
+  order: { select: { id: true, email: true, customerName: true, paymentStatus: true, status: true } },
+  product: { select: { id: true, name: true, slug: true } },
+} as const;
+
+type AdminReviewRow = Prisma.ReviewGetPayload<{ include: typeof adminInclude }>;
+
+function toAdminReview(r: AdminReviewRow): AdminReviewListItem {
+  return {
+    id: r.id,
+    rating: r.rating,
+    comment: r.comment,
+    images: r.images,
+    isVisible: r.isVisible,
+    moderatedAt: r.moderatedAt,
+    createdAt: r.createdAt,
+    state: reviewState(r),
+    user: {
+      fullName: r.authorName ?? r.user?.fullName ?? r.order?.customerName ?? "Customer",
+      email: r.user?.email ?? r.order?.email ?? null,
+    },
+    orderId: r.order?.id ?? null,
+    verified: isVerifiedPurchase(r.order),
+    product: r.product,
+  };
+}
 
 export async function getAllAdminReviews(): Promise<AdminReviewListItem[]> {
   const review = getReviewDelegate();
@@ -49,35 +92,22 @@ export async function getAllAdminReviews(): Promise<AdminReviewListItem[]> {
 
   try {
     const reviews = await review.findMany({
-      include: {
-        user: { select: { fullName: true } },
-        product: { select: { id: true, name: true, slug: true } },
-      },
+      include: adminInclude,
       orderBy: { createdAt: "desc" },
     });
-    return reviews as AdminReviewListItem[];
+    return reviews.map(toAdminReview);
   } catch {
     return [];
   }
 }
-
-export type AdminReviewDetail = Omit<AdminReviewListItem, "user"> & {
-  user: { fullName: string; email: string };
-};
 
 export async function getAdminReviewById(id: string): Promise<AdminReviewDetail | null> {
   const review = getReviewDelegate();
   if (!review) return null;
 
   try {
-    const r = await review.findUnique({
-      where: { id },
-      include: {
-        user: { select: { fullName: true, email: true } },
-        product: { select: { id: true, name: true, slug: true } },
-      },
-    });
-    return r as AdminReviewDetail | null;
+    const r = await review.findUnique({ where: { id }, include: adminInclude });
+    return r ? toAdminReview(r) : null;
   } catch {
     return null;
   }

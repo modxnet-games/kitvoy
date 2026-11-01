@@ -11,7 +11,7 @@ import {
 } from "@/components/storefront";
 import { useLanguage } from "@/contexts/language-context";
 import type { ProductDisplay } from "@/types/product";
-import type { ReviewWithUser } from "@/lib/data/reviews";
+import type { PublicReview } from "@/lib/reviews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -21,7 +21,7 @@ import { ProductDetailsClient } from "./product-details-client";
 interface ProductPageContentProps {
   product: ProductDisplay;
   relatedProducts: ProductDisplay[];
-  reviews: ReviewWithUser[];
+  reviews: PublicReview[];
   customer: { userId: string; fullName: string; email: string } | null;
   hasReviewed: boolean;
 }

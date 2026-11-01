@@ -72,18 +72,26 @@ model Product {
 
 model Review {
   id          String    @id @default(cuid())
-  userId      String
+  /// Null for reviews written from the emailed review link of a guest order
+  userId      String?
   productId   String
+  /// The purchase this review is about; a paid order earns the "Verified Buyer" badge
+  orderId     String?
+  /// Name as written at submission (account or order name); shown as "First L."
+  authorName  String?
   rating      Int
   comment     String
   images      String[]
-  isVisible   Boolean   @default(true)
+  /// Approved for the storefront. New reviews wait for an admin to approve them.
+  isVisible   Boolean   @default(false)
   moderatedAt DateTime?
   createdAt   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order       Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@unique([userId, productId])
+  @@unique([orderId, productId])
   @@index([productId])
   @@index([isVisible])
   @@map("reviews")
@@ -154,12 +162,17 @@ model Order {
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
   trackingNumber    String?
   shippedAt         DateTime?
+  /// When the order was first marked Delivered; cleared if that's undone
+  deliveredAt       DateTime?
+  /// When the post-delivery review request email was claimed for sending; set once
+  reviewRequestSentAt DateTime?
   userId            String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   user              User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   items             OrderItem[]
   sentEmails        SentEmail[]
+  reviews           Review[]
 
   @@index([status])
   @@index([createdAt])

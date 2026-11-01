@@ -4,6 +4,7 @@ import { landingConfig } from "@/config/landing";
 import { productSeo } from "@/config/seo";
 import { siteConfig } from "@/config/site";
 import { getProductBySlug } from "@/lib/data/products";
+import { getProductReviewSummary } from "@/lib/data/reviews";
 import { getStoreSettings } from "@/lib/data/store-settings";
 import { faqSchema, graph, organizationSchema, productSchema, websiteSchema } from "@/lib/seo/structured-data";
 import { storefrontFaqs } from "@/lib/storefront-faq";
@@ -34,15 +35,17 @@ export default async function HomePage() {
     getProductBySlug(landingConfig.productSlug).catch(() => null),
     getStoreSettings().catch(() => null),
   ]);
+  // The reviews section and the rating markup come from the same approved reviews
+  const reviews = product ? await getProductReviewSummary(product.id) : null;
   const structured = graph(
     organizationSchema(settings?.supportEmail || undefined),
     websiteSchema(),
-    ...(product ? [productSchema(product), faqSchema(storefrontFaqs((product.shippingTax ?? 0) === 0))] : []),
+    ...(product ? [productSchema(product, reviews), faqSchema(storefrontFaqs((product.shippingTax ?? 0) === 0))] : []),
   );
   return (
     <>
       <JsonLd data={structured} />
-      <StorefrontHome product={product} />
+      <StorefrontHome product={product} reviews={reviews} />
     </>
   );
 }

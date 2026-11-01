@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Trash2 } from "lucide-react";
+import { Check, EyeOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   toggleReviewVisibilityAction,
@@ -60,8 +60,8 @@ export function ReviewDetailActions({
           </>
         ) : (
           <>
-            <Eye className="mr-1.5 size-4" />
-            Show
+            <Check className="mr-1.5 size-4" />
+            Approve
           </>
         )}
       </Button>

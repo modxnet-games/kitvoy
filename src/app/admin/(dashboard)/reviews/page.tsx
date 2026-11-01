@@ -3,6 +3,10 @@ import { Star as StarIcon } from "lucide-react";
 import { getAllAdminReviews } from "@/lib/data/admin-reviews";
 import { Badge } from "@/components/ui/badge";
 import { ReviewRowActions } from "./review-row-actions";
+import { ReviewStateBadge } from "./review-state-badge";
+
+// New reviews arrive from the storefront and emailed links; always show the current list
+export const dynamic = "force-dynamic";
 
 function truncate(str: string, max: number) {
   if (str.length <= max) return str;
@@ -35,7 +39,10 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default async function AdminReviewsPage() {
-  const reviews = await getAllAdminReviews();
+  const all = await getAllAdminReviews();
+  // Waiting for approval first, then newest
+  const reviews = [...all.filter((r) => r.state === "pending"), ...all.filter((r) => r.state !== "pending")];
+  const pending = all.filter((r) => r.state === "pending").length;
 
   return (
     <div>
@@ -44,8 +51,15 @@ export default async function AdminReviewsPage() {
           Reviews
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Moderate customer reviews from your storefront
+          New reviews stay off the storefront until you approve them. Approve
+          every genuine review, good or bad; hide only spam, abuse or personal
+          details.
         </p>
+        {pending > 0 && (
+          <p className="mt-3 inline-flex rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900">
+            {pending} {pending === 1 ? "review is" : "reviews are"} waiting for approval
+          </p>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
@@ -78,8 +92,11 @@ export default async function AdminReviewsPage() {
                   key={review.id}
                   className="border-b last:border-0 transition-colors hover:bg-muted/40"
                 >
-                  <td className="px-4 py-3.5 font-semibold">
-                    {review.user.fullName}
+                  <td className="px-4 py-3.5">
+                    <p className="font-semibold">{review.user.fullName}</p>
+                    {review.verified && (
+                      <p className="text-xs font-medium text-emerald-700">Verified Buyer</p>
+                    )}
                   </td>
                   <td className="px-4 py-3.5">
                     <Link
@@ -105,16 +122,7 @@ export default async function AdminReviewsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3.5">
-                    <Badge
-                      variant={review.isVisible ? "default" : "secondary"}
-                      className={
-                        review.isVisible
-                          ? "bg-emerald-600 hover:bg-emerald-700"
-                          : ""
-                      }
-                    >
-                      {review.isVisible ? "Visible" : "Hidden"}
-                    </Badge>
+                    <ReviewStateBadge state={review.state} />
                   </td>
                   <td className="px-4 py-3.5 text-muted-foreground">
                     {formatDate(review.createdAt)}

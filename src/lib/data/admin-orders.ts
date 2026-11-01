@@ -42,10 +42,16 @@ export async function getOrderById(id: string) {
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   const order = getOrderDelegate();
   if (!order) throw new Error("Order data layer unavailable");
+  const current = await order.findUnique({ where: { id }, select: { deliveredAt: true } });
   return order.update({
     where: { id },
-    data: { status },
+    data: { status, deliveredAt: deliveredAtFor(status, current?.deliveredAt ?? null) },
   });
+}
+
+/** Keeps the first delivery time (the review request counts from it); cleared when delivery is undone. */
+function deliveredAtFor(status: OrderStatus, current: Date | null): Date | null {
+  return status === "DELIVERED" ? (current ?? new Date()) : null;
 }
 
 /** Delete an order and its items (OrderItems are deleted by cascade). */
@@ -144,6 +150,7 @@ export async function updateOrderFulfillment(
       trackingNumber,
       status,
       shippedAt: next === "UNFULFILLED" ? null : (order.shippedAt ?? new Date()),
+      deliveredAt: deliveredAtFor(status, order.deliveredAt),
     },
   });
   return {

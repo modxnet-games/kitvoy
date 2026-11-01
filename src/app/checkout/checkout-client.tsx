@@ -8,6 +8,7 @@ import { ShoppingBag } from "lucide-react";
 import { useLanguage } from "@/contexts/language-context";
 import { useCartStore } from "@/store/cart-store";
 import { Breadcrumbs, EmptyState } from "@/components/storefront";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { CheckoutForm, OrderSummary } from "@/components/checkout";
 import type { CheckoutFormData } from "@/components/checkout";
 import { PayPalPayment } from "@/components/checkout/paypal-payment";
@@ -18,6 +19,8 @@ import { useMounted } from "@/hooks/use-mounted";
 interface CheckoutClientProps {
   /** Public PayPal client id, or null when PayPal isn't configured */
   paypalClientId: string | null;
+  /** The signed-in customer, whose order is saved to their account */
+  customer: { email: string; fullName: string } | null;
 }
 
 /** `cartKey` is the cart the order was created from; its total is stale once the cart changes. */
@@ -27,7 +30,7 @@ type PendingOrder = { orderId: string; orderReference: string; cartKey: string }
  * Two steps: shipping details create a pending (unpaid) order, then PayPal
  * collects payment for that order's server-side total.
  */
-export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
+export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps) {
   const { t } = useLanguage();
   const router = useRouter();
   const mounted = useMounted();
@@ -146,12 +149,31 @@ export function CheckoutClient({ paypalClientId }: CheckoutClientProps) {
                 </section>
               </div>
             ) : (
-              <CheckoutForm
-                onSubmit={handleDetails}
-                isSubmitting={isSubmitting}
-                initialValues={details ?? undefined}
-                submitLabel={t("checkout.continueToPayment")}
-              />
+              <>
+                {customer ? (
+                  <p className="mb-6 rounded-lg bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+                    {t("checkout.signedInAs", { email: customer.email })}
+                  </p>
+                ) : (
+                  <div className="mb-8 space-y-3">
+                    <div>
+                      <h2 className="text-base font-semibold">{t("checkout.googleTitle")}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">{t("checkout.googleText")}</p>
+                    </div>
+                    <GoogleSignInButton redirectUrl="/checkout" />
+                    <div className="relative pt-3">
+                      <div className="absolute inset-x-0 top-1/2 border-t border-border" />
+                      <p className="relative mx-auto w-fit bg-card px-3 text-xs uppercase tracking-wide text-muted-foreground">{t("checkout.guestDivider")}</p>
+                    </div>
+                  </div>
+                )}
+                <CheckoutForm
+                  onSubmit={handleDetails}
+                  isSubmitting={isSubmitting}
+                  initialValues={details ?? (customer ? { email: customer.email, fullName: customer.fullName } : undefined)}
+                  submitLabel={t("checkout.continueToPayment")}
+                />
+              </>
             )}
           </div>
         </div>

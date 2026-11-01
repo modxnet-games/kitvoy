@@ -1,56 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? "";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "";
+import {
+  GOOGLE_STATE_COOKIE,
+  GOOGLE_STATE_TTL_SECONDS,
+  createGoogleAuthRequest,
+  googleConfig,
+  googleRedirectUri,
+  publicBaseUrl,
+  safeRedirectPath,
+} from "@/lib/auth/google-oauth";
 
-function getPublicBaseUrl(origin: string): string {
-  if (APP_URL) return APP_URL.replace(/\/+$/, "");
-  return origin.replace(/\/+$/, "");
-}
+export const dynamic = "force-dynamic";
 
-function resolveRedirectUri(origin: string): string {
-  const configured = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim();
-  if (configured) return configured;
-  if (APP_URL) return `${APP_URL.replace(/\/+$/, "")}/api/auth/google/callback`;
-  return `${origin}/api/auth/google/callback`;
-}
-
-function sanitizeRedirectPath(raw: string | null): string {
-  if (!raw) return "/shop";
-  const value = raw.trim();
-  if (!value.startsWith("/")) return "/shop";
-  if (value.startsWith("//")) return "/shop";
-  return value;
-}
-
+/** Starts Google sign-in: /api/auth/google?redirect=/checkout */
 export async function GET(request: NextRequest) {
-  const publicBaseUrl = getPublicBaseUrl(request.nextUrl.origin);
-  if (!CLIENT_ID) {
-    return NextResponse.redirect(
-      `${publicBaseUrl}/login?error=google_not_configured`,
-    );
+  const origin = request.nextUrl.origin;
+  const base = publicBaseUrl(origin);
+  const redirect = safeRedirectPath(request.nextUrl.searchParams.get("redirect"));
+  const { clientId, configured } = googleConfig();
+  if (!configured) {
+    return NextResponse.redirect(`${base}/login?error=google_not_configured&redirect=${encodeURIComponent(redirect)}`);
   }
 
-  const redirectTo = sanitizeRedirectPath(
-    request.nextUrl.searchParams.get("redirect"),
-  );
-  const redirectUri = resolveRedirectUri(request.nextUrl.origin);
-
-  const state = Buffer.from(JSON.stringify({ redirect: redirectTo })).toString(
-    "base64url",
-  );
-
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: "openid email profile",
-    access_type: "offline",
-    prompt: "select_account",
-    state,
+  const { url, cookie } = createGoogleAuthRequest(clientId, googleRedirectUri(origin), redirect);
+  const response = NextResponse.redirect(url);
+  response.cookies.set(GOOGLE_STATE_COOKIE, cookie, {
+    httpOnly: true,
+    secure: base.startsWith("https"),
+    // Lax still sends it on Google's top-level redirect back to the callback
+    sameSite: "lax",
+    path: "/api/auth/google",
+    maxAge: GOOGLE_STATE_TTL_SECONDS,
   });
-
-  return NextResponse.redirect(
-    `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
-  );
+  return response;
 }

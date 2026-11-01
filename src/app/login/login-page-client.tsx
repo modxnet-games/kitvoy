@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { useLanguage } from "@/contexts/language-context";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { LoginForm } from "./login-form";
-import { GoogleLoginButton } from "./google-login-button";
 
 interface LoginPageClientProps {
   redirectUrl: string;
+  /** Set when Google sign-in sent the customer back with an error */
+  googleError?: string;
 }
 
-export function LoginPageClient({ redirectUrl }: LoginPageClientProps) {
+export function LoginPageClient({ redirectUrl, googleError }: LoginPageClientProps) {
   const { t } = useLanguage();
   const registerHref = redirectUrl ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : "/register";
 
@@ -24,7 +26,12 @@ export function LoginPageClient({ redirectUrl }: LoginPageClientProps) {
             {t("auth.login.subtitle")}
           </p>
         </div>
-        <GoogleLoginButton redirectUrl={redirectUrl} />
+        {googleError && (
+          <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-red-800">
+            {t(`auth.login.googleErrors.${googleError}`)}
+          </p>
+        )}
+        <GoogleSignInButton redirectUrl={redirectUrl} />
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-border" />
@@ -38,7 +45,7 @@ export function LoginPageClient({ redirectUrl }: LoginPageClientProps) {
         <LoginForm redirectUrl={redirectUrl} />
         <p className="text-center text-sm text-muted-foreground">
           {t("auth.login.noAccount")}{" "}
-          <Link href={registerHref} className="font-medium text-primary hover:underline">
+          <Link href={registerHref} className="font-medium text-[#a83d10] hover:underline">
             {t("auth.login.registerLink")}
           </Link>
         </p>

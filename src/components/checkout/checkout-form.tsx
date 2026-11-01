@@ -36,14 +36,14 @@ const ALL_TOUCHED = Object.fromEntries(
 interface CheckoutFormProps {
   onSubmit: (data: CheckoutFormData) => void;
   isSubmitting?: boolean;
-  /** Pre-fill when the customer goes back to edit their details */
-  initialValues?: CheckoutFormData;
+  /** Pre-fill: the signed-in customer's name and email, or their details when they go back to edit */
+  initialValues?: Partial<CheckoutFormData>;
   submitLabel?: string;
 }
 
 export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, submitLabel }: CheckoutFormProps) {
   const { t } = useLanguage();
-  const [values, setValues] = useState<CheckoutFormData>(initialValues ?? EMPTY_FORM);
+  const [values, setValues] = useState<CheckoutFormData>({ ...EMPTY_FORM, ...initialValues });
   const [errors, setErrors] = useState<CheckoutErrors>({});
   const [touched, setTouched] = useState<Partial<Record<keyof CheckoutFormData, boolean>>>({});
 

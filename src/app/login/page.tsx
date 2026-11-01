@@ -1,26 +1,20 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCustomer } from "@/lib/auth/customer-session";
+import { googleErrorCode, safeRedirectPath } from "@/lib/auth/google-oauth";
 import { LoginPageClient } from "./login-page-client";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false, follow: true } };
 
-const DEFAULT_REDIRECT = "/shop";
-
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<{ redirect?: string; error?: string }>;
 }) {
-  const customer = await getCustomer();
-  if (customer) {
-    const { redirect: redirectTo } = await searchParams;
-    const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : DEFAULT_REDIRECT;
-    redirect(target);
-  }
+  const { redirect: redirectTo, error } = await searchParams;
+  const redirectUrl = safeRedirectPath(redirectTo);
 
-  const { redirect: redirectTo } = await searchParams;
-  const redirectUrl = redirectTo && redirectTo.startsWith("/") ? redirectTo : DEFAULT_REDIRECT;
+  if (await getCustomer()) redirect(redirectUrl);
 
-  return <LoginPageClient redirectUrl={redirectUrl} />;
+  return <LoginPageClient redirectUrl={redirectUrl} googleError={googleErrorCode(error)} />;
 }

@@ -305,3 +305,44 @@ test("terms name New Mexico as the governing law", async () => {
   const { storePolicies } = await import("../src/config/policies");
   assert.equal(storePolicies.governingLaw, "the State of New Mexico, United States");
 });
+
+test("Google sign-in only returns to same-site paths", async () => {
+  const { safeRedirectPath } = await import("../src/lib/auth/google-oauth");
+  assert.equal(safeRedirectPath("/checkout"), "/checkout");
+  assert.equal(safeRedirectPath("/account/orders?tab=1"), "/account/orders?tab=1");
+  for (const bad of ["//evil.com", "/\\evil.com", "https://evil.com", "evil.com", "/\tevil", "", null, undefined]) {
+    assert.equal(safeRedirectPath(bad), "/account", String(bad));
+  }
+});
+
+test("Google sign-in request uses PKCE and a state the callback must match", async () => {
+  const { createGoogleAuthRequest, readGoogleStateCookie, statesMatch } = await import("../src/lib/auth/google-oauth");
+  const { createHash } = await import("node:crypto");
+  const { url, cookie } = createGoogleAuthRequest("client-id", "https://kitvoy.com/api/auth/google/callback", "//evil.com");
+  const params = new URL(url).searchParams;
+  const saved = readGoogleStateCookie(cookie)!;
+  assert.equal(params.get("redirect_uri"), "https://kitvoy.com/api/auth/google/callback");
+  assert.equal(params.get("scope"), "openid email profile");
+  assert.equal(params.get("code_challenge_method"), "S256");
+  assert.equal(params.get("code_challenge"), createHash("sha256").update(saved.verifier).digest("base64url"));
+  assert.equal(params.get("access_type"), null);
+  assert.equal(saved.redirect, "/account");
+  assert.ok(statesMatch(saved.state, params.get("state")));
+  assert.ok(!statesMatch(saved.state, "forged"));
+  assert.ok(!statesMatch(saved.state, null));
+  assert.equal(readGoogleStateCookie("not-a-cookie"), null);
+  assert.notEqual(readGoogleStateCookie(createGoogleAuthRequest("c", "r", "/").cookie)!.state, saved.state);
+});
+
+test("Google accounts need a verified email before they can sign in or link", async () => {
+  const { checkGoogleProfile, googleErrorCode } = await import("../src/lib/auth/google-oauth");
+  assert.deepEqual(checkGoogleProfile({ sub: "1", email: "Sam@Example.com", email_verified: true, name: "Sam Lee", picture: "https://lh3.googleusercontent.com/a" }),
+    { ok: true, profile: { googleId: "1", email: "sam@example.com", fullName: "Sam Lee", image: "https://lh3.googleusercontent.com/a" } });
+  assert.deepEqual(checkGoogleProfile({ sub: "1", email: "sam@example.com", email_verified: false }), { ok: false, error: "google_unverified" });
+  assert.deepEqual(checkGoogleProfile({ sub: "1", email: "sam@example.com" }), { ok: false, error: "google_unverified" });
+  assert.deepEqual(checkGoogleProfile({ email: "sam@example.com", email_verified: true }), { ok: false, error: "google_profile_failed" });
+  assert.equal(checkGoogleProfile({ sub: "2", email: "pat@example.com", email_verified: true }).ok && "pat", "pat");
+  assert.equal(googleErrorCode("google_state"), "google_state");
+  assert.equal(googleErrorCode("google_token_failed"), "google_failed");
+  assert.equal(googleErrorCode("something_else"), undefined);
+});

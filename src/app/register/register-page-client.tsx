@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useLanguage } from "@/contexts/language-context";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { RegisterForm } from "./register-form";
-import { GoogleLoginButton } from "@/app/login/google-login-button";
 
 interface RegisterPageClientProps {
   redirectUrl: string;
@@ -24,7 +24,7 @@ export function RegisterPageClient({ redirectUrl }: RegisterPageClientProps) {
             {t("auth.register.subtitle")}
           </p>
         </div>
-        <GoogleLoginButton redirectUrl={redirectUrl} />
+        <GoogleSignInButton redirectUrl={redirectUrl} />
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-border" />
@@ -38,7 +38,7 @@ export function RegisterPageClient({ redirectUrl }: RegisterPageClientProps) {
         <RegisterForm redirectUrl={redirectUrl} />
         <p className="text-center text-sm text-muted-foreground">
           {t("auth.register.hasAccount")}{" "}
-          <Link href={loginHref} className="font-medium text-primary hover:underline">
+          <Link href={loginHref} className="font-medium text-[#a83d10] hover:underline">
             {t("auth.register.loginLink")}
           </Link>
         </p>

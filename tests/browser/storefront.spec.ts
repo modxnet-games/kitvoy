@@ -121,3 +121,18 @@ test("failed quote blocks checkout and can be retried", async ({ page }) => {
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByRole("link", { name: "Continue to checkout" })).toBeVisible();
 });
+
+test("sign-in and checkout offer Continue with Google", async ({ page }) => {
+  await page.goto("/login?error=google_denied&redirect=//evil.com");
+  await expect(page.getByRole("alert").filter({ hasText: "Google sign-in was cancelled" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Continue with Google" })).toHaveAttribute("href", "/api/auth/google?redirect=%2Faccount");
+  const login = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(login.violations).toEqual([]);
+
+  await page.goto("/");
+  await add(page, 1);
+  await page.getByRole("link", { name: "Continue to checkout" }).click();
+  await expect(page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Continue with Google" })).toHaveAttribute("href", "/api/auth/google?redirect=%2Fcheckout");
+  await noOverflow(page);
+});

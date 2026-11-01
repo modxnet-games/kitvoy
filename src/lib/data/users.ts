@@ -48,6 +48,11 @@ export async function findUserById(id: string) {
   }
 }
 
+/**
+ * Signs in by Google account id, else links the Google account to an existing
+ * customer with the same (Google-verified) email, else creates one. The
+ * caller must pass only a verified email; see checkGoogleProfile.
+ */
 export async function findOrCreateGoogleUser(profile: {
   googleId: string;
   email: string;
@@ -60,7 +65,12 @@ export async function findOrCreateGoogleUser(profile: {
   const existing = await delegate.findUnique({
     where: { googleId: profile.googleId },
   });
-  if (existing) return existing;
+  if (existing) {
+    // Keep the profile picture current; the name stays as the customer set it
+    return profile.image && profile.image !== existing.image
+      ? delegate.update({ where: { id: existing.id }, data: { image: profile.image } })
+      : existing;
+  }
 
   const byEmail = await delegate.findUnique({
     where: { email: profile.email.trim().toLowerCase() },

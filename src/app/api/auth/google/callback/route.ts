@@ -1,76 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findOrCreateGoogleUser } from "@/lib/data/users";
+
 import { getCustomerSession } from "@/lib/auth/customer-session";
+import {
+  DEFAULT_AFTER_LOGIN,
+  GOOGLE_STATE_COOKIE,
+  checkGoogleProfile,
+  googleConfig,
+  googleRedirectUri,
+  publicBaseUrl,
+  readGoogleStateCookie,
+  statesMatch,
+  type GoogleProfile,
+} from "@/lib/auth/google-oauth";
+import { findOrCreateGoogleUser } from "@/lib/data/users";
 import { saveSubscriberEmail } from "@/lib/subscribers";
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? "";
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? "";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "";
-
-function getPublicBaseUrl(origin: string): string {
-  if (APP_URL) return APP_URL.replace(/\/+$/, "");
-  return origin.replace(/\/+$/, "");
-}
-
-function resolveRedirectUri(origin: string): string {
-  const configured = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim();
-  if (configured) return configured;
-  if (APP_URL) return `${APP_URL.replace(/\/+$/, "")}/api/auth/google/callback`;
-  return `${origin}/api/auth/google/callback`;
-}
-
-function sanitizeRedirectPath(raw: string): string {
-  const value = raw.trim();
-  if (!value.startsWith("/")) return "/shop";
-  if (value.startsWith("//")) return "/shop";
-  return value;
-}
-
-interface GoogleTokenResponse {
-  access_token: string;
-  id_token: string;
-  token_type: string;
-}
-
-interface GoogleUserInfo {
-  sub: string;
-  email: string;
-  name: string;
-  picture?: string;
-  email_verified: boolean;
-}
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const appOrigin = request.nextUrl.origin;
-  const publicBaseUrl = getPublicBaseUrl(appOrigin);
-  const redirectUri = resolveRedirectUri(appOrigin);
+  const origin = request.nextUrl.origin;
+  const base = publicBaseUrl(origin);
+  const params = request.nextUrl.searchParams;
+  const saved = readGoogleStateCookie(request.cookies.get(GOOGLE_STATE_COOKIE)?.value);
+  const redirectTo = saved?.redirect ?? DEFAULT_AFTER_LOGIN;
 
-  const code = request.nextUrl.searchParams.get("code");
-  const stateParam = request.nextUrl.searchParams.get("state");
+  const finish = (path: string) => {
+    const response = NextResponse.redirect(`${base}${path}`);
+    // One use only, whatever the outcome
+    response.cookies.delete({ name: GOOGLE_STATE_COOKIE, path: "/api/auth/google" });
+    return response;
+  };
+  const fail = (error: string) => finish(`/login?error=${error}&redirect=${encodeURIComponent(redirectTo)}`);
 
-  let redirectTo = "/shop";
-  if (stateParam) {
-    try {
-      const decoded = JSON.parse(
-        Buffer.from(stateParam, "base64url").toString(),
-      );
-      if (decoded.redirect && typeof decoded.redirect === "string") {
-        redirectTo = sanitizeRedirectPath(decoded.redirect);
-      }
-    } catch {}
-  }
+  if (!saved || !statesMatch(saved.state, params.get("state"))) return fail("google_state");
+  // The customer pressed Cancel on Google's screen, or Google refused the request
+  if (params.get("error")) return fail("google_denied");
+  const code = params.get("code");
+  if (!code) return fail("google_denied");
 
-  if (!code) {
-    return NextResponse.redirect(
-      `${publicBaseUrl}/login?error=google_denied&redirect=${encodeURIComponent(redirectTo)}`,
-    );
-  }
-
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    return NextResponse.redirect(
-      `${publicBaseUrl}/login?error=google_not_configured&redirect=${encodeURIComponent(redirectTo)}`,
-    );
-  }
+  const { clientId, clientSecret, configured } = googleConfig();
+  if (!configured) return fail("google_not_configured");
 
   try {
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -78,53 +47,42 @@ export async function GET(request: NextRequest) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        redirect_uri: redirectUri,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: googleRedirectUri(origin),
         grant_type: "authorization_code",
+        code_verifier: saved.verifier,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
-
     if (!tokenRes.ok) {
-      return NextResponse.redirect(
-        `${publicBaseUrl}/login?error=google_token_failed&redirect=${encodeURIComponent(redirectTo)}`,
-      );
+      console.warn("[auth] Google token exchange failed:", tokenRes.status);
+      return fail("google_token_failed");
     }
+    const tokens = (await tokenRes.json()) as { access_token?: string };
+    if (!tokens.access_token) return fail("google_token_failed");
 
-    const tokens: GoogleTokenResponse = await tokenRes.json();
-
-    const userRes = await fetch(
-      "https://www.googleapis.com/oauth2/v3/userinfo",
-      { headers: { Authorization: `Bearer ${tokens.access_token}` } },
-    );
-
-    if (!userRes.ok) {
-      return NextResponse.redirect(
-        `${publicBaseUrl}/login?error=google_profile_failed&redirect=${encodeURIComponent(redirectTo)}`,
-      );
-    }
-
-    const profile: GoogleUserInfo = await userRes.json();
-
-    const user = await findOrCreateGoogleUser({
-      googleId: profile.sub,
-      email: profile.email,
-      fullName: profile.name,
-      image: profile.picture,
+    const userRes = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+      signal: AbortSignal.timeout(10_000),
     });
+    if (!userRes.ok) return fail("google_profile_failed");
 
+    const checked = checkGoogleProfile((await userRes.json()) as Partial<GoogleProfile>);
+    if (!checked.ok) return fail(checked.error);
+
+    const user = await findOrCreateGoogleUser(checked.profile);
     const session = await getCustomerSession();
     session.userId = user.id;
     session.email = user.email;
     session.fullName = user.fullName;
     session.loginAt = Date.now();
     await session.save();
-    await saveSubscriberEmail(user.email, "google");
+    await saveSubscriberEmail(user.email, "google").catch(() => undefined);
 
-    return NextResponse.redirect(`${publicBaseUrl}${redirectTo}`);
-  } catch {
-    return NextResponse.redirect(
-      `${publicBaseUrl}/login?error=google_failed&redirect=${encodeURIComponent(redirectTo)}`,
-    );
+    return finish(redirectTo);
+  } catch (err) {
+    console.error("[auth] Google sign-in failed:", err instanceof Error ? err.message : err);
+    return fail("google_failed");
   }
 }

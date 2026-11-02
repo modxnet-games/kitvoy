@@ -43,14 +43,14 @@ for (const width of [360, 390, 768, 1440]) {
 
     await page.locator("#hero-cta").click();
     await choose(page, 2);
-    await expect(page.getByRole("button", { name: "Add 2 to cart · $101.98" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Add 2 to cart · $99.99" })).toBeEnabled();
     await page.locator("#bundles").screenshot({ path: screenshotDir + "/bundles-" + width + ".png" });
     await add(page, 2);
-    await expect(page.locator(".cart-total dd")).toHaveText("$101.98");
+    await expect(page.locator(".cart-total dd")).toHaveText("$99.99");
     await page.getByRole("button", { name: "Increase quantity" }).click();
     await expect(page.locator(".cart-total dd")).toHaveText("$134.98");
     await page.getByRole("button", { name: "Decrease quantity" }).click();
-    await expect(page.locator(".cart-total dd")).toHaveText("$101.98");
+    await expect(page.locator(".cart-total dd")).toHaveText("$99.99");
     await page.screenshot({ path: screenshotDir + "/cart-" + width + ".png" });
     await noOverflow(page);
     await page.keyboard.press("Escape");
@@ -91,7 +91,7 @@ test("mobile navigation, sticky bar and modal keyboard containment", async ({ pa
   await expect(page.getByRole("button", { name: "Add 3 to cart · $134.98" })).toBeFocused();
   await page.locator("#faq").scrollIntoViewIfNeeded();
   await page.getByText("How do the bundle savings work?", { exact: true }).click();
-  await expect(page.getByText(/Buy two inflators and save 15%/)).toBeVisible();
+  await expect(page.getByText(/Two inflators cost \$99\.99 together/)).toBeVisible();
   await noOverflow(page);
 });
 

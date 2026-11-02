@@ -47,7 +47,12 @@
 .hero-purchase { padding-top: 27px; }
 .hero-price { display: flex; align-items: baseline; gap: 13px; }
 .hero-price strong { font-size: 35px; font-weight: 750; letter-spacing: -.05em; }
-.hero-price > span { color: #666a67; font-size: 11px; }
+.hero-price > span { color: #171918; font-size: 13px; font-weight: 600; }
+/* PayPal fills this after the page is idle; the reserved height stops the layout from jumping */
+.pay-later-message { min-height: 20px; }
+.hero-pay-later { margin-top: 4px; }
+.bundle-pay-later { margin-top: 10px; }
+.hero-box-note { margin-top: 12px; color: #666a67; font-size: 12px; line-height: 1.5; }
 .hero-cta { margin-top: 19px; min-width: 290px; }
 .hero-how { display: flex; width: fit-content; margin-top: 5px; }
 .purchase-notes { display: flex; gap: 20px; margin-top: 16px; font-size: 11px; }
@@ -397,7 +402,8 @@
   .gallery-thumbnail > span:last-child { font-size: 10px; padding-block: 5px; }
   .hero-purchase { padding-top: 16px; }
   .hero-price strong { font-size: 32px; }
-  .hero-price > span { font-size: 10px; }
+  .hero-price > span { font-size: 12px; }
+  .hero-box-note { font-size: 11px; }
   .hero-cta { min-height: 50px; margin-top: 12px; }
   .hero-how { display: none; }
   .purchase-notes { justify-content: center; gap: 13px; font-size: 10px; margin-top: 16px; }

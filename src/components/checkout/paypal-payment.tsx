@@ -5,6 +5,7 @@ import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from "@pa
 import { Loader2, Lock } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
+import { paypalScriptOptions } from "@/components/payments/pay-later-message";
 
 interface PayPalPaymentProps {
   clientId: string;
@@ -82,7 +83,7 @@ export function PayPalPayment({ clientId, orderId, onPaid }: PayPalPaymentProps)
           {t(error)}
         </div>
       )}
-      <PayPalScriptProvider options={{ clientId, currency: "USD", intent: "capture", components: "buttons" }}>
+      <PayPalScriptProvider options={paypalScriptOptions(clientId)}>
         <Buttons orderId={orderId} onPaid={onPaid} onError={(key) => setError(key)} />
       </PayPalScriptProvider>
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

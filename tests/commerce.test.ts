@@ -16,10 +16,13 @@ const product: ProductDisplay = { id: "unit-test", slug: "inflator", name: "Infl
 const valid: CheckoutDetails = { email: "test@example.com", fullName: "Test Customer", phone: "2025550143", address1: "123 Test St", address2: "", city: "Washington", state: "DC", zip: "20001", paymentMethod: "paypal" };
 
 test("shared pricing matches bundle totals and actual savings", () => {
-  assert.deepEqual([1, 2, 3].map(q => getLineTotal(59.99, q)), [59.99, 101.98, 134.98]);
-  assert.deepEqual([1, 2, 3].map(q => getBundleSavings(59.99, q)), [0, 18, 44.99]);
+  assert.deepEqual([1, 2, 3].map(q => getLineTotal(59.99, q)), [59.99, 99.99, 134.98]);
+  assert.deepEqual([1, 2, 3].map(q => getBundleSavings(59.99, q)), [0, 19.99, 44.99]);
   assert.equal(getLineTotal(59.99, 4), 179.97);
-  assert.equal(getLineTotal(63.27, 2), 107.56);
+  assert.equal(getLineTotal(63.27, 2), 106.55, "the pair is a fixed $19.99 off");
+  // A much cheaper unit price can't make the pair a deeper discount than three (25%)
+  assert.equal(getLineTotal(20, 2), 30);
+  assert.ok(getLineTotal(59.99, 2) / 2 > getLineTotal(59.99, 3) / 3, "three stay the best value per inflator");
 });
 
 test("bundle replacement is exact, preserves other products, and rejects unavailable offers", () => {
@@ -215,7 +218,16 @@ test("FAQ, structured data and product copy state the published policies and onl
   const { storefrontFaqs } = await import("../src/lib/storefront-faq");
   const { productSchema, returnPolicySchema } = await import("../src/lib/seo/structured-data");
   const { productSeo, verifiedProductCopy } = await import("../src/config/seo");
-  const faqs = storefrontFaqs(true).map(f => f.a).join(" ");
+  const faqList = storefrontFaqs(true, 59.99);
+  const faqs = faqList.map(f => f.a).join(" ");
+  const why = faqList.find(f => f.q === "Why buy from Kitvoy?")!.a;
+  assert.match(why, /all 50 US states and Washington, DC/);
+  assert.match(why, /30 days to return it unused in its original packaging/);
+  assert.match(why, /damaged or defective, we replace it or refund you, return shipping included/);
+  assert.match(faqs, /Two inflators cost \$99\.99 together, \$19\.99 less/);
+  assert.match(faqs, /Three cost \$134\.98, which saves \$44\.99/);
+  assert.doesNotMatch(storefrontFaqs(true).map(f => f.a).join(" "), /\$/, "without a price the FAQ names no dollar amounts");
+  assert.doesNotMatch(faqs, /amazon|cheaper than|premium|best[- ]selling|#1|most popular/i);
   assert.match(faqs, /1–2 business days/);
   assert.match(faqs, /4–9 business days/);
   assert.match(faqs, /within 30 days of delivery/);

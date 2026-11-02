@@ -90,7 +90,7 @@ export const landingConfig = {
   bundle: {
     eyebrow: "Bundle & save",
     title: "One for every car in the driveway",
-    subtitle: "Buy 2 and save 15%. Buy 3 and save 25%. Every bundle ships free.",
+    subtitle: "Buy 2 for $99.99, or 3 and save 25%. Every bundle ships free.",
     cta: "Claim My Bundle",
   },
 

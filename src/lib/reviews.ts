@@ -100,3 +100,23 @@ export function reviewRequestStatus(
   if (now < due) return `Review request will be emailed on ${day(due)}`;
   return "Review request goes out with the next daily run";
 }
+
+/**
+ * Whether the buyer can review this order from their account: "open" once a
+ * paid order is delivered, "done" when every product in it has a review, and
+ * null otherwise (not delivered yet, unpaid or canceled).
+ */
+export function orderReviewState(o: {
+  status: string;
+  paymentStatus: string;
+  fulfillmentStatus: string;
+  items: { productId: string | null }[];
+  reviews: { productId: string }[];
+}): "open" | "done" | null {
+  if (!isVerifiedPurchase(o)) return null;
+  if (o.status !== "DELIVERED" && o.fulfillmentStatus !== "DELIVERED") return null;
+  const products = new Set(o.items.flatMap((i) => (i.productId ? [i.productId] : [])));
+  if (products.size === 0) return null;
+  const reviewed = new Set(o.reviews.map((r) => r.productId));
+  return [...products].every((p) => reviewed.has(p)) ? "done" : "open";
+}

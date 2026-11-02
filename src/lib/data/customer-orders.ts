@@ -19,8 +19,10 @@ export type CustomerOrderListItem = {
   total: number;
   currency: string;
   locale: string;
+  fulfillmentStatus: FulfillmentStatus;
   createdAt: Date;
-  items: { quantity: number }[];
+  items: { quantity: number; productId: string | null }[];
+  reviews: { productId: string }[];
 };
 
 export async function getOrdersByUserId(
@@ -32,7 +34,10 @@ export async function getOrdersByUserId(
   try {
     const orders = await order.findMany({
       where: { userId },
-      include: { items: { select: { quantity: true } } },
+      include: {
+        items: { select: { quantity: true, productId: true } },
+        reviews: { select: { productId: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
     return orders as CustomerOrderListItem[];
@@ -57,8 +62,10 @@ export type CustomerOrderDetail = {
   currency: string;
   locale: string;
   createdAt: Date;
+  reviews: { productId: string }[];
   items: {
     id: string;
+    productId: string | null;
     productName: string;
     productSlug: string;
     unitPrice: number;
@@ -80,7 +87,7 @@ export async function getOrderByIdForCustomer(
   try {
     const o = await order.findFirst({
       where: { id: orderId, userId },
-      include: { items: true },
+      include: { items: true, reviews: { select: { productId: true } } },
     });
     return o as CustomerOrderDetail | null;
   } catch {

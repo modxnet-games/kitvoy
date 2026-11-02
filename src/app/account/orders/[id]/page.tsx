@@ -5,6 +5,7 @@ import {
   getOrderByIdForCustomer,
   formatOrderReference,
 } from "@/lib/data/customer-orders";
+import { accountReviewEntry } from "@/lib/review-links";
 import { AccountOrderDetailClient } from "./account-order-detail-client";
 
 interface AccountOrderPageProps {
@@ -32,6 +33,7 @@ export default async function AccountOrderDetailPage({
         ...order,
         reference,
       }}
+      review={accountReviewEntry(order)}
     />
   );
 }

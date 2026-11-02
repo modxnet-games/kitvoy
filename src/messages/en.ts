@@ -234,6 +234,11 @@ export const en = {
       items: "Items",
       total: "Total",
       viewDetails: "View details",
+      writeReview: "Write a review",
+      reviewed: "Reviewed",
+      reviewTitle: "How's it working?",
+      reviewText: "Tell other drivers what you think. Your review appears with a Verified Buyer badge once we've checked it.",
+      reviewDone: "Thanks for reviewing this order. Reviews appear on the site once we've checked them.",
       cancel: {
         title: "Cancel order",
         short: "Cancel",

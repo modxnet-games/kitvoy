@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { siteConfig } from "@/config/site";
+import { orderReviewState } from "@/lib/reviews";
 
 /* Signed review links for the post-delivery email: the link itself proves the
    customer received that order's email, so they can review without signing in. */
@@ -33,6 +34,20 @@ export function readReviewToken(token: string | null | undefined, secret = revie
   return given.length === expected.length && timingSafeEqual(given, expected) ? orderId : null;
 }
 
+/** Site-relative link to the review form for this order (used on the account's order pages). */
+export function reviewPath(orderId: string): string {
+  return `/review/${createReviewToken(orderId)}`;
+}
+
 export function reviewLink(orderId: string): string {
-  return new URL(`/review/${createReviewToken(orderId)}`, siteConfig.url).toString();
+  return new URL(reviewPath(orderId), siteConfig.url).toString();
+}
+
+export type AccountReviewEntry = { state: "open"; href: string } | { state: "done" } | null;
+
+/** "Write a review" on My orders for delivered paid orders, using the same signed link as the review email. */
+export function accountReviewEntry(order: Parameters<typeof orderReviewState>[0] & { id: string }): AccountReviewEntry {
+  const state = orderReviewState(order);
+  if (state === "open") return { state, href: reviewPath(order.id) };
+  return state === "done" ? { state } : null;
 }

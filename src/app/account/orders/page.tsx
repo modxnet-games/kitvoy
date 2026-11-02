@@ -4,6 +4,7 @@ import {
   getOrdersByUserId,
   formatOrderReference,
 } from "@/lib/data/customer-orders";
+import { accountReviewEntry } from "@/lib/review-links";
 import { AccountOrdersListClient } from "./account-orders-list-client";
 
 // Ensure the "My orders" list reflects newly created orders immediately.
@@ -27,6 +28,7 @@ export default async function AccountOrdersPage() {
         paymentStatus: o.paymentStatus,
         total: o.total,
         itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
+        review: accountReviewEntry(o),
       }))}
     />
   );

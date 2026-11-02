@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { OrderStatus } from "@prisma/client";
 import { CancelOrderModal } from "@/components/account/cancel-order-modal";
+import type { AccountReviewEntry } from "@/lib/review-links";
+import { Star } from "lucide-react";
 
 const STATUS_KEYS: Record<OrderStatus, string> = {
   PENDING: "account.orders.statusPending",
@@ -26,6 +28,7 @@ export type OrderRow = {
   paymentStatus: string;
   total: number;
   itemCount: number;
+  review: AccountReviewEntry;
 };
 
 interface AccountOrdersListClientProps {
@@ -57,6 +60,9 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
     return now - createdAtMs <= 5 * 60 * 60 * 1000;
   }
 
+  // Shown above the table too, since on phones the table scrolls sideways
+  const toReview = orders.filter((o) => o.review?.state === "open");
+
   const cancelOrder = cancelModalOrderId
     ? orders.find((o) => o.id === cancelModalOrderId)
     : undefined;
@@ -72,6 +78,28 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
             {t("account.orders.subtitle")}
           </p>
         </div>
+
+        {toReview.map((order) => (
+          <div key={order.id} className="flex flex-col gap-3 rounded-xl border bg-card p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 font-semibold">
+                <Star className="size-4 text-brand" aria-hidden="true" />
+                {t("account.orders.reviewTitle")}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                <span className="font-mono text-xs">{order.reference}</span> · {t("account.orders.reviewText")}
+              </p>
+            </div>
+            {order.review?.state === "open" && (
+              <Link
+                href={order.review.href}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-ink transition hover:bg-brand/90"
+              >
+                {t("account.orders.writeReview")}
+              </Link>
+            )}
+          </div>
+        ))}
 
         {orders.length === 0 ? (
           <div className="rounded-xl border bg-card p-12 text-center">
@@ -129,9 +157,23 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
                             {t("account.orders.cancel.short") || "Cancel"}
                           </Button>
                         )}
+                        {order.review?.state === "open" && (
+                          <Link
+                            href={order.review.href}
+                            className="hidden h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-brand px-3 text-xs font-bold text-ink transition hover:bg-brand/90 sm:inline-flex"
+                          >
+                            <Star className="size-3.5" aria-hidden="true" />
+                            {t("account.orders.writeReview")}
+                          </Link>
+                        )}
+                        {order.review?.state === "done" && (
+                          <span className="whitespace-nowrap text-xs text-muted-foreground">
+                            {t("account.orders.reviewed")}
+                          </span>
+                        )}
                         <Link
                           href={`/account/orders/${order.id}`}
-                          className="text-primary hover:underline"
+                          className="whitespace-nowrap text-primary hover:underline"
                         >
                           {t("account.orders.viewDetails")}
                         </Link>

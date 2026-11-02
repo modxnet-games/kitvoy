@@ -10,7 +10,8 @@ import type { OrderStatus } from "@prisma/client";
 import type { CustomerOrderDetail } from "@/lib/data/customer-orders";
 import { CancelOrderModal } from "@/components/account/cancel-order-modal";
 import { trackingUrl } from "@/lib/tracking";
-import { ExternalLink, PackageCheck, Truck } from "lucide-react";
+import { ExternalLink, PackageCheck, Star, Truck } from "lucide-react";
+import type { AccountReviewEntry } from "@/lib/review-links";
 
 const STATUS_KEYS: Record<OrderStatus, string> = {
   PENDING: "account.orders.statusPending",
@@ -23,9 +24,10 @@ const STATUS_KEYS: Record<OrderStatus, string> = {
 
 interface AccountOrderDetailClientProps {
   order: CustomerOrderDetail & { reference: string };
+  review: AccountReviewEntry;
 }
 
-export function AccountOrderDetailClient({ order }: AccountOrderDetailClientProps) {
+export function AccountOrderDetailClient({ order, review }: AccountOrderDetailClientProps) {
   const { t } = useLanguage();
   const statusLabel = t(STATUS_KEYS[order.status] ?? "account.orders.statusPending");
   const now = useMemo(() => Date.now(), []);
@@ -195,6 +197,28 @@ export function AccountOrderDetailClient({ order }: AccountOrderDetailClientProp
               </div>
             ) : (
               <p className="mt-3 text-sm text-muted-foreground">{t("account.orders.preparingNote")}</p>
+            )}
+          </div>
+        )}
+
+        {review && (
+          <div className="rounded-lg border bg-card p-5">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <Star className="size-5 text-brand" aria-hidden="true" />
+              {t("account.orders.reviewTitle")}
+            </h2>
+            {review.state === "open" ? (
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">{t("account.orders.reviewText")}</p>
+                <Link
+                  href={review.href}
+                  className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-ink transition hover:bg-brand/90"
+                >
+                  {t("account.orders.writeReview")}
+                </Link>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">{t("account.orders.reviewDone")}</p>
             )}
           </div>
         )}

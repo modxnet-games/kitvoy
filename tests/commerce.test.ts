@@ -463,3 +463,15 @@ test("review requests go out once per order, a few days after delivery, and a fa
   assert.match(reviewRequestStatus({ deliveredAt: delivered, reviewRequestSentAt: new Date("2026-11-14T16:00:00Z"), hasReview: false, hasEmail: true }, now)!, /emailed Nov 14, 2026/);
   assert.match(reviewRequestStatus({ deliveredAt: new Date("2026-09-01T12:00:00Z"), reviewRequestSentAt: null, hasReview: false, hasEmail: true }, now)!, /too long ago/);
 });
+
+test("My orders offers a review only for delivered paid orders, until every product is reviewed", async () => {
+  const { orderReviewState } = await import("../src/lib/reviews");
+  const delivered = { status: "DELIVERED", paymentStatus: "paid", fulfillmentStatus: "DELIVERED", items: [{ productId: "p1" }, { productId: "p1" }, { productId: null }], reviews: [] as { productId: string }[] };
+  assert.equal(orderReviewState(delivered), "open");
+  assert.equal(orderReviewState({ ...delivered, reviews: [{ productId: "p1" }] }), "done");
+  assert.equal(orderReviewState({ ...delivered, status: "SHIPPED", fulfillmentStatus: "SHIPPED" }), null, "not before delivery");
+  assert.equal(orderReviewState({ ...delivered, status: "DELIVERED", fulfillmentStatus: "SHIPPED" }), "open", "an order marked delivered by hand counts");
+  assert.equal(orderReviewState({ ...delivered, paymentStatus: "unpaid" }), null);
+  assert.equal(orderReviewState({ ...delivered, status: "CANCELED" }), null);
+  assert.equal(orderReviewState({ ...delivered, items: [{ productId: null }] }), null, "nothing reviewable");
+});

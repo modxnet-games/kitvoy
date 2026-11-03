@@ -262,6 +262,22 @@
 .checkout-page .order-total { font-size: 22px; }
 .checkout-page .checkout-back { min-height: 44px; display: inline-flex; align-items: center; }
 .checkout-summary-edit { float: right; font-size: 12px; color: #666a67; }
+/* Phones: the order collapses to one line above the form */
+.checkout-summary-mobile { border: 1px solid #e7e5df; border-radius: 11px; background: #fff; }
+.checkout-summary-mobile > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 16px; font-size: 14px; cursor: pointer; list-style: none; }
+.checkout-summary-mobile > summary::-webkit-details-marker { display: none; }
+.checkout-summary-mobile > summary span::after { content: " ▾"; color: #666a67; }
+.checkout-summary-mobile[open] > summary span::after { content: " ▴"; }
+.checkout-summary-mobile > summary strong { font-size: 16px; }
+.checkout-summary-mobile[open] > div { border: 0; border-top: 1px solid #e7e5df; border-radius: 0 0 11px 11px; margin-top: 0; }
+.checkout-compact .checkout-progress { margin-top: 10px; }
+@media (max-width: 639px) {
+  .checkout-compact .checkout-progress { margin-top: 0; }
+  .checkout-compact input, .checkout-compact select { min-height: 44px; padding-block: 9px; }
+  .checkout-compact .checkout-form-card { padding: 16px 14px; }
+  /* The floating chat button would cover the Phone field */
+  body:has(.checkout-compact) .whatsapp-fab { display: none; }
+}
 .field-help { font-size: 11px; color: #666a67; margin-top: 5px; }
 
 /* Depth and motion: transforms and opacity only, so nothing shifts layout */

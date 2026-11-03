@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
-import { useCartStore } from "@/store/cart-store";
+import { getShippingForItems, useCartStore } from "@/store/cart-store";
 import { Breadcrumbs, EmptyState } from "@/components/storefront";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { CheckoutForm, OrderSummary } from "@/components/checkout";
@@ -15,6 +15,8 @@ import { PayPalPayment } from "@/components/checkout/paypal-payment";
 import { placeOrder } from "@/lib/client/place-order";
 import { US_STATES } from "@/lib/us-address";
 import { useMounted } from "@/hooks/use-mounted";
+import { CheckoutSkeleton } from "@/components/checkout/checkout-skeleton";
+import { formatPrice } from "@/lib/formatters";
 
 interface CheckoutClientProps {
   /** Public PayPal client id, or null when PayPal isn't configured */
@@ -36,6 +38,7 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
   const mounted = useMounted();
   const items = useCartStore((s) => s.items);
   const clearCart = useCartStore((s) => s.clearCart);
+  const subtotal = useCartStore((s) => s.getSubtotal());
   const [details, setDetails] = useState<CheckoutFormData | null>(null);
   const [created, setCreated] = useState<PendingOrder | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,7 +71,7 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
     router.push(`/checkout/success?ref=${encodeURIComponent(pending.orderReference)}`);
   };
 
-  if (!mounted) return <div className="store-container py-16" role="status">Loading checkout…</div>;
+  if (!mounted) return <CheckoutSkeleton />;
 
   if (items.length === 0) {
     return (
@@ -90,14 +93,9 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
   const stateName = details ? US_STATES.find((s) => s.code === details.state)?.name ?? details.state : "";
 
   return (
-    <div className="store-container checkout-page py-8 md:py-12">
-      <Breadcrumbs
-        items={[{ label: t("cart.title"), href: "/cart" }, { label: t("checkout.title") }]}
-        className="mb-8"
-      />
-
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("checkout.title")}</h1>
-      <p className="mt-1 text-muted-foreground">{t("checkout.subtitle")}</p>
+    <div className="store-container checkout-page checkout-compact py-6 md:py-10">
+      {/* On phones the step line below says where you are; the heading stays for screen readers */}
+      <h1 className="sr-only sm:not-sr-only sm:text-3xl sm:font-bold sm:tracking-tight">{t("checkout.title")}</h1>
       <div className="checkout-progress" aria-label="Checkout progress"><Link href="/cart" className="text-link">Cart</Link><span aria-hidden="true">/</span><strong aria-current={pending ? undefined : "step"}>Delivery details</strong><span aria-hidden="true">/</span><span aria-current={pending ? "step" : undefined}>Payment</span></div>
       {!paypalClientId && <p className="mt-5 rounded-lg border bg-white p-4 text-sm text-muted-foreground" role="status">Online payment is temporarily unavailable. You can review your details, but no order will be created.</p>}
 
@@ -110,7 +108,16 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
         </div>
       )}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-3">
+      {/* Phones: the order is one tappable line so the form starts near the top */}
+      <details className="checkout-summary-mobile mt-4 lg:hidden">
+        <summary>
+          <span>{t("cart.orderSummary")} · {items.reduce((n, i) => n + i.quantity, 0)} {items.reduce((n, i) => n + i.quantity, 0) === 1 ? "item" : "items"}</span>
+          <strong>{formatPrice(subtotal + getShippingForItems(items))}</strong>
+        </summary>
+        <OrderSummary className="mt-2" />
+      </details>
+
+      <div className="mt-4 grid gap-6 lg:mt-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="checkout-form-card rounded-xl border bg-card p-6">
             {pending && details ? (
@@ -155,17 +162,7 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
                     {t("checkout.signedInAs", { email: customer.email })}
                   </p>
                 ) : (
-                  <div className="mb-8 space-y-3">
-                    <div>
-                      <h2 className="text-base font-semibold">{t("checkout.googleTitle")}</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">{t("checkout.googleText")}</p>
-                    </div>
-                    <GoogleSignInButton redirectUrl="/checkout" />
-                    <div className="relative pt-3">
-                      <div className="absolute inset-x-0 top-1/2 border-t border-border" />
-                      <p className="relative mx-auto w-fit bg-card px-3 text-xs uppercase tracking-wide text-muted-foreground">{t("checkout.guestDivider")}</p>
-                    </div>
-                  </div>
+                  null
                 )}
                 <CheckoutForm
                   onSubmit={handleDetails}
@@ -173,12 +170,22 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
                   initialValues={details ?? (customer ? { email: customer.email, fullName: customer.fullName } : undefined)}
                   submitLabel={t("checkout.continueToPayment")}
                 />
+                {/* Guests fill the form straight away; Google is the optional shortcut below it */}
+                {!customer && (
+                  <div className="mt-4 space-y-3">
+                    <div className="relative">
+                      <div className="absolute inset-x-0 top-1/2 border-t border-border" />
+                      <p className="relative mx-auto w-fit bg-card px-3 text-xs uppercase tracking-wide text-muted-foreground">{t("checkout.googleDivider")}</p>
+                    </div>
+                    <GoogleSignInButton redirectUrl="/checkout" />
+                  </div>
+                )}
               </>
             )}
           </div>
         </div>
 
-        <div className="lg:col-span-1">
+        <div className="hidden lg:col-span-1 lg:block">
           <div className="sticky top-24">
             <OrderSummary />
           </div>

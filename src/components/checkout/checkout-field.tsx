@@ -22,7 +22,7 @@ export function CheckoutField({
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, "-");
 
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn("space-y-1", className)}>
       <label htmlFor={inputId} className="text-sm font-medium">
         {label}
         {required && <span className="text-destructive"> *</span>}

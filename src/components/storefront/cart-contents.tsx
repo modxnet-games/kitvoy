@@ -62,7 +62,7 @@ export function CartContents({ onNavigate }: { onNavigate?: () => void }) {
       <div className="cart-shipping"><Truck size={25} /><span>{shipping === 0 ? "Free US shipping included" : "Shipping: " + formatPrice(shipping)}</span></div>
     </div>
     <div className="cart-summary"><dl><div><dt>Subtotal</dt><dd>{formatPrice(subtotal)}</dd></div>{savings > 0 && <div className="savings-row"><dt>Bundle savings included</dt><dd>{formatPrice(savings)}</dd></div>}<div><dt>Shipping</dt><dd>{shipping === 0 ? "Free" : formatPrice(shipping)}</dd></div><div className="cart-total"><dt>Total <small>USD</small></dt><dd aria-live="polite">{formatPrice(subtotal + shipping)}</dd></div></dl>
-      {blocked ? <button className="primary-button" disabled>{loading ? "Checking your cart…" : "Review your cart to continue"}</button> : <Link className="primary-button" href="/checkout" onClick={onNavigate}><LockKeyhole size={18} />Continue to checkout <ArrowRight size={18} /></Link>}
+      {blocked ? <button className="primary-button" disabled>{loading ? "Checking your cart…" : "Review your cart to continue"}</button> : <Link className="primary-button" href="/checkout" prefetch onClick={onNavigate}><LockKeyhole size={18} />Continue to checkout <ArrowRight size={18} /></Link>}
       <p className="cart-payment-note">Available payment options shown at checkout</p><Link className="text-link continue-shopping" href="/#bundles" onClick={onNavigate}>Continue shopping</Link>
     </div>
   </div>;

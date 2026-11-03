@@ -12,7 +12,6 @@ import {
 } from "@/lib/us-address";
 import { cn } from "@/lib/utils";
 import { CheckoutField } from "./checkout-field";
-import { CheckoutSection } from "./checkout-section";
 
 export type CheckoutFormData = CheckoutDetails;
 
@@ -97,93 +96,90 @@ export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, su
   const stateError = showError("state");
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-8" aria-busy={isSubmitting}>
+    <form onSubmit={handleSubmit} noValidate className="space-y-4" aria-busy={isSubmitting}>
       {Object.keys(errors).some(key => touched[key as keyof CheckoutFormData] && errors[key as keyof CheckoutFormData]) && <p role="alert" className="rounded-lg bg-destructive/5 p-3 text-sm text-destructive">Please check the highlighted fields before continuing.</p>}
-      <CheckoutSection title={t("checkout.contactTitle")}>
-        <CheckoutField
-          {...fieldProps("email")}
-          label={t("checkout.email")}
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          required
-        />
-      </CheckoutSection>
-
-      <CheckoutSection title={t("checkout.shippingTitle")}>
-        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-          <span className="text-muted-foreground">{t("checkout.country")}: </span>
-          <span className="font-medium">{t("checkout.countryValue")}</span>
-        </div>
-        <CheckoutField
-          {...fieldProps("fullName")}
-          label={t("checkout.fullName")}
-          autoComplete="shipping name"
-          required
-        />
+      <CheckoutField
+        {...fieldProps("email")}
+        label={t("checkout.email")}
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        required
+      />
+      <CheckoutField
+        {...fieldProps("fullName")}
+        label={t("checkout.fullName")}
+        autoComplete="shipping name"
+        required
+      />
+      {/* Apartment sits beside the street so it stays visible to browser autofill without taking a row */}
+      <div className="grid grid-cols-3 gap-3">
         <CheckoutField
           {...fieldProps("address1")}
           label={t("checkout.address1")}
           placeholder={t("checkout.address1Placeholder")}
           autoComplete="shipping address-line1"
           required
+          className="col-span-2"
         />
         <CheckoutField
           {...fieldProps("address2")}
           label={t("checkout.address2")}
           autoComplete="shipping address-line2"
         />
-        <div className="grid gap-4 sm:grid-cols-3">
-          <CheckoutField
-            {...fieldProps("city")}
-            label={t("checkout.city")}
-            autoComplete="shipping address-level2"
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <CheckoutField
+          {...fieldProps("city")}
+          label={t("checkout.city")}
+          autoComplete="shipping address-level2"
+          required
+        />
+        <div className="space-y-1 min-w-0">
+          <label htmlFor="checkout-state" className="text-sm font-medium">
+            {t("checkout.state")}
+            <span className="text-destructive"> *</span>
+          </label>
+          <select
+            id="checkout-state"
+            name="state"
             required
-          />
-          <div className="space-y-1.5">
-            <label htmlFor="checkout-state" className="text-sm font-medium">
-              {t("checkout.state")}
-              <span className="text-destructive"> *</span>
-            </label>
-            <select
-              id="checkout-state"
-              name="state"
-              required
-              disabled={isSubmitting}
-              value={values.state}
-              onChange={handleChange("state")}
-              onBlur={handleBlur("state")}
-              autoComplete="shipping address-level1"
-              aria-invalid={!!stateError}
-              aria-describedby={stateError ? "checkout-state-error" : undefined}
-              className={cn(
-                "min-h-12 w-full rounded-lg border border-input bg-transparent px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-                stateError && "border-destructive",
-                !values.state && "text-muted-foreground",
-              )}
-            >
-              <option value="">{t("checkout.statePlaceholder")}</option>
-              {US_STATES.map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            {stateError && (
-              <p id="checkout-state-error" className="text-xs text-destructive">
-                {stateError}
-              </p>
+            disabled={isSubmitting}
+            value={values.state}
+            onChange={handleChange("state")}
+            onBlur={handleBlur("state")}
+            autoComplete="shipping address-level1"
+            aria-invalid={!!stateError}
+            aria-describedby={stateError ? "checkout-state-error" : undefined}
+            className={cn(
+              "min-h-12 w-full rounded-lg border border-input bg-transparent px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+              stateError && "border-destructive",
+              !values.state && "text-muted-foreground",
             )}
-          </div>
-          <CheckoutField
-            {...fieldProps("zip")}
-            label={t("checkout.zip")}
-            inputMode="numeric"
-            autoComplete="shipping postal-code"
-            maxLength={10}
-            required
-          />
+          >
+            <option value="">{t("checkout.statePlaceholder")}</option>
+            {US_STATES.map((s) => (
+              <option key={s.code} value={s.code}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          {stateError && (
+            <p id="checkout-state-error" className="text-xs text-destructive">
+              {stateError}
+            </p>
+          )}
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <CheckoutField
+          {...fieldProps("zip")}
+          label={t("checkout.zip")}
+          inputMode="numeric"
+          autoComplete="shipping postal-code"
+          maxLength={10}
+          required
+        />
         <CheckoutField
           {...fieldProps("phone")}
           label={t("checkout.phone")}
@@ -193,12 +189,8 @@ export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, su
           placeholder="(555) 555-0123"
           required
         />
-      </CheckoutSection>
+      </div>
 
-      <p className="flex items-start gap-2 rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground">
-        <Lock className="mt-0.5 size-3.5 shrink-0" />
-        {t("checkout.paymentIntro")}
-      </p>
 
       <button
         type="submit"
@@ -207,6 +199,10 @@ export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, su
       >
         {isSubmitting ? <span className="inline-flex items-center gap-2" role="status"><Loader2 className="size-4 animate-spin" />{t("checkout.processing")}</span> : (submitLabel ?? t("checkout.placeOrder"))}
       </button>
+      <p className="flex items-start gap-2 px-1 text-xs text-muted-foreground">
+        <Lock className="mt-0.5 size-3.5 shrink-0" />
+        {t("checkout.paymentIntro")}
+      </p>
     </form>
   );
 }

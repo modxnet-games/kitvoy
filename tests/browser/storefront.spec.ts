@@ -66,7 +66,8 @@ for (const width of [360, 390, 768, 1440]) {
     await expect(page.locator("input[aria-invalid=true]")).toHaveCount(6);
     await page.screenshot({ path: screenshotDir + "/checkout-" + width + ".png", fullPage: true });
     await noOverflow(page);
-    await page.getByRole("link", { name: "Edit cart" }).click();
+    // On phones the order summary is folded, so use the step line that every width shows
+    await page.locator(".checkout-progress").getByRole("link", { name: "Cart" }).click();
     await page.getByRole("button", { name: /^Remove/ }).click();
     await expect(page.getByText("Your next trip starts here.")).toBeVisible();
   });

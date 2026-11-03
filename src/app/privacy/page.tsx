@@ -21,6 +21,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Account details:</strong> if you create an account, your email address and a securely hashed password, or the basic profile Google shares if you sign in with Google.</li>
           <li><strong>Messages:</strong> anything you send us when you contact support.</li>
           <li><strong>Technical information:</strong> your IP address, browser and device type, which our hosting and security providers process to deliver and protect the site.</li>
+          <li><strong>Ad measurement:</strong> the Meta Pixel records the pages you view on kitvoy.com and, when you place an order, the order total and items, along with cookie and device identifiers (see Cookies below).</li>
         </ul>
         <p>We don&apos;t collect or store your card or bank details. Payments are handled by PayPal.</p>
       </section>
@@ -31,8 +32,9 @@ export default function PrivacyPolicyPage() {
           <li>To handle returns, refunds and support requests.</li>
           <li>To run your account, if you have one.</li>
           <li>To prevent fraud, keep the store secure, and meet legal and tax obligations.</li>
+          <li>To measure our ads on Facebook and Instagram and show them to people likely to be interested, using the Meta Pixel.</li>
         </ul>
-        <p>We don&apos;t sell your personal information, and we don&apos;t use it for targeted advertising.</p>
+        <p>We don&apos;t sell your personal information for money. Sharing visit and purchase activity with Meta for advertising may count as &quot;sharing&quot; or targeted advertising under some state privacy laws; you can opt out as described under Cookies.</p>
       </section>
       <section aria-labelledby="share">
         <h2 id="share">Who we share it with</h2>
@@ -43,12 +45,14 @@ export default function PrivacyPolicyPage() {
           <li><strong>Email and notification providers</strong> (Brevo, and Google Firebase for our team&apos;s order alerts) deliver order confirmation, shipping and support emails and notify us of new orders.</li>
           <li><strong>Hosting and security providers</strong> (including Cloudflare) host the site and protect it from abuse.</li>
           <li><strong>Google</strong>, if you choose to sign in with Google.</li>
+          <li><strong>Meta Platforms</strong> receives page-view and purchase events from the Meta Pixel to measure and target our ads, and uses them under its own privacy policy.</li>
         </ul>
         <p>We may also disclose information when the law requires it. Some of these providers may process information outside the United States.</p>
       </section>
       <section aria-labelledby="cookies">
         <h2 id="cookies">Cookies and browser storage</h2>
-        <p>We use essential cookies to keep you signed in, and your browser&apos;s local storage to remember your cart. We don&apos;t use advertising cookies or third-party analytics trackers.</p>
+        <p>We use essential cookies to keep you signed in, and your browser&apos;s local storage to remember your cart.</p>
+        <p>We also use the Meta Pixel, an advertising tool that sets cookies and sends Meta the pages you visit here and, when you buy, the order total and items. We don&apos;t load it on our admin pages, and we don&apos;t load it at all if your browser sends a Global Privacy Control signal. You can also opt out by blocking third-party cookies in your browser, by changing your ad preferences in your Facebook or Instagram settings, or by emailing <a className="text-link" href={`mailto:${email}`}>{email}</a>.</p>
       </section>
       <section aria-labelledby="keep">
         <h2 id="keep">How long we keep it</h2>

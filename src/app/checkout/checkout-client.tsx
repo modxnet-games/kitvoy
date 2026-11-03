@@ -17,6 +17,7 @@ import { US_STATES } from "@/lib/us-address";
 import { useMounted } from "@/hooks/use-mounted";
 import { CheckoutSkeleton } from "@/components/checkout/checkout-skeleton";
 import { formatPrice } from "@/lib/formatters";
+import { trackPurchase } from "@/lib/analytics/meta-pixel";
 
 interface CheckoutClientProps {
   /** Public PayPal client id, or null when PayPal isn't configured */
@@ -67,6 +68,13 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
 
   const handlePaid = () => {
     if (!pending) return;
+    // The cart priced this order with the same bundle rules the server charged, so its total is the amount paid
+    trackPurchase({
+      orderReference: pending.orderReference,
+      value: subtotal + getShippingForItems(items),
+      skus: items.map((i) => i.product.sku),
+      quantity: items.reduce((n, i) => n + i.quantity, 0),
+    });
     clearCart();
     router.push(`/checkout/success?ref=${encodeURIComponent(pending.orderReference)}`);
   };

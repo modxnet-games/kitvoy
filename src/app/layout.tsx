@@ -8,6 +8,8 @@ import { LanguageProvider } from "@/contexts/language-context";
 import { NavbarWrapper } from "@/components/layout/navbar-wrapper";
 import { FooterWrapper } from "@/components/layout/footer-wrapper";
 import { WhatsappFloatingWrapper } from "@/components/layout/whatsapp-floating-wrapper";
+import { MetaPixel } from "@/components/analytics/meta-pixel";
+import { META_PIXEL_ID } from "@/config/analytics";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -60,6 +62,16 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
+        {!isAdminOrderPrint && (
+          <>
+            <MetaPixel />
+            {/* Meta Pixel fallback for browsers without JavaScript */}
+            <noscript>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img height="1" width="1" style={{ display: "none" }} alt="" src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`} />
+            </noscript>
+          </>
+        )}
         <LanguageProvider>
           {isAdminOrderPrint ? (
             <div className="min-h-screen bg-[#f5f5f5]">{children}</div>

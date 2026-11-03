@@ -487,3 +487,22 @@ test("My orders offers a review only for delivered paid orders, until every prod
   assert.equal(orderReviewState({ ...delivered, status: "CANCELED" }), null);
   assert.equal(orderReviewState({ ...delivered, items: [{ productId: null }] }), null, "nothing reviewable");
 });
+
+test("Meta Pixel Purchase sends the paid total in USD with the order reference, and skips admin pages", async () => {
+  const { trackPurchase, isUntrackedPath, hasPrivacyOptOut } = await import("../src/lib/analytics/meta-pixel");
+  const calls: unknown[][] = [];
+  const g = globalThis as unknown as { window?: { fbq?: (...a: unknown[]) => void } };
+  const hadWindow = "window" in g;
+  g.window = { fbq: (...a: unknown[]) => { calls.push(a); } };
+  try {
+    trackPurchase({ orderReference: "KTV-ABCD1234", value: 99.99, skus: ["INF-001"], quantity: 2 });
+    assert.deepEqual(calls, [["track", "Purchase", { currency: "USD", value: 99.99, content_ids: ["INF-001"], content_type: "product", num_items: 2 }, { eventID: "KTV-ABCD1234" }]]);
+    g.window = {};
+    assert.doesNotThrow(() => trackPurchase({ orderReference: "KTV-X", value: 1, skus: [], quantity: 1 }), "no pixel loaded (opted out) is a no-op");
+  } finally {
+    if (!hadWindow) delete g.window;
+  }
+  assert.equal(isUntrackedPath("/admin/orders"), true);
+  assert.equal(isUntrackedPath("/checkout"), false);
+  assert.equal(typeof hasPrivacyOptOut(), "boolean");
+});

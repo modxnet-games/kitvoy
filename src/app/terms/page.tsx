@@ -6,7 +6,7 @@ import { PolicyPage } from "@/components/policies/policy-page";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "The terms for shopping at kitvoy.com: orders, pricing, PayPal payment, shipping, returns, product safety and support.",
+  description: "The terms for shopping at kitvoy.com: orders, pricing, payment, shipping, returns, product safety and support.",
   alternates: { canonical: "/terms" },
 };
 
@@ -23,7 +23,7 @@ export default function TermsPage() {
       </section>
       <section aria-labelledby="pricing">
         <h2 id="pricing">Prices and payment</h2>
-        <p>Prices are in US dollars and include standard US shipping. Bundle discounts are shown before you add items to your cart. Payment is taken at checkout through PayPal; we never see or store your card details.</p>
+        <p>Prices are in US dollars and include standard US shipping. Bundle discounts are shown before you add items to your cart. Payment is taken at checkout through Stripe or PayPal; we never see or store your card details.</p>
       </section>
       <section aria-labelledby="orders">
         <h2 id="orders">Orders</h2>

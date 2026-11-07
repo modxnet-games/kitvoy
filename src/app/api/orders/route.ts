@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       orderId: result.orderId,
       orderReference: result.orderReference,
+      totals: result.totals,
     });
   } catch (err) {
     console.error("Order creation error:", err);

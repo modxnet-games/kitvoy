@@ -7,10 +7,7 @@ import { deliverOrderConfirmation } from "@/lib/order-confirmation";
 import { notifyAdminDevices } from "@/lib/push/admin-devices";
 import { validateStockForCheckout } from "@/lib/stock";
 
-/** Order amounts are stored in dollars; payment providers want cents. */
-export function toCents(amount: number): number {
-  return Math.round(amount * 100);
-}
+export { toCents } from "@/lib/payments/money";
 
 const orderReference = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
 
@@ -46,11 +43,22 @@ export async function orderHasStock(orderId: string): Promise<boolean> {
  * false when it was already paid (duplicate capture or webhook), so callers
  * only notify and fulfill once.
  */
-export async function completePaidOrder(orderId: string, paymentRef: string, paymentFee?: number): Promise<boolean> {
+export async function completePaidOrder(
+  orderId: string,
+  paymentRef: string,
+  paymentFee?: number,
+  paymentMethod?: "card" | "paypal",
+): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
     const { count } = await tx.order.updateMany({
       where: { id: orderId, paymentStatus: { not: "paid" } },
-      data: { paymentStatus: "paid", paymentRef, status: "CONFIRMED", ...(paymentFee !== undefined ? { paymentFee } : {}) },
+      data: {
+        paymentStatus: "paid",
+        paymentRef,
+        status: "CONFIRMED",
+        ...(paymentMethod ? { paymentMethod } : {}),
+        ...(paymentFee !== undefined ? { paymentFee } : {}),
+      },
     });
     if (count === 0) return false;
 

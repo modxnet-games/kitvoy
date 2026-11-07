@@ -195,13 +195,22 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
               <div>
                 <dt className="text-muted-foreground">Payment</dt>
                 <dd>
-                  {isPaid ? "Paid" : "Unpaid"}
-                  {order.paymentMethod && <> · {order.paymentMethod === "paypal" ? "PayPal" : order.paymentMethod}</>}
+                  {isPaid ? "Paid" : order.paymentStatus === "refunded" ? "Refunded" : "Unpaid"}
+                  {order.paymentMethod && <> · {order.paymentMethod === "paypal" ? "PayPal" : order.paymentMethod === "card" ? "Card (Stripe)" : order.paymentMethod}</>}
                 </dd>
-                {isPaid && order.paymentRef && (
-                  <dd className="mt-0.5 font-mono text-xs text-muted-foreground" title="PayPal capture ID (use it to refund)">
+                {(isPaid || order.paymentStatus === "refunded") && order.paymentRef && (
+                  <dd
+                    className="mt-0.5 font-mono text-xs text-muted-foreground"
+                    title={order.paymentRef.startsWith("pi_") ? "Stripe PaymentIntent (refund it in the Stripe Dashboard)" : "PayPal capture ID (use it to refund)"}
+                  >
                     {order.paymentRef}
                   </dd>
+                )}
+                {order.paymentFee != null && (
+                  <dd className="mt-0.5 text-xs text-muted-foreground">Fee {formatPrice(order.paymentFee)}</dd>
+                )}
+                {order.refundedAmount != null && order.refundedAmount > 0 && (
+                  <dd className="mt-0.5 text-xs font-medium text-destructive">Refunded {formatPrice(order.refundedAmount)}</dd>
                 )}
               </div>
             </dl>

@@ -12,6 +12,8 @@ import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { CheckoutForm, OrderSummary } from "@/components/checkout";
 import type { CheckoutFormData } from "@/components/checkout";
 import { PayPalPayment } from "@/components/checkout/paypal-payment";
+import { StripePayment } from "@/components/checkout/stripe-payment";
+import type { OrderTotals } from "@/lib/payments/money";
 import { placeOrder } from "@/lib/client/place-order";
 import { US_STATES } from "@/lib/us-address";
 import { useMounted } from "@/hooks/use-mounted";
@@ -22,18 +24,22 @@ import { trackPurchase } from "@/lib/analytics/meta-pixel";
 interface CheckoutClientProps {
   /** Public PayPal client id, or null when PayPal isn't configured */
   paypalClientId: string | null;
+  /** Stripe publishable key, or null when card payments aren't configured */
+  stripePublishableKey: string | null;
   /** The signed-in customer, whose order is saved to their account */
   customer: { email: string; fullName: string } | null;
 }
 
 /** `cartKey` is the cart the order was created from; its total is stale once the cart changes. */
-type PendingOrder = { orderId: string; orderReference: string; cartKey: string };
+type PendingOrder = { orderId: string; orderReference: string; cartKey: string; totals: OrderTotals };
 
 /**
- * Two steps: shipping details create a pending (unpaid) order, then PayPal
- * collects payment for that order's server-side total.
+ * Two steps: shipping details create a pending (unpaid) order, then the
+ * Payment Element (Stripe) or PayPal collects payment for that order's
+ * server-side total.
  */
-export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps) {
+export function CheckoutClient({ paypalClientId, stripePublishableKey, customer }: CheckoutClientProps) {
+  const canPay = Boolean(paypalClientId || stripePublishableKey);
   const { t } = useLanguage();
   const router = useRouter();
   const mounted = useMounted();
@@ -51,7 +57,7 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
 
   const handleDetails = async (data: CheckoutFormData) => {
     if (isSubmitting) return;
-    if (!paypalClientId) { setError(t("checkout.paymentUnavailable")); return; }
+    if (!canPay) { setError(t("checkout.paymentUnavailable")); return; }
     setError(null);
     setIsSubmitting(true);
     const result = await placeOrder(data, items);
@@ -62,16 +68,16 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
       return;
     }
     setDetails(data);
-    setCreated({ orderId: result.orderId, orderReference: result.orderReference, cartKey });
+    setCreated({ orderId: result.orderId, orderReference: result.orderReference, cartKey, totals: result.totals });
     window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   };
 
   const handlePaid = () => {
     if (!pending) return;
-    // The cart priced this order with the same bundle rules the server charged, so its total is the amount paid
+    // The server's total for this order, which is the amount paid
     trackPurchase({
       orderReference: pending.orderReference,
-      value: subtotal + getShippingForItems(items),
+      value: pending.totals.total,
       skus: items.map((i) => i.product.sku),
       quantity: items.reduce((n, i) => n + i.quantity, 0),
     });
@@ -105,7 +111,7 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
       {/* On phones the step line below says where you are; the heading stays for screen readers */}
       <h1 className="sr-only sm:not-sr-only sm:text-3xl sm:font-bold sm:tracking-tight">{t("checkout.title")}</h1>
       <div className="checkout-progress" aria-label="Checkout progress"><Link href="/cart" className="text-link">Cart</Link><span aria-hidden="true">/</span><strong aria-current={pending ? undefined : "step"}>Delivery details</strong><span aria-hidden="true">/</span><span aria-current={pending ? "step" : undefined}>Payment</span></div>
-      {!paypalClientId && <p className="mt-5 rounded-lg border bg-white p-4 text-sm text-muted-foreground" role="status">Online payment is temporarily unavailable. You can review your details, but no order will be created.</p>}
+      {!canPay && <p className="mt-5 rounded-lg border bg-white p-4 text-sm text-muted-foreground" role="status">Online payment is temporarily unavailable. You can review your details, but no order will be created.</p>}
 
       {error && (
         <div
@@ -120,9 +126,9 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
       <details className="checkout-summary-mobile mt-4 lg:hidden">
         <summary>
           <span>{t("cart.orderSummary")} · {items.reduce((n, i) => n + i.quantity, 0)} {items.reduce((n, i) => n + i.quantity, 0) === 1 ? "item" : "items"}</span>
-          <strong>{formatPrice(subtotal + getShippingForItems(items))}</strong>
+          <strong>{formatPrice(pending ? pending.totals.total : subtotal + getShippingForItems(items))}</strong>
         </summary>
-        <OrderSummary className="mt-2" />
+        <OrderSummary className="mt-2" totals={pending?.totals} />
       </details>
 
       <div className="mt-4 grid gap-6 lg:mt-6 lg:grid-cols-3">
@@ -154,9 +160,26 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
 
                 <section className="space-y-4">
                   <h2 className="text-base font-semibold">{t("checkout.paymentTitle")}</h2>
-                  {paypalClientId ? (
+                  {stripePublishableKey && (
+                    <StripePayment
+                      publishableKey={stripePublishableKey}
+                      orderId={pending.orderId}
+                      orderReference={pending.orderReference}
+                      total={pending.totals.total}
+                      billing={{ name: details.fullName, email: details.email, phone: details.phone, postalCode: details.zip }}
+                      onPaid={handlePaid}
+                    />
+                  )}
+                  {stripePublishableKey && paypalClientId && (
+                    <div className="relative py-1" aria-hidden="true">
+                      <div className="absolute inset-x-0 top-1/2 border-t border-border" />
+                      <p className="relative mx-auto w-fit bg-card px-3 text-xs uppercase tracking-wide text-muted-foreground">{t("checkout.payOr")}</p>
+                    </div>
+                  )}
+                  {paypalClientId && (
                     <PayPalPayment clientId={paypalClientId} orderId={pending.orderId} onPaid={handlePaid} />
-                  ) : (
+                  )}
+                  {!canPay && (
                     <p className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
                       {t("checkout.paymentUnavailable")}
                     </p>
@@ -195,7 +218,7 @@ export function CheckoutClient({ paypalClientId, customer }: CheckoutClientProps
 
         <div className="hidden lg:col-span-1 lg:block">
           <div className="sticky top-24">
-            <OrderSummary />
+            <OrderSummary totals={pending?.totals} />
           </div>
         </div>
       </div>

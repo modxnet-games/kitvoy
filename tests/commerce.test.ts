@@ -506,3 +506,15 @@ test("Meta Pixel Purchase sends the paid total in USD with the order reference, 
   assert.equal(isUntrackedPath("/checkout"), false);
   assert.equal(typeof hasPrivacyOptOut(), "boolean");
 });
+
+test("the card checkout never names payment method types and confirms orders only from the verified webhook", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const route = await readFile("src/app/api/checkout/stripe/route.ts", "utf8");
+  const webhook = await readFile("src/app/api/webhooks/stripe/route.ts", "utf8");
+  const element = await readFile("src/components/checkout/stripe-payment.tsx", "utf8");
+  for (const source of [route, webhook, element]) assert.ok(!source.includes("payment_method_types"));
+  assert.match(route, /automatic_payment_methods: \{ enabled: true \}/);
+  assert.ok(!route.includes("completePaidOrder"), "the PaymentIntent route must not mark orders paid");
+  assert.match(webhook, /constructEvent\(await request\.text\(\)/);
+  assert.match(webhook, /completePaidOrder\(/);
+});

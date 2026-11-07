@@ -9,18 +9,21 @@ import { Price, ProductLineImage } from "@/components/storefront";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { getLineTotal, getBundleSavings } from "@/lib/bundles";
+import type { OrderTotals } from "@/lib/payments/money";
 
 interface OrderSummaryProps {
   className?: string;
+  /** The created order's server figures; before that, the cart's */
+  totals?: OrderTotals | null;
 }
 
-export function OrderSummary({ className }: OrderSummaryProps) {
+export function OrderSummary({ className, totals }: OrderSummaryProps) {
   const { t } = useLanguage();
   const items = useCartStore((s) => s.items);
   const getSubtotal = useCartStore((s) => s.getSubtotal);
-  const subtotal = getSubtotal();
-  const shipping = getShippingForItems(items);
-  const total = subtotal + shipping;
+  const subtotal = totals?.subtotal ?? getSubtotal();
+  const shipping = totals?.shippingCost ?? getShippingForItems(items);
+  const total = totals?.total ?? subtotal + shipping;
 
   return (
     <div

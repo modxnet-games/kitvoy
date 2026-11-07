@@ -5,6 +5,7 @@ import {
 } from "@/lib/stock";
 import type { ProductDisplay } from "@/types/product";
 import { getLineTotal } from "@/lib/bundles";
+import { toCents, type OrderTotals } from "@/lib/payments/money";
 import {
   formatAddressLine,
   toShippingAddress,
@@ -31,7 +32,7 @@ export interface CreateOrderInput {
 }
 
 export type CreateOrderResult =
-  | { success: true; orderId: string; orderReference: string }
+  | { success: true; orderId: string; orderReference: string; totals: OrderTotals }
   | { success: false; error: string; errorKey?: string };
 
 export function validateOrderInput(input: unknown): { valid: false; error: string } | { valid: true; data: CreateOrderInput } {
@@ -164,12 +165,12 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     });
   }
 
-  const subtotal = pricedItems.reduce((sum, i) => sum + i.lineTotal, 0);
-  const shippingCost = pricedItems.reduce(
-    (sum, i) => sum + i.shippingTax * i.quantity,
-    0,
-  );
-  const total = subtotal + shippingCost;
+  // Work in cents so the stored total is exactly what Stripe and PayPal charge
+  const subtotalCents = pricedItems.reduce((sum, i) => sum + toCents(i.lineTotal), 0);
+  const shippingCents = pricedItems.reduce((sum, i) => sum + toCents(i.shippingTax * i.quantity), 0);
+  const subtotal = subtotalCents / 100;
+  const shippingCost = shippingCents / 100;
+  const total = (subtotalCents + shippingCents) / 100;
 
   // Stock is reserved when the payment is captured (see completePaidOrder),
   // so abandoned checkouts don't drain inventory.
@@ -209,5 +210,6 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     success: true,
     orderId: order.id,
     orderReference,
+    totals: { subtotal, shippingCost, total },
   };
 }

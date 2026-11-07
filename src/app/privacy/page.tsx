@@ -7,7 +7,7 @@ const email = storePolicies.supportEmail;
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "How Kitvoy collects, uses and protects your information when you shop, check out with PayPal, or contact support.",
+  description: "How Kitvoy collects, uses and protects your information when you shop, check out with Stripe or PayPal, or contact support.",
   alternates: { canonical: "/privacy" },
 };
 
@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Technical information:</strong> your IP address, browser and device type, which our hosting and security providers process to deliver and protect the site.</li>
           <li><strong>Ad measurement:</strong> the Meta Pixel records the pages you view on kitvoy.com and, when you place an order, the order total and items, along with cookie and device identifiers (see Cookies below).</li>
         </ul>
-        <p>We don&apos;t collect or store your card or bank details. Payments are handled by PayPal.</p>
+        <p>We don&apos;t collect or store your card or bank details. Payments are handled by Stripe and PayPal.</p>
       </section>
       <section aria-labelledby="use">
         <h2 id="use">How we use it</h2>
@@ -40,7 +40,8 @@ export default function PrivacyPolicyPage() {
         <h2 id="share">Who we share it with</h2>
         <p>We share information only with the services that help us run the store, and only what each one needs:</p>
         <ul>
-          <li><strong>PayPal</strong> processes your payment under its own privacy policy.</li>
+          <li><strong>Stripe</strong> processes card and wallet payments under its own privacy policy.</li>
+          <li><strong>PayPal</strong> processes PayPal payments under its own privacy policy.</li>
           <li><strong>Our fulfillment partner (CJdropshipping)</strong> receives your name, delivery address, phone number and order items to pack and ship your order.</li>
           <li><strong>Email and notification providers</strong> (Brevo, and Google Firebase for our team&apos;s order alerts) deliver order confirmation, shipping and support emails and notify us of new orders.</li>
           <li><strong>Hosting and security providers</strong> (including Cloudflare) host the site and protect it from abuse.</li>

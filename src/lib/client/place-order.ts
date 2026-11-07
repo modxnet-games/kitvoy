@@ -1,13 +1,15 @@
+import type { OrderTotals } from "@/lib/payments/money";
 import type { CheckoutDetails } from "@/lib/us-address";
 import type { ProductDisplay } from "@/types/product";
 
 export type PlaceOrderResult =
-  | { ok: true; orderId: string; orderReference: string }
+  | { ok: true; orderId: string; orderReference: string; totals: OrderTotals }
   | { ok: false; errorKey: string };
 
 /**
  * Creates a pending (unpaid) order from checkout details. The payment step
- * (Stripe / PayPal) runs against the returned orderId.
+ * (Stripe / PayPal) runs against the returned orderId and charges the
+ * returned total.
  */
 export async function placeOrder(
   details: CheckoutDetails,
@@ -33,7 +35,7 @@ export async function placeOrder(
             : "order.errorGeneric";
       return { ok: false, errorKey };
     }
-    return { ok: true, orderId: json.orderId, orderReference: json.orderReference };
+    return { ok: true, orderId: json.orderId, orderReference: json.orderReference, totals: json.totals };
   } catch {
     return { ok: false, errorKey: "order.errorGeneric" };
   }

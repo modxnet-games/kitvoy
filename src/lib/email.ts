@@ -300,6 +300,27 @@ export async function sendOrderNotification(
   }
 }
 
+/**
+ * Plain-text alert to the owner (NOTIFY_EMAIL) for payment events that need a
+ * person: a disputed charge, a duplicate payment that was refunded, an amount
+ * mismatch. Never throws; the message is also logged so it's never lost.
+ */
+export async function sendOwnerAlert(subject: string, lines: string[]): Promise<void> {
+  console.warn(`[alert] ${subject}\n  ${lines.join("\n  ")}`);
+  const transport = NOTIFY_EMAIL ? getTransport() : null;
+  if (!transport) return;
+  try {
+    await transport.sendMail({
+      from: { name: ADMIN_SENDERS.orders.name, address: ADMIN_SENDERS.orders.email },
+      to: NOTIFY_EMAIL,
+      subject: `[Kitvoy] ${subject}`,
+      text: lines.join("\n"),
+    });
+  } catch (err) {
+    console.error("[email] Failed to send owner alert:", err instanceof Error ? err.message : err);
+  }
+}
+
 
 /* ------------------------------------------------------------------ */
 /*  Customer shipping confirmation                                     */

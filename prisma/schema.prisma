@@ -144,10 +144,14 @@ model Order {
   paymentMethod     String?
   /// "unpaid" | "paid" | "refunded" | "failed"
   paymentStatus     String            @default("unpaid")
-  /// Stripe PaymentIntent id or PayPal order id
+  /// What paid the order: Stripe PaymentIntent id or PayPal capture id (PayPal order id until capture)
   paymentRef        String?
-  /// The payment provider's fee for this order (PayPal capture fee); null until recorded
+  /// The card checkout's PaymentIntent, kept apart from paymentRef so switching to PayPal never loses it
+  stripePaymentIntentId String?
+  /// The payment provider's fee for this order (PayPal capture fee or Stripe balance-transaction fee); null until recorded
   paymentFee        Float?
+  /// Amount refunded so far through the payment provider; null when nothing was refunded
+  refundedAmount    Float?
   /// When the customer's order confirmation email was claimed for sending; set once, so it never goes out twice
   confirmationEmailSentAt DateTime?
   /// Supplier (CJdropshipping) order id once fulfillment has been triggered
@@ -178,6 +182,7 @@ model Order {
   @@index([createdAt])
   @@index([userId])
   @@index([paymentRef])
+  @@index([stripePaymentIntentId])
   @@index([fulfillmentStatus])
   @@map("orders")
 }

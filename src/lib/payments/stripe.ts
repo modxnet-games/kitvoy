@@ -17,9 +17,13 @@ export function getStripe(): Stripe | null {
   return client;
 }
 
-/** The browser key, or null when card payments aren't set up (both keys are needed). */
+/**
+ * The browser key, or null when card payments aren't set up (both keys are
+ * needed). Read with bracket access so Next.js doesn't inline it at build
+ * time: switching keys on the server then only needs a restart.
+ */
 export function getStripePublishableKey(): string | null {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim();
+  const key = process.env["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"]?.trim();
   return key && process.env.STRIPE_SECRET_KEY?.trim() ? key : null;
 }
 

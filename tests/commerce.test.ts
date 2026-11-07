@@ -507,22 +507,21 @@ test("Meta Pixel Purchase sends the paid total in USD with the order reference, 
   assert.equal(typeof hasPrivacyOptOut(), "boolean");
 });
 
-test("Stripe Checkout never names payment method types and confirms orders only from the verified webhook", async () => {
+test("the inline Stripe form never names payment method types and confirms orders only from the verified webhook", async () => {
   const { readFile } = await import("node:fs/promises");
   const route = await readFile("src/app/api/checkout/stripe/route.ts", "utf8");
   const webhook = await readFile("src/app/api/webhooks/stripe/route.ts", "utf8");
-  const button = await readFile("src/components/checkout/stripe-checkout-button.tsx", "utf8");
-  for (const source of [route, webhook, button]) assert.ok(!source.includes("payment_method_types"));
-  assert.match(route, /stripe\.checkout\.sessions\.create\(/);
-  assert.match(route, /success_url: .*\{CHECKOUT_SESSION_ID\}/, "Stripe fills in the session id on the success URL");
-  assert.match(route, /cancel_url: absolute\("\/checkout"\)/);
-  assert.match(route, /adaptive_pricing: \{ enabled: false \}/, "charges stay in USD so the webhook's amount check holds");
-  assert.ok(!route.includes("completePaidOrder"), "the Checkout Session route must not mark orders paid");
-  assert.match(button, /window\.location\.href = json\.url/);
-  assert.match(button, /checkout\\.stripe\\.com/, "only Stripe's own checkout URL is followed");
+  const element = await readFile("src/components/checkout/stripe-payment.tsx", "utf8");
+  for (const source of [route, webhook, element]) assert.ok(!source.includes("payment_method_types"));
+  assert.match(route, /stripe\.paymentIntents\.create\(/);
+  assert.match(route, /automatic_payment_methods: \{ enabled: true \}/);
+  assert.ok(!route.includes("checkout.sessions"), "no hosted Checkout redirect");
+  assert.ok(!route.includes("completePaidOrder"), "the PaymentIntent route must not mark orders paid");
+  assert.match(element, /<PaymentElement/);
+  assert.match(element, /stripe\.confirmPayment\(/);
   assert.match(webhook, /constructEvent\(await request\.text\(\)/);
-  assert.match(webhook, /case "checkout\.session\.completed":/);
-  assert.match(webhook, /payment_status !== "paid"\) return;/, "an unpaid (expired or pending) session never completes an order");
+  assert.match(webhook, /case "payment_intent\.succeeded":/);
+  assert.ok(!webhook.includes("checkout.session"));
   assert.match(webhook, /completePaidOrder\(/);
   // Testing on the live site: test payments never reach CJ
   assert.match(webhook, /testPayment: !intent\.livemode/);
@@ -532,4 +531,7 @@ test("Stripe Checkout never names payment method types and confirms orders only 
   const stripeLib = await readFile("src/lib/payments/stripe.ts", "utf8");
   assert.match(stripeLib, /canUseStripeCheckout\(\): Promise<boolean> \{\s+return Boolean\(getStripe\(\) && getStripePublishableKey\(\)\);/);
   assert.ok(!stripeLib.includes("isAdminAuthenticated"));
+  // PayPal's own card button is off; cards go through the Stripe form
+  const paypalOptions = await readFile("src/components/payments/pay-later-message.tsx", "utf8");
+  assert.match(paypalOptions, /disableFunding: "card"/);
 });

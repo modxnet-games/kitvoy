@@ -36,8 +36,9 @@ function Buttons({ orderId, onPaid, onError }: Omit<PayPalPaymentProps, "clientI
     return <p className="text-sm text-destructive">PayPal couldn’t load. Check your connection and refresh the page.</p>;
   }
 
+  // One yellow PayPal button (the card button is off), so reserve just its height
   return (
-    <div className="relative min-h-[150px]">
+    <div className="relative min-h-[56px]">
       {(isPending || capturing) && (
         <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-background/80 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
@@ -71,7 +72,7 @@ function Buttons({ orderId, onPaid, onError }: Omit<PayPalPaymentProps, "clientI
   );
 }
 
-/** PayPal Smart Buttons: PayPal and guest debit/credit card. */
+/** PayPal Smart Buttons: PayPal (and Pay Later). Cards go through the Stripe form, so PayPal's card button is off. */
 export function PayPalPayment({ clientId, orderId, onPaid }: PayPalPaymentProps) {
   const { t } = useLanguage();
   const [error, setError] = useState<string | null>(null);

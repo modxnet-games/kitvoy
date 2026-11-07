@@ -13,9 +13,11 @@ import {
 /**
  * One set of PayPal SDK options for every page, so the landing page and the
  * checkout share a single script instead of loading two that conflict.
+ * Cards are taken by Stripe's form, so PayPal's own black "Debit or Credit
+ * Card" button is turned off (disable-funding=card); Pay Later stays on.
  */
 export function paypalScriptOptions(clientId: string): ReactPayPalScriptOptions {
-  return { clientId, currency: "USD", intent: "capture", components: "buttons,messages" };
+  return { clientId, currency: "USD", intent: "capture", components: "buttons,messages", disableFunding: "card" };
 }
 
 /** Starts the deferred SDK download once the browser is idle, so it never delays the first paint. */

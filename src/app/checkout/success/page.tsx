@@ -13,16 +13,16 @@ import { trackPurchase } from "@/lib/analytics/meta-pixel";
 type StripeResult = { status: "paid" | "processing" | "open"; orderReference: string; total: number; skus: string[]; quantity: number };
 
 /**
- * Asks the server whether the Stripe Checkout the customer came back from
- * finished. Stripe's redirect alone proves nothing, so nothing is trusted
- * from the URL; "open" or an error shows the payment as not completed.
+ * Asks the server whether the Stripe payment the customer came back from
+ * went through. Stripe's redirect_status alone proves nothing, so nothing is
+ * trusted from the URL; "open" or an error shows the payment as not completed.
  */
-function useStripeResult(sessionId: string | null) {
+function useStripeResult(intentId: string | null) {
   const [result, setResult] = useState<StripeResult | { status: "failed" } | null>(null);
   useEffect(() => {
-    if (!sessionId) return;
+    if (!intentId) return;
     let active = true;
-    fetch(`/api/checkout/stripe?session_id=${encodeURIComponent(sessionId)}`)
+    fetch(`/api/checkout/stripe?payment_intent=${encodeURIComponent(intentId)}`)
       .then(async (res) => {
         const json = (await res.json().catch(() => null)) as StripeResult | null;
         if (!active) return;
@@ -34,7 +34,7 @@ function useStripeResult(sessionId: string | null) {
     return () => {
       active = false;
     };
-  }, [sessionId]);
+  }, [intentId]);
   return result;
 }
 
@@ -42,10 +42,11 @@ function SuccessContent() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
   const refParam = searchParams.get("ref") ?? "";
-  // Set by Stripe Checkout on its way back; PayPal arrives here with only ?ref=
-  const sessionId = searchParams.get("session_id");
-  const stripe = useStripeResult(sessionId);
-  const checking = !!sessionId && stripe === null;
+  // Added by Stripe when a payment method left the site and came back. Cards
+  // and PayPal finish on the checkout page and arrive here with only ?ref=
+  const intentId = searchParams.get("payment_intent");
+  const stripe = useStripeResult(intentId);
+  const checking = !!intentId && stripe === null;
   const failed = stripe?.status === "failed";
   const processing = stripe?.status === "processing";
   const orderReference = stripe && stripe.status !== "failed" ? stripe.orderReference : refParam;
@@ -53,8 +54,8 @@ function SuccessContent() {
   const celebrated = useRef(false);
 
   useEffect(() => {
-    // Stripe Checkout left the checkout page before it could clear the cart or
-    // count the sale, so both happen here, once, after the server confirms it
+    // A redirect left the checkout page before it could clear the cart or count
+    // the sale, so both happen here, once, after the server confirms it
     if (!stripe || stripe.status === "failed" || celebrated.current) return;
     celebrated.current = true;
     clearCart();

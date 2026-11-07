@@ -13,10 +13,8 @@ const idOf = (ref: string | { id: string } | null | undefined) => (typeof ref ==
 /**
  * POST /api/webhooks/stripe
  *
- * The only place a Stripe payment completes an order. Verifies the signature
- * on the raw body (request.text(), never a parsed body) first, then:
- *  - checkout.session.completed / checkout.session.async_payment_succeeded →
- *    the session's PaymentIntent → the same completion as below
+ * The only place a card payment completes an order. Verifies the signature on
+ * the raw body first, then:
  *  - payment_intent.succeeded → completePaidOrder() → afterOrderPaid(); refunds a
  *    second payment for an order that's already paid or canceled
  *  - payment_intent.payment_failed → logged (the customer can retry)
@@ -44,15 +42,6 @@ export async function POST(request: Request) {
 
   try {
     switch (event.type) {
-      case "checkout.session.completed":
-      case "checkout.session.async_payment_succeeded":
-        await handleSessionCompleted(stripe, event.data.object);
-        break;
-      case "checkout.session.async_payment_failed": {
-        const session = event.data.object;
-        console.info(`[stripe] delayed payment failed for order ${session.metadata?.orderId ?? "?"} (session ${session.id})`);
-        break;
-      }
       case "payment_intent.succeeded":
         await handleSucceeded(stripe, event.data.object);
         break;
@@ -95,28 +84,17 @@ async function chargeFee(stripe: Stripe, chargeId: string | null): Promise<numbe
   }
 }
 
-/**
- * Stripe Checkout finished. Only a paid session counts (a delayed method such
- * as a bank debit arrives later as async_payment_succeeded); the order is then
- * completed through its PaymentIntent, so amount checks and the duplicate
- * refund apply the same way. Idempotent: a second event finds the order paid.
- */
-async function handleSessionCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
-  if (session.mode !== "payment" || session.payment_status !== "paid") return;
-  const orderId = session.metadata?.orderId;
-  const intentId = idOf(session.payment_intent);
-  if (!orderId || !intentId) return; // Not a store checkout
-  const intent = await stripe.paymentIntents.retrieve(intentId);
-  if (!intent.metadata?.orderId) intent.metadata = { ...intent.metadata, orderId };
-  await handleSucceeded(stripe, intent);
-}
-
 async function handleSucceeded(stripe: Stripe, intent: Stripe.PaymentIntent) {
   const orderId = intent.metadata?.orderId;
   if (!orderId) return; // Not a store checkout (e.g. a Dashboard payment)
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) {
+    // Sandbox payments from a developer machine carry orders this database doesn't have
+    if (!intent.livemode) {
+      console.info(`[stripe] test payment ${intent.id} for order ${orderId}, which isn't in this database; ignored`);
+      return;
+    }
     await sendOwnerAlert("Card payment for an unknown order", [
       `PaymentIntent ${intent.id} succeeded for ${formatPrice(intent.amount_received / 100)}, but order ${orderId} doesn't exist.`,
       "Check it in the Stripe Dashboard and refund it if needed.",

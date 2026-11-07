@@ -12,7 +12,7 @@ import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { CheckoutForm, OrderSummary } from "@/components/checkout";
 import type { CheckoutFormData } from "@/components/checkout";
 import { PayPalPayment } from "@/components/checkout/paypal-payment";
-import { StripeCheckoutButton } from "@/components/checkout/stripe-checkout-button";
+import { StripePayment } from "@/components/checkout/stripe-payment";
 import type { OrderTotals } from "@/lib/payments/money";
 import { placeOrder } from "@/lib/client/place-order";
 import { US_STATES } from "@/lib/us-address";
@@ -34,9 +34,9 @@ interface CheckoutClientProps {
 type PendingOrder = { orderId: string; orderReference: string; cartKey: string; totals: OrderTotals };
 
 /**
- * Two steps: shipping details create a pending (unpaid) order, then Stripe
- * Checkout (on Stripe's hosted page) or PayPal collects payment for that
- * order's server-side total.
+ * Two steps: shipping details create a pending (unpaid) order, then the
+ * inline Payment Element (Stripe) or PayPal collects payment for that order's
+ * server-side total.
  */
 export function CheckoutClient({ paypalClientId, stripePublishableKey, customer }: CheckoutClientProps) {
   const canPay = Boolean(paypalClientId || stripePublishableKey);
@@ -161,7 +161,14 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer 
                 <section className="space-y-4">
                   <h2 className="text-base font-semibold">{t("checkout.paymentTitle")}</h2>
                   {stripePublishableKey && (
-                    <StripeCheckoutButton orderId={pending.orderId} total={pending.totals.total} />
+                    <StripePayment
+                      publishableKey={stripePublishableKey}
+                      orderId={pending.orderId}
+                      orderReference={pending.orderReference}
+                      total={pending.totals.total}
+                      billing={{ name: details.fullName, email: details.email, phone: details.phone, postalCode: details.zip }}
+                      onPaid={handlePaid}
+                    />
                   )}
                   {stripePublishableKey && paypalClientId && (
                     <div className="relative py-1" aria-hidden="true">

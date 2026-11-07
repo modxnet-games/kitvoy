@@ -196,6 +196,7 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
                 <dt className="text-muted-foreground">Payment</dt>
                 <dd>
                   {isPaid ? "Paid" : order.paymentStatus === "refunded" ? "Refunded" : "Unpaid"}
+                  {order.testPayment && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">TEST</span>}
                   {order.paymentMethod && <> · {order.paymentMethod === "paypal" ? "PayPal" : order.paymentMethod === "card" ? "Card (Stripe)" : order.paymentMethod}</>}
                 </dd>
                 {(isPaid || order.paymentStatus === "refunded") && order.paymentRef && (

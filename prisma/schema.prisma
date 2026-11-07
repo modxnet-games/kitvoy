@@ -152,6 +152,8 @@ model Order {
   paymentFee        Float?
   /// Amount refunded so far through the payment provider; null when nothing was refunded
   refundedAmount    Float?
+  /// Paid with a Stripe test-mode (sandbox) payment: never sent to the supplier, left out of sales figures
+  testPayment       Boolean           @default(false)
   /// When the customer's order confirmation email was claimed for sending; set once, so it never goes out twice
   confirmationEmailSentAt DateTime?
   /// Supplier (CJdropshipping) order id once fulfillment has been triggered

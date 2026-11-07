@@ -113,9 +113,10 @@ async function handleSucceeded(stripe: Stripe, intent: Stripe.PaymentIntent) {
   }
 
   const fee = await chargeFee(stripe, idOf(intent.latest_charge));
-  if (await completePaidOrder(order.id, intent.id, fee, "card")) {
-    // Respond to Stripe now; email, push and CJ run after the response
-    after(() => afterOrderPaid(order.id));
+  if (await completePaidOrder(order.id, intent.id, fee, "card", !intent.livemode)) {
+    // Respond to Stripe now; email, push and CJ run after the response.
+    // Test-mode payments never reach the supplier.
+    after(() => afterOrderPaid(order.id, { testPayment: !intent.livemode }));
     return;
   }
 

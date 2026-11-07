@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 
+import { isAdminAuthenticated } from "@/lib/auth/admin-session";
+
 let client: Stripe | null = null;
 
 /**
@@ -19,6 +21,27 @@ export function getStripe(): Stripe | null {
 export function getStripePublishableKey(): string | null {
   const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim();
   return key && process.env.STRIPE_SECRET_KEY?.trim() ? key : null;
+}
+
+/** True when the configured secret key is a test-mode key (sandbox). */
+export function isStripeTestMode(): boolean {
+  return /^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY?.trim() ?? "");
+}
+
+/**
+ * Whether this visitor may pay by card. With test keys on the production
+ * server, only a signed-in admin sees the card form: customers would
+ * otherwise get a form that declines every real card. Local development
+ * (`next dev`) and live keys show it to everyone.
+ */
+export async function canUseStripeCheckout(): Promise<boolean> {
+  if (!getStripe() || !getStripePublishableKey()) return false;
+  if (!isStripeTestMode() || process.env.NODE_ENV !== "production") return true;
+  try {
+    return await isAdminAuthenticated();
+  } catch {
+    return false;
+  }
 }
 
 /** PaymentIntent states where the customer can still pay (or retry) on the same intent. */

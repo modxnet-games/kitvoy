@@ -517,4 +517,10 @@ test("the card checkout never names payment method types and confirms orders onl
   assert.ok(!route.includes("completePaidOrder"), "the PaymentIntent route must not mark orders paid");
   assert.match(webhook, /constructEvent\(await request\.text\(\)/);
   assert.match(webhook, /completePaidOrder\(/);
+  // Testing on the live site: test payments never reach CJ, and test keys are admin-only in production
+  assert.match(webhook, /testPayment: !intent\.livemode/);
+  const cj = await readFile("src/lib/fulfillment/cj.ts", "utf8");
+  assert.match(cj, /if \(order\.testPayment\) return \{ ok: false/);
+  const stripeLib = await readFile("src/lib/payments/stripe.ts", "utf8");
+  assert.match(stripeLib, /isStripeTestMode\(\) \|\| process\.env\.NODE_ENV !== "production"\) return true;[\s\S]*isAdminAuthenticated\(\)/);
 });

@@ -30,6 +30,7 @@ export async function sendOrderToCj(orderId: string): Promise<CjSendResult> {
   if (!order) return { ok: false, error: "Order not found" };
   if (order.paymentStatus !== "paid") return { ok: false, error: "Only paid orders can be sent to CJ" };
   if (order.status === "CANCELED") return { ok: false, error: "This order is canceled" };
+  if (order.testPayment) return { ok: false, error: "This order was paid with a Stripe test payment, so it's never sent to CJ" };
 
   const sandbox = isCjSandbox();
   try {

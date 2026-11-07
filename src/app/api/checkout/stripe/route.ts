@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 
 import { prisma } from "@/lib/db";
 import { getPayableOrder, orderHasStock, toCents } from "@/lib/payments/order-payment";
-import { getStripe, isOpenIntent } from "@/lib/payments/stripe";
+import { canUseStripeCheckout, getStripe, isOpenIntent } from "@/lib/payments/stripe";
 
 const orderReference = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
 
@@ -21,7 +21,8 @@ type StoredAddress = { address1?: string; address2?: string; city?: string; stat
  */
 export async function POST(request: Request) {
   const stripe = getStripe();
-  if (!stripe) {
+  // Same gate as the checkout page: test keys in production are admin-only
+  if (!stripe || !(await canUseStripeCheckout())) {
     return NextResponse.json({ error: "STRIPE_NOT_CONFIGURED" }, { status: 503 });
   }
 

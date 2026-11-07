@@ -215,7 +215,8 @@ export async function getSalesOverview(now = new Date()): Promise<SalesOverview>
 
   const orders = await prisma.order.findMany({
     // A day of margin covers the time zone offset; days are matched in computeSalesOverview
-    where: { createdAt: { gte: new Date(`${addDays(earliest, -1)}T00:00:00Z`) }, paymentStatus: { in: ["paid", "refunded"] } },
+    // Stripe test-mode orders aren't sales
+    where: { createdAt: { gte: new Date(`${addDays(earliest, -1)}T00:00:00Z`) }, paymentStatus: { in: ["paid", "refunded"] }, testPayment: false },
     select: {
       createdAt: true,
       total: true,

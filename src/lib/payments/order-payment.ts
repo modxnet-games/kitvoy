@@ -48,6 +48,7 @@ export async function completePaidOrder(
   paymentRef: string,
   paymentFee?: number,
   paymentMethod?: "card" | "paypal",
+  testPayment = false,
 ): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
     const { count } = await tx.order.updateMany({
@@ -56,6 +57,7 @@ export async function completePaidOrder(
         paymentStatus: "paid",
         paymentRef,
         status: "CONFIRMED",
+        testPayment,
         ...(paymentMethod ? { paymentMethod } : {}),
         ...(paymentFee !== undefined ? { paymentFee } : {}),
       },
@@ -78,8 +80,12 @@ export async function completePaidOrder(
  * Everything that happens once money is in: customer confirmation, owner
  * email, admin push, and the fulfillment hand-off. Each step is best-effort
  * and never throws, because the customer has already paid.
+ *
+ * `testPayment` (a Stripe test-mode payment) runs everything except the
+ * supplier hand-off, so testing checkout on the live site never creates a
+ * real CJ order; the admin shows why it wasn't sent.
  */
-export async function afterOrderPaid(orderId: string): Promise<void> {
+export async function afterOrderPaid(orderId: string, options: { testPayment?: boolean } = {}): Promise<void> {
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return;
   const reference = orderReference(order.id);
@@ -123,6 +129,14 @@ export async function afterOrderPaid(orderId: string): Promise<void> {
     total: order.total,
     itemCount: order.items.reduce((sum, i) => sum + i.quantity, 0),
   });
+
+  if (options.testPayment) {
+    await prisma.order
+      .update({ where: { id: order.id }, data: { fulfillmentError: "Stripe test-mode payment: not sent to the supplier. Delete this order when you're done testing." } })
+      .catch((err) => console.error("[fulfillment] couldn't flag test order:", err));
+    console.info(`[fulfillment] ${reference} is a test payment; not sent to the supplier`);
+    return;
+  }
 
   try {
     if (isCjConfigured()) {

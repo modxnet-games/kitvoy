@@ -10,7 +10,7 @@ import {
 } from "@/lib/payments/order-payment";
 import { sendOwnerAlert } from "@/lib/email";
 import { getPayPal, paypal } from "@/lib/payments/paypal";
-import { cancelOpenPaymentIntent, getStripe } from "@/lib/payments/stripe";
+import { checkoutSessionCompleted, expireOpenCheckoutSession } from "@/lib/payments/stripe";
 
 type PayPalMoney = { value?: string; currency_code?: string };
 type PayPalCapture = {
@@ -26,20 +26,6 @@ type PayPalOrderResult = {
 };
 
 const firstCapture = (r: PayPalOrderResult | undefined) => r?.purchase_units?.[0]?.payments?.captures?.[0];
-
-/** True when the order's card PaymentIntent is paid or settling. */
-async function cardPaymentInProgress(paymentIntentId: string | null): Promise<boolean> {
-  const stripe = getStripe();
-  if (!stripe || !paymentIntentId) return false;
-  try {
-    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    return intent.status === "succeeded" || intent.status === "processing" || intent.status === "requires_capture";
-  } catch (err) {
-    // Stripe being unreachable must not block PayPal; a real double payment is refunded anyway
-    console.warn("[checkout/paypal] couldn't check the card payment:", err instanceof Error ? err.message : err);
-    return false;
-  }
-}
 
 /** Refunds a PayPal capture in full when the order was already paid by card, and tells the owner. */
 async function refundDuplicateCapture(
@@ -90,8 +76,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "stock.notEnoughStock" }, { status: 409 });
     }
 
-    // A card payment for this order is already settling: don't open a second way to pay
-    if (await cardPaymentInProgress(order.stripePaymentIntentId)) {
+    // The customer already finished Stripe Checkout for this order: don't open a second way to pay
+    if (await checkoutSessionCompleted(order.stripeCheckoutSessionId)) {
       return NextResponse.json({ error: "checkout.paymentInProgress" }, { status: 409 });
     }
 
@@ -184,7 +170,7 @@ export async function PUT(request: Request) {
     if (await completePaidOrder(order.id, captureRef, Number.isFinite(fee) ? fee : undefined, "paypal")) {
       // Don't make the customer wait on email/push; the server keeps running
       void afterOrderPaid(order.id);
-      void cancelOpenPaymentIntent(order.stripePaymentIntentId);
+      void expireOpenCheckoutSession(order.stripeCheckoutSessionId);
       return NextResponse.json({ ok: true });
     }
 

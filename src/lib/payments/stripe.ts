@@ -48,31 +48,40 @@ export async function canUseStripeCheckout(): Promise<boolean> {
   }
 }
 
-/** PaymentIntent states where the customer can still pay (or retry) on the same intent. */
-const OPEN_STATUSES = new Set<Stripe.PaymentIntent.Status>([
-  "requires_payment_method",
-  "requires_confirmation",
-  "requires_action",
-]);
-
-export function isOpenIntent(intent: Stripe.PaymentIntent): boolean {
-  return OPEN_STATUSES.has(intent.status);
+/** The Checkout Session's state, or null when Stripe can't be asked right now. */
+async function sessionStatus(sessionId: string): Promise<Stripe.Checkout.Session.Status | null> {
+  const stripe = getStripe();
+  if (!stripe) return null;
+  try {
+    return (await stripe.checkout.sessions.retrieve(sessionId)).status;
+  } catch (err) {
+    console.warn(`[stripe] couldn't read session ${sessionId}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /**
- * Cancels an order's card PaymentIntent once the order is paid another way
- * (PayPal), so a card form left open in another tab can't charge it again.
+ * True once the customer finished the order's Stripe Checkout (paid, or a
+ * delayed method still settling), so no second way to pay should open.
+ * Stripe being unreachable never blocks PayPal: a real double payment is
+ * refunded by the webhook anyway.
+ */
+export async function checkoutSessionCompleted(sessionId: string | null | undefined): Promise<boolean> {
+  if (!sessionId) return false;
+  return (await sessionStatus(sessionId)) === "complete";
+}
+
+/**
+ * Closes an order's Stripe Checkout once the order is paid another way (PayPal)
+ * or canceled, so a Checkout page left open in another tab can't charge it.
  * Best-effort: the webhook refunds a duplicate payment anyway.
  */
-export async function cancelOpenPaymentIntent(paymentIntentId: string | null | undefined): Promise<void> {
+export async function expireOpenCheckoutSession(sessionId: string | null | undefined): Promise<void> {
   const stripe = getStripe();
-  if (!stripe || !paymentIntentId) return;
+  if (!stripe || !sessionId) return;
   try {
-    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    if (isOpenIntent(intent)) {
-      await stripe.paymentIntents.cancel(paymentIntentId, { cancellation_reason: "duplicate" });
-    }
+    if ((await sessionStatus(sessionId)) === "open") await stripe.checkout.sessions.expire(sessionId);
   } catch (err) {
-    console.warn(`[stripe] couldn't cancel ${paymentIntentId}:`, err instanceof Error ? err.message : err);
+    console.warn(`[stripe] couldn't expire session ${sessionId}:`, err instanceof Error ? err.message : err);
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCustomer } from "@/lib/auth/customer-session";
 import { prisma } from "@/lib/db";
-import { cancelOpenPaymentIntent } from "@/lib/payments/stripe";
+import { expireOpenCheckoutSession } from "@/lib/payments/stripe";
 import type { OrderStatus } from "@prisma/client";
 
 const CANCEL_WINDOW_MS = 5 * 60 * 60 * 1000; // first 5 hours
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
     const order = await prisma.order.findFirst({
       where: { id: orderId, userId: customer.userId },
-      select: { id: true, status: true, createdAt: true, paymentStatus: true, stripePaymentIntentId: true },
+      select: { id: true, status: true, createdAt: true, paymentStatus: true, stripeCheckoutSessionId: true },
     });
 
     if (!order) {
@@ -71,8 +71,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "PAID" }, { status: 409 });
     }
 
-    // A card form left open can't charge a canceled order (the webhook refunds it if one slips through)
-    await cancelOpenPaymentIntent(order.stripePaymentIntentId);
+    // A Stripe Checkout page left open can't charge a canceled order (the webhook refunds it if one slips through)
+    await expireOpenCheckoutSession(order.stripeCheckoutSessionId);
 
     return NextResponse.json({ success: true });
   } catch (err) {

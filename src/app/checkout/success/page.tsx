@@ -1,44 +1,92 @@
 "use client";
 
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
 import { useCartStore } from "@/store/cart-store";
 import { buttonVariants } from "@/components/ui/button";
+import { trackPurchase } from "@/lib/analytics/meta-pixel";
+
+type StripeResult = { status: "paid" | "processing" | "open"; orderReference: string; total: number; skus: string[]; quantity: number };
+
+/**
+ * Asks the server whether the Stripe Checkout the customer came back from
+ * finished. Stripe's redirect alone proves nothing, so nothing is trusted
+ * from the URL; "open" or an error shows the payment as not completed.
+ */
+function useStripeResult(sessionId: string | null) {
+  const [result, setResult] = useState<StripeResult | { status: "failed" } | null>(null);
+  useEffect(() => {
+    if (!sessionId) return;
+    let active = true;
+    fetch(`/api/checkout/stripe?session_id=${encodeURIComponent(sessionId)}`)
+      .then(async (res) => {
+        const json = (await res.json().catch(() => null)) as StripeResult | null;
+        if (!active) return;
+        setResult(res.ok && json && (json.status === "paid" || json.status === "processing") ? json : { status: "failed" });
+      })
+      .catch(() => {
+        if (active) setResult({ status: "failed" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [sessionId]);
+  return result;
+}
 
 function SuccessContent() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  const orderReference = searchParams.get("ref") ?? "";
-  // Set by Stripe when a payment method redirected away and back (status only;
-  // the order itself is marked paid by the webhook)
-  const redirectStatus = searchParams.get("redirect_status");
-  const failed = redirectStatus === "failed";
+  const refParam = searchParams.get("ref") ?? "";
+  // Set by Stripe Checkout on its way back; PayPal arrives here with only ?ref=
+  const sessionId = searchParams.get("session_id");
+  const stripe = useStripeResult(sessionId);
+  const checking = !!sessionId && stripe === null;
+  const failed = stripe?.status === "failed";
+  const processing = stripe?.status === "processing";
+  const orderReference = stripe && stripe.status !== "failed" ? stripe.orderReference : refParam;
   const clearCart = useCartStore((s) => s.clearCart);
+  const celebrated = useRef(false);
+
+  useEffect(() => {
+    // Stripe Checkout left the checkout page before it could clear the cart or
+    // count the sale, so both happen here, once, after the server confirms it
+    if (!stripe || stripe.status === "failed" || celebrated.current) return;
+    celebrated.current = true;
+    clearCart();
+    trackPurchase({ orderReference: stripe.orderReference, value: stripe.total, skus: stripe.skus, quantity: stripe.quantity });
+  }, [stripe, clearCart]);
+
   const audioPlayed = useRef(false);
-
   useEffect(() => {
-    // Redirect-based payments leave the checkout page before it can clear the cart
-    if (redirectStatus === "succeeded" || redirectStatus === "processing") clearCart();
-  }, [redirectStatus, clearCart]);
-
-  useEffect(() => {
-    if (failed || audioPlayed.current) return;
+    if (checking || failed || audioPlayed.current) return;
     audioPlayed.current = true;
     const audio = new Audio("/confirm_order.mp3");
     audio.volume = 0.7;
     audio.play().catch(() => {});
-  }, [failed]);
+  }, [checking, failed]);
+
+  if (checking) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-lg rounded-2xl border bg-background p-8 text-center shadow-2xl" role="status">
+          <Loader2 className="mx-auto size-10 animate-spin text-muted-foreground" />
+          <p className="mt-4 text-muted-foreground">{t("checkout.paymentChecking")}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (failed) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
         <div className="w-full max-w-lg rounded-2xl border bg-background p-6 text-center shadow-2xl sm:p-8" role="alert">
           <XCircle className="mx-auto size-16 text-destructive" />
-          <h1 className="mt-6 text-2xl font-bold tracking-tight">{t("checkout.paymentFailed")}</h1>
+          <h1 className="mt-6 text-2xl font-bold tracking-tight">{t("checkout.paymentNotCompleted")}</h1>
           <div className="mt-8 flex justify-center">
             <Link href="/checkout" className={buttonVariants({ size: "lg" })}>
               {t("checkout.title")}
@@ -50,14 +98,14 @@ function SuccessContent() {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-2xl border bg-background p-6 text-center shadow-2xl sm:p-8">
         <CheckCircle2 className="mx-auto size-16 text-green-500" />
         <h1 className="mt-6 text-2xl font-bold tracking-tight sm:text-3xl">
           {t("order.successTitle")}
         </h1>
         <p className="mt-3 text-muted-foreground">
-          {redirectStatus === "processing" ? t("order.processingMessage") : t("order.successMessage")}
+          {processing ? t("order.processingMessage") : t("order.successMessage")}
         </p>
         <p className="mt-2 text-sm font-medium text-muted-foreground">
           {t("order.shippingMessage")}

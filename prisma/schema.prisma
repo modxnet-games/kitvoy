@@ -146,8 +146,8 @@ model Order {
   paymentStatus     String            @default("unpaid")
   /// What paid the order: Stripe PaymentIntent id or PayPal capture id (PayPal order id until capture)
   paymentRef        String?
-  /// The card checkout's PaymentIntent, kept apart from paymentRef so switching to PayPal never loses it
-  stripePaymentIntentId String?
+  /// The Stripe Checkout Session opened for this order, kept apart from paymentRef so switching to PayPal never loses it
+  stripeCheckoutSessionId String?
   /// The payment provider's fee for this order (PayPal capture fee or Stripe balance-transaction fee); null until recorded
   paymentFee        Float?
   /// Amount refunded so far through the payment provider; null when nothing was refunded
@@ -184,7 +184,7 @@ model Order {
   @@index([createdAt])
   @@index([userId])
   @@index([paymentRef])
-  @@index([stripePaymentIntentId])
+  @@index([stripeCheckoutSessionId])
   @@index([fulfillmentStatus])
   @@map("orders")
 }

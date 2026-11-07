@@ -13,8 +13,10 @@ const idOf = (ref: string | { id: string } | null | undefined) => (typeof ref ==
 /**
  * POST /api/webhooks/stripe
  *
- * The only place a card payment completes an order. Verifies the signature on
- * the raw body first, then:
+ * The only place a Stripe payment completes an order. Verifies the signature
+ * on the raw body (request.text(), never a parsed body) first, then:
+ *  - checkout.session.completed / checkout.session.async_payment_succeeded →
+ *    the session's PaymentIntent → the same completion as below
  *  - payment_intent.succeeded → completePaidOrder() → afterOrderPaid(); refunds a
  *    second payment for an order that's already paid or canceled
  *  - payment_intent.payment_failed → logged (the customer can retry)
@@ -42,6 +44,15 @@ export async function POST(request: Request) {
 
   try {
     switch (event.type) {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded":
+        await handleSessionCompleted(stripe, event.data.object);
+        break;
+      case "checkout.session.async_payment_failed": {
+        const session = event.data.object;
+        console.info(`[stripe] delayed payment failed for order ${session.metadata?.orderId ?? "?"} (session ${session.id})`);
+        break;
+      }
       case "payment_intent.succeeded":
         await handleSucceeded(stripe, event.data.object);
         break;
@@ -82,6 +93,22 @@ async function chargeFee(stripe: Stripe, chargeId: string | null): Promise<numbe
     console.warn(`[stripe] fee lookup for ${chargeId} failed:`, err instanceof Error ? err.message : err);
     return undefined;
   }
+}
+
+/**
+ * Stripe Checkout finished. Only a paid session counts (a delayed method such
+ * as a bank debit arrives later as async_payment_succeeded); the order is then
+ * completed through its PaymentIntent, so amount checks and the duplicate
+ * refund apply the same way. Idempotent: a second event finds the order paid.
+ */
+async function handleSessionCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
+  if (session.mode !== "payment" || session.payment_status !== "paid") return;
+  const orderId = session.metadata?.orderId;
+  const intentId = idOf(session.payment_intent);
+  if (!orderId || !intentId) return; // Not a store checkout
+  const intent = await stripe.paymentIntents.retrieve(intentId);
+  if (!intent.metadata?.orderId) intent.metadata = { ...intent.metadata, orderId };
+  await handleSucceeded(stripe, intent);
 }
 
 async function handleSucceeded(stripe: Stripe, intent: Stripe.PaymentIntent) {

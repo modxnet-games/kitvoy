@@ -167,6 +167,10 @@ export async function GET(request: Request) {
       quantity: order.items.reduce((n, i) => n + i.quantity, 0),
     });
   } catch (err) {
+    // A made-up or foreign session id is a bad request, not an outage
+    if ((err as { code?: string })?.code === "resource_missing") {
+      return NextResponse.json({ error: "INVALID_SESSION" }, { status: 404 });
+    }
     console.error("[checkout/stripe] session lookup failed:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "LOOKUP_FAILED" }, { status: 500 });
   }

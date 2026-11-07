@@ -27,7 +27,6 @@ type StoredAddress = { address1?: string; address2?: string; city?: string; stat
  */
 export async function POST(request: Request) {
   const stripe = getStripe();
-  // Same gate as the checkout page: test keys in production are admin-only
   if (!stripe || !(await canUseStripeCheckout())) {
     return NextResponse.json({ error: "STRIPE_NOT_CONFIGURED" }, { status: 503 });
   }

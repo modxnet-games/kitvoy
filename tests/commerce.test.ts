@@ -524,10 +524,12 @@ test("Stripe Checkout never names payment method types and confirms orders only 
   assert.match(webhook, /case "checkout\.session\.completed":/);
   assert.match(webhook, /payment_status !== "paid"\) return;/, "an unpaid (expired or pending) session never completes an order");
   assert.match(webhook, /completePaidOrder\(/);
-  // Testing on the live site: test payments never reach CJ, and test keys are admin-only in production
+  // Testing on the live site: test payments never reach CJ
   assert.match(webhook, /testPayment: !intent\.livemode/);
   const cj = await readFile("src/lib/fulfillment/cj.ts", "utf8");
   assert.match(cj, /if \(order\.testPayment\) return \{ ok: false/);
+  // Every visitor gets Stripe once both keys are set (no admin-only gate)
   const stripeLib = await readFile("src/lib/payments/stripe.ts", "utf8");
-  assert.match(stripeLib, /isStripeTestMode\(\) \|\| process\.env\.NODE_ENV !== "production"\) return true;[\s\S]*isAdminAuthenticated\(\)/);
+  assert.match(stripeLib, /canUseStripeCheckout\(\): Promise<boolean> \{\s+return Boolean\(getStripe\(\) && getStripePublishableKey\(\)\);/);
+  assert.ok(!stripeLib.includes("isAdminAuthenticated"));
 });

@@ -1,7 +1,5 @@
 import Stripe from "stripe";
 
-import { isAdminAuthenticated } from "@/lib/auth/admin-session";
-
 let client: Stripe | null = null;
 
 /**
@@ -33,19 +31,14 @@ export function isStripeTestMode(): boolean {
 }
 
 /**
- * Whether this visitor may pay by card. With test keys on the production
- * server, only a signed-in admin sees the card form: customers would
- * otherwise get a form that declines every real card. Local development
- * (`next dev`) and live keys show it to everyone.
+ * Whether checkout offers Stripe: true for every visitor once both keys are
+ * set. With test (sandbox) keys that means everyone gets Stripe's sandbox
+ * Checkout, where real cards are declined; the owner chose that while the
+ * store has no traffic. Test payments are flagged and never reach CJ.
+ * Switch the server to live keys before sending real customers.
  */
 export async function canUseStripeCheckout(): Promise<boolean> {
-  if (!getStripe() || !getStripePublishableKey()) return false;
-  if (!isStripeTestMode() || process.env.NODE_ENV !== "production") return true;
-  try {
-    return await isAdminAuthenticated();
-  } catch {
-    return false;
-  }
+  return Boolean(getStripe() && getStripePublishableKey());
 }
 
 /** The Checkout Session's state, or null when Stripe can't be asked right now. */

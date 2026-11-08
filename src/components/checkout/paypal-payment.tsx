@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from "@paypal/react-paypal-js";
-import { Loader2, Lock } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
 import { paypalScriptOptions } from "@/components/payments/pay-later-message";
@@ -12,6 +12,10 @@ interface PayPalPaymentProps {
   /** Store order created from the checkout details (amount lives server-side) */
   orderId: string;
   onPaid: () => void;
+  /** Lets the page lock the other payment option while PayPal confirms */
+  onProcessingChange?: (processing: boolean) => void;
+  /** True while a card payment runs, so a second payment can't start here */
+  disabled?: boolean;
 }
 
 /** Server error codes (e.g. PAYMENT_NOT_COMPLETED) map to a generic message; message keys pass through. */
@@ -28,9 +32,13 @@ async function callPayPalRoute(method: "POST" | "PUT", orderId: string) {
   return json;
 }
 
-function Buttons({ orderId, onPaid, onError }: Omit<PayPalPaymentProps, "clientId"> & { onError: (key: string) => void }) {
+function Buttons({ orderId, onPaid, onError, onProcessingChange, disabled }: Omit<PayPalPaymentProps, "clientId"> & { onError: (key: string) => void }) {
   const [{ isPending, isRejected }] = usePayPalScriptReducer();
   const [capturing, setCapturing] = useState(false);
+  const setBusy = (busy: boolean) => {
+    setCapturing(busy);
+    onProcessingChange?.(busy);
+  };
 
   if (isRejected) {
     return <p className="text-sm text-destructive">PayPal couldn’t load. Check your connection and refresh the page.</p>;
@@ -38,27 +46,28 @@ function Buttons({ orderId, onPaid, onError }: Omit<PayPalPaymentProps, "clientI
 
   // One yellow PayPal button (the card button is off), so reserve just its height
   return (
-    <div className="relative min-h-[56px]">
+    <div className={disabled ? "relative min-h-13 opacity-50" : "relative min-h-13"} aria-disabled={disabled || undefined}>
       {(isPending || capturing) && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-background/80 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {capturing ? "Confirming your payment…" : "Loading secure payment…"}
+        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-white/85 text-sm font-medium text-[#666a67]" role="status">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          {capturing ? "Confirming your payment…" : "Loading PayPal…"}
         </div>
       )}
       <PayPalButtons
-        style={{ layout: "vertical", shape: "rect", label: "pay", height: 48 }}
+        style={{ layout: "vertical", shape: "rect", label: "pay", height: 52 }}
+        disabled={disabled}
         forceReRender={[orderId]}
         createOrder={async () => {
           const { id } = await callPayPalRoute("POST", orderId);
           return id as string;
         }}
         onApprove={async () => {
-          setCapturing(true);
+          setBusy(true);
           try {
             await callPayPalRoute("PUT", orderId);
             onPaid();
           } catch (err) {
-            setCapturing(false);
+            setBusy(false);
             onError(toMessageKey((err as Error).message));
           }
         }}
@@ -73,24 +82,21 @@ function Buttons({ orderId, onPaid, onError }: Omit<PayPalPaymentProps, "clientI
 }
 
 /** PayPal Smart Buttons: PayPal (and Pay Later). Cards go through the Stripe form, so PayPal's card button is off. */
-export function PayPalPayment({ clientId, orderId, onPaid }: PayPalPaymentProps) {
+export function PayPalPayment({ clientId, orderId, onPaid, onProcessingChange, disabled }: PayPalPaymentProps) {
   const { t } = useLanguage();
   const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
       {error && (
-        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm font-medium text-destructive">
-          {t(error)}
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-[#f1c7c0] bg-[#fdf3f1] px-4 py-3 text-sm font-medium text-[#8f2a1f]">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <p>{t(error)}</p>
         </div>
       )}
       <PayPalScriptProvider options={paypalScriptOptions(clientId)}>
-        <Buttons orderId={orderId} onPaid={onPaid} onError={(key) => setError(key)} />
+        <Buttons orderId={orderId} onPaid={onPaid} onError={(key) => setError(key)} onProcessingChange={onProcessingChange} disabled={disabled} />
       </PayPalScriptProvider>
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Lock className="size-3.5" />
-        {t("checkout.secureNote")}
-      </p>
     </div>
   );
 }

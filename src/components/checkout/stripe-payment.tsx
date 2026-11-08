@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
+import { loadStripe, type Stripe as StripeJs, type Appearance } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Lock } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
 import { formatPrice } from "@/lib/formatters";
+import { CheckoutButton } from "./checkout-button";
 
 interface StripePaymentProps {
   publishableKey: string;
@@ -18,6 +19,10 @@ interface StripePaymentProps {
   /** Prefills the Payment Element's billing fields */
   billing: { name: string; email: string; phone: string; postalCode: string };
   onPaid: () => void;
+  /** Lets the page lock the other payment option while a card payment runs */
+  onProcessingChange?: (processing: boolean) => void;
+  /** True while PayPal is confirming, so a second payment can't start here */
+  disabled?: boolean;
 }
 
 // Stripe.js loads once per key, and only when the payment step shows
@@ -34,13 +39,48 @@ function getStripeJs(key: string) {
 /** Server error codes map to a generic message; message keys (with a dot) pass through. */
 const toMessageKey = (code: unknown) => (typeof code === "string" && code.includes(".") ? code : "checkout.paymentUnavailable");
 
+/** The Payment Element drawn like the rest of the checkout: same radius, borders, focus ring and brand color. */
+const appearance: Appearance = {
+  theme: "stripe",
+  variables: {
+    colorPrimary: "#C94B16",
+    colorText: "#171918",
+    colorTextSecondary: "#666a67",
+    colorTextPlaceholder: "#9a9d99",
+    colorDanger: "#b3261e",
+    colorBackground: "#ffffff",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontSizeBase: "16px",
+    fontWeightNormal: "500",
+    borderRadius: "12px",
+    spacingUnit: "4px",
+    spacingGridRow: "16px",
+    spacingGridColumn: "16px",
+    focusBoxShadow: "0 0 0 4px rgba(201, 75, 22, 0.15)",
+    focusOutline: "none",
+  },
+  rules: {
+    ".Input": { padding: "13px 16px", border: "1px solid #dcd9d0", boxShadow: "none", transition: "border-color 0.2s, box-shadow 0.2s" },
+    ".Input:hover": { borderColor: "#bdb9ae" },
+    ".Input:focus": { borderColor: "#C94B16", boxShadow: "0 0 0 4px rgba(201, 75, 22, 0.15)" },
+    ".Input--invalid": { borderColor: "#d13b2b", boxShadow: "none" },
+    ".Label": { fontSize: "14px", fontWeight: "500", marginBottom: "6px" },
+    ".Error": { fontSize: "13px", fontWeight: "500" },
+    ".AccordionItem": { border: "1px solid #e7e5df", boxShadow: "none", padding: "14px 16px", transition: "border-color 0.2s, box-shadow 0.2s" },
+    ".AccordionItem:hover": { borderColor: "#bdb9ae" },
+    ".AccordionItem--selected": { borderColor: "#C94B16", boxShadow: "0 0 0 1px #C94B16", backgroundColor: "#fffaf6" },
+    ".Tab, .Block": { border: "1px solid #e7e5df", boxShadow: "none" },
+    ".Tab--selected": { borderColor: "#C94B16", boxShadow: "0 0 0 1px #C94B16" },
+  },
+};
+
 /**
  * Stripe Payment Element: cards, wallets and whatever else is turned on under
  * Dashboard → Settings → Payment methods (dynamic payment methods). The
  * PaymentIntent comes from /api/checkout/stripe; the webhook marks the order
  * paid, so this only confirms and moves the customer on.
  */
-export function StripePayment({ publishableKey, orderId, orderReference, total, billing, onPaid }: StripePaymentProps) {
+export function StripePayment({ publishableKey, orderId, orderReference, total, billing, onPaid, onProcessingChange, disabled }: StripePaymentProps) {
   const { t } = useLanguage();
   // Keyed by order, so a new order never shows the previous order's intent
   const [intent, setIntent] = useState<{ orderId: string; clientSecret?: string; errorKey?: string } | null>(null);
@@ -71,17 +111,20 @@ export function StripePayment({ publishableKey, orderId, orderReference, total, 
 
   if (current?.errorKey) {
     return (
-      <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm font-medium text-destructive">
+      <p role="alert" className="flex items-start gap-3 rounded-xl border border-[#f1c7c0] bg-[#fdf3f1] px-4 py-3 text-sm font-medium text-[#8f2a1f]">
+        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         {t(current.errorKey)}
       </p>
     );
   }
 
   if (!clientSecret) {
+    // The Element's shape while Stripe prepares the payment, so nothing jumps
     return (
-      <div className="flex min-h-[180px] items-center justify-center gap-2 rounded-xl border text-sm text-muted-foreground" role="status">
-        <Loader2 className="size-4 animate-spin" />
-        Loading secure payment…
+      <div className="space-y-3" role="status" aria-label={t("checkout.loadingPayment")}>
+        {[0, 1, 2].map((i) => <div key={i} className="h-[52px] rounded-xl border border-[#eeece6] bg-[#f6f5f1] motion-safe:animate-pulse" />)}
+        <div className="h-13 rounded-xl bg-[#c94b16]/20 motion-safe:animate-pulse" />
+        <span className="sr-only">{t("checkout.loadingPayment")}</span>
       </div>
     );
   }
@@ -92,15 +135,16 @@ export function StripePayment({ publishableKey, orderId, orderReference, total, 
       stripe={getStripeJs(publishableKey)}
       options={{
         clientSecret,
-        appearance: { theme: "stripe", variables: { colorPrimary: "#C94B16", borderRadius: "8px" } },
+        appearance,
+        fonts: [{ cssSrc: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" }],
       }}
     >
-      <PaymentForm orderReference={orderReference} total={total} billing={billing} onPaid={onPaid} />
+      <PaymentForm orderReference={orderReference} total={total} billing={billing} onPaid={onPaid} onProcessingChange={onProcessingChange} disabled={disabled} />
     </Elements>
   );
 }
 
-function PaymentForm({ orderReference, total, billing, onPaid }: Pick<StripePaymentProps, "orderReference" | "total" | "billing" | "onPaid">) {
+function PaymentForm({ orderReference, total, billing, onPaid, onProcessingChange, disabled }: Pick<StripePaymentProps, "orderReference" | "total" | "billing" | "onPaid" | "onProcessingChange" | "disabled">) {
   const { t } = useLanguage();
   const stripe = useStripe();
   const elements = useElements();
@@ -108,14 +152,19 @@ function PaymentForm({ orderReference, total, billing, onPaid }: Pick<StripePaym
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const setBusy = (busy: boolean) => {
+    setSubmitting(busy);
+    onProcessingChange?.(busy);
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!stripe || !elements || submitting) return;
-    setSubmitting(true);
+    if (!stripe || !elements || submitting || disabled) return;
+    setBusy(true);
     setError(null);
 
     // Methods that leave the page (bank redirects) come back to the success page,
-    // which reads Stripe's redirect_status; cards finish here without a redirect
+    // which verifies the payment with the server; cards finish here without a redirect
     const returnUrl = `${window.location.origin}/checkout/success?ref=${encodeURIComponent(orderReference)}`;
     const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
@@ -124,7 +173,7 @@ function PaymentForm({ orderReference, total, billing, onPaid }: Pick<StripePaym
     });
 
     if (confirmError) {
-      setSubmitting(false);
+      setBusy(false);
       // Card and validation messages are written for customers; anything else gets ours
       setError(
         confirmError.type === "card_error" || confirmError.type === "validation_error"
@@ -137,22 +186,23 @@ function PaymentForm({ orderReference, total, billing, onPaid }: Pick<StripePaym
       onPaid();
       return;
     }
-    setSubmitting(false);
+    setBusy(false);
     setError(t("checkout.paymentFailed"));
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5" aria-busy={submitting}>
       {error && (
-        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm font-medium text-destructive">
-          {error}
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-[#f1c7c0] bg-[#fdf3f1] px-4 py-3 text-sm font-medium text-[#8f2a1f]">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <p>{error}</p>
         </div>
       )}
-      <div className="min-h-[180px]">
+      <div className={!ready ? "min-h-[180px]" : undefined}>
         <PaymentElement
           onReady={() => setReady(true)}
           options={{
-            layout: "tabs",
+            layout: { type: "accordion", defaultCollapsed: false, radios: "if_multiple", spacedAccordionItems: true },
             defaultValues: {
               billingDetails: {
                 name: billing.name,
@@ -164,20 +214,13 @@ function PaymentForm({ orderReference, total, billing, onPaid }: Pick<StripePaym
           }}
         />
       </div>
-      <button
-        type="submit"
-        disabled={!stripe || !elements || !ready || submitting}
-        className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-      >
-        {submitting ? (
-          <span className="inline-flex items-center gap-2" role="status">
-            <Loader2 className="size-4 animate-spin" />
-            {t("checkout.processing")}
-          </span>
-        ) : (
-          `${t("checkout.payWithCard")} ${formatPrice(total)}`
-        )}
-      </button>
+      <CheckoutButton type="submit" disabled={!stripe || !elements || !ready || disabled} loading={submitting} loadingLabel={t("checkout.processingPayment")}>
+        <Lock className="size-4" aria-hidden="true" />
+        {t("checkout.payWithCard")} {formatPrice(total)}
+      </CheckoutButton>
+      {submitting && (
+        <p className="text-center text-xs text-[#666a67]" aria-live="polite">{t("checkout.keepPageOpen")}</p>
+      )}
     </form>
   );
 }

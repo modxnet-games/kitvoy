@@ -253,30 +253,9 @@
 .policy-nav, .support-policy-links { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 18px; font-size: 14px; }
 .policy-nav { border-top: 1px solid #e7e5df; padding-top: 24px; }
 .checkout-page { max-width: 1120px; }
-.checkout-page h1 { font-size: 38px; letter-spacing: -.045em; }
-.checkout-progress { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 22px; color: #666a67; font-size: 12px; }
-.checkout-progress strong { color: #a83d10; }
-.checkout-page input, .checkout-page select { min-height: 48px; padding: 12px; background: #fff; font-size: 16px; border-radius: 8px; }
-.checkout-page select { padding-block: 10px; }
-.checkout-page button[type=submit] { min-height: 52px; font-size: 14px; }
-.checkout-page .order-total { font-size: 22px; }
-.checkout-page .checkout-back { min-height: 44px; display: inline-flex; align-items: center; }
-.checkout-summary-edit { float: right; font-size: 12px; color: #666a67; }
-/* Phones: the order collapses to one line above the form */
-.checkout-summary-mobile { border: 1px solid #e7e5df; border-radius: 11px; background: #fff; }
-.checkout-summary-mobile > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 16px; font-size: 14px; cursor: pointer; list-style: none; }
-.checkout-summary-mobile > summary::-webkit-details-marker { display: none; }
-.checkout-summary-mobile > summary span::after { content: " ▾"; color: #666a67; }
-.checkout-summary-mobile[open] > summary span::after { content: " ▴"; }
-.checkout-summary-mobile > summary strong { font-size: 16px; }
-.checkout-summary-mobile[open] > div { border: 0; border-top: 1px solid #e7e5df; border-radius: 0 0 11px 11px; margin-top: 0; }
-.checkout-compact .checkout-progress { margin-top: 10px; }
 @media (max-width: 639px) {
-  .checkout-compact .checkout-progress { margin-top: 0; }
-  .checkout-compact input, .checkout-compact select { min-height: 44px; padding-block: 9px; }
-  .checkout-compact .checkout-form-card { padding: 16px 14px; }
-  /* The floating chat button would cover the Phone field */
-  body:has(.checkout-compact) .whatsapp-fab { display: none; }
+  /* The floating chat button would cover the form's last fields and the pay button */
+  body:has(.checkout-page) .whatsapp-fab { display: none; }
 }
 .field-help { font-size: 11px; color: #666a67; margin-top: 5px; }
 
@@ -507,9 +486,6 @@
   .cart-page .cart-line { flex-direction: row; }
   .cart-page .cart-body, .cart-page .cart-summary { padding: 18px; }
   .cart-page .cart-product-image { width: 70px; }
-  .checkout-page { padding-top: 24px; }
-  .checkout-page h1 { font-size: 32px; }
-  .checkout-page .checkout-form-card { padding: 20px 16px; }
   .support-page { padding-block: 24px 44px; }
   .support-page h1 { font-size: 35px; }
 }

@@ -62,7 +62,7 @@ for (const width of [360, 390, 768, 1440]) {
     await expect(page.locator(".mobile-buy-bar")).toHaveCount(0);
     await page.getByRole("button", { name: "Continue to payment" }).click();
     await expect(page.getByLabel("Email", { exact: false })).toBeFocused();
-    await expect(page.getByText("Please check the highlighted fields before continuing.")).toBeVisible();
+    await expect(page.getByText(/Please fix the 7 highlighted fields to continue\./)).toBeVisible();
     await expect(page.locator("input[aria-invalid=true]")).toHaveCount(6);
     await page.screenshot({ path: screenshotDir + "/checkout-" + width + ".png", fullPage: true });
     await noOverflow(page);

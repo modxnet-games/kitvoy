@@ -531,6 +531,16 @@ test("the inline Stripe form never names payment method types and confirms order
   const stripeLib = await readFile("src/lib/payments/stripe.ts", "utf8");
   assert.match(stripeLib, /canUseStripeCheckout\(\): Promise<boolean> \{\s+return Boolean\(getStripe\(\) && getStripePublishableKey\(\)\);/);
   assert.ok(!stripeLib.includes("isAdminAuthenticated"));
+  // The publishable key is read at runtime: no literal NEXT_PUBLIC_ lookup Next.js could inline at build time
+  assert.ok(!/process\.env(\.|\[")NEXT_PUBLIC_STRIPE/.test(stripeLib), "a literal NEXT_PUBLIC_ lookup gets frozen into the build");
+  process.env.STRIPE_SECRET_KEY = "sk_test_unit";
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = "pk_test_runtime";
+  const { getStripePublishableKey } = await import("../src/lib/payments/stripe");
+  assert.equal(getStripePublishableKey(), "pk_test_runtime");
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = "pk_live_changed";
+  assert.equal(getStripePublishableKey(), "pk_live_changed", "a changed key is picked up without a rebuild");
+  delete process.env.STRIPE_SECRET_KEY;
+  delete process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   // PayPal's own card button is off; cards go through the Stripe form
   const paypalOptions = await readFile("src/components/payments/pay-later-message.tsx", "utf8");
   assert.match(paypalOptions, /disableFunding: "card"/);

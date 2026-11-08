@@ -16,12 +16,17 @@ export function getStripe(): Stripe | null {
 }
 
 /**
- * The browser key, or null when card payments aren't set up (both keys are
- * needed). Read with bracket access so Next.js doesn't inline it at build
- * time: switching keys on the server then only needs a restart.
+ * NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, looked up by a name built at runtime.
+ * Next.js replaces any literal `process.env.NEXT_PUBLIC_*` (dot or bracket)
+ * with its build-time value, which kept serving the test key after the
+ * server switched to live; a computed name can't be inlined, so switching
+ * keys on the server only needs a restart.
  */
+const PUBLISHABLE_KEY_ENV = ["NEXT", "PUBLIC", "STRIPE", "PUBLISHABLE", "KEY"].join("_");
+
+/** The browser key, or null when card payments aren't set up (both keys are needed). */
 export function getStripePublishableKey(): string | null {
-  const key = process.env["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"]?.trim();
+  const key = process.env[PUBLISHABLE_KEY_ENV]?.trim();
   return key && process.env.STRIPE_SECRET_KEY?.trim() ? key : null;
 }
 

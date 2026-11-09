@@ -240,7 +240,101 @@ test("FAQ, structured data and product copy state the published policies and onl
   assert.equal(returnPolicySchema().merchantReturnDays, 30);
 
   const unverified = /usb-c|\bsos\b|shut(s)? (itself )?off|stops by itself|auto(matic)?[ -]?(shut|stop)|presta|ball-needle/i;
-  for (const text of [productSeo.summary, productSeo.description, faqs, ...Object.values(verifiedProductCopy)]) assert.doesNotMatch(text, unverified);
+  const { merchantListing } = await import("../src/config/seo");
+  const listingCopy = [merchantListing.title, merchantListing.description, ...merchantListing.highlights];
+  for (const text of [productSeo.summary, productSeo.description, productSeo.pageTitle, faqs, ...listingCopy, ...Object.values(verifiedProductCopy)]) assert.doesNotMatch(text, unverified);
+
+  // Google's structured-data rule: a marked-up fact must be readable on the page. The specs answer carries them all.
+  const visible = faqs.toLowerCase();
+  for (const fact of productSeo.facts) assert.ok(visible.includes(fact.value.toLowerCase()), `the homepage FAQ states "${fact.value}" (${fact.name})`);
+  // The page names the product the ways shoppers search for it
+  for (const term of ["portable air compressor", "tire pump", "air pump"]) assert.ok(visible.includes(term), `the FAQ uses "${term}"`);
+  assert.ok(productSeo.pageTitle.length >= 50 && productSeo.pageTitle.length <= 60, "homepage title is 50–60 characters");
+  assert.ok(productSeo.description.length >= 130 && productSeo.description.length <= 155, "meta description is 130–155 characters");
+  assert.ok(!productSeo.description.includes('"'), "no quotation marks in the meta description");
+});
+
+test("the Merchant Center feed follows Google's product data rules and carries only what the page says", async () => {
+  const { merchantFeed, merchantFeedItem, merchantLandingUrl } = await import("../src/lib/seo/merchant-feed");
+  const { merchantListing, productSeo } = await import("../src/config/seo");
+  const item = merchantFeedItem({ sku: "INF-001", price: 59.99, stock: 12, shippingTax: 0, images: ["/uploads/a.jpg", "/uploads/b.jpg"] });
+  const one = (tag: string) => {
+    const found = [...item.matchAll(new RegExp(`<g:${tag}>([^<]*)</g:${tag}>`, "g"))].map((m) => m[1]);
+    assert.equal(found.length, 1, `exactly one ${tag}`);
+    return found[0];
+  };
+  assert.equal(one("id"), "INF-001");
+  assert.equal(one("availability"), "in_stock");
+  assert.equal(one("brand"), "Kitvoy");
+  assert.equal(one("condition"), "new");
+  assert.equal(one("identifier_exists"), "no", "no GTIN or MPN exists, and none is invented");
+  assert.ok(!/<g:(gtin|mpn)>/.test(item));
+  assert.equal(item.match(/<g:price>([^<]*)<\/g:price>/)![1], "59.99 USD", "the item price comes first, before the shipping price");
+  assert.match(item, /<g:shipping><g:country>US<\/g:country><g:price>0\.00 USD<\/g:price><g:min_handling_time>1<\/g:min_handling_time><g:max_handling_time>2<\/g:max_handling_time><g:min_transit_time>4<\/g:min_transit_time><g:max_transit_time>9<\/g:max_transit_time><\/g:shipping>/);
+
+  // Title and description: within Google's limits, product name first, no price, shipping or promotional wording
+  assert.ok(merchantListing.title.length <= 150);
+  assert.ok(merchantListing.title.startsWith(productSeo.title), "the listing title starts with the product's name on the page");
+  assert.ok(merchantListing.description.length >= 500 && merchantListing.description.length <= 5000);
+  for (const text of [merchantListing.title, merchantListing.description, ...merchantListing.highlights]) {
+    assert.doesNotMatch(text, /\$|free shipping|ships free|free (u\.?s\.?|delivery)|sale|discount|% off|best|cheap|guarantee|#1|!/i);
+    assert.doesNotMatch(text, /[A-Z]{6,}/, "no shouting");
+  }
+  assert.ok(merchantListing.highlights.length >= 2 && merchantListing.highlights.length <= 10);
+  for (const h of merchantListing.highlights) assert.ok(h.length <= 150);
+  assert.equal([...item.matchAll(/<g:product_highlight>/g)].length, merchantListing.highlights.length);
+  assert.equal([...item.matchAll(/<g:product_detail>/g)].length, productSeo.facts.length);
+  assert.match(item, /<g:product_detail><g:section_name>Specifications<\/g:section_name><g:attribute_name>Power<\/g:attribute_name><g:attribute_value>80 W<\/g:attribute_value><\/g:product_detail>/);
+  assert.equal(one("material"), "ABS");
+  assert.equal(one("product_weight"), "610 g");
+
+  // The click lands on the product page with attribution; the canonical stays clean
+  const origin = (process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000").replace(/\/$/, "");
+  assert.equal(merchantLandingUrl(), `${origin}/?utm_source=google&utm_medium=shopping&utm_campaign=merchant_feed`);
+  assert.equal(one("link"), merchantLandingUrl().replace(/&/g, "&amp;"), "ampersands are escaped in XML");
+  assert.equal(one("canonical_link"), `${origin}/`);
+  assert.equal(one("image_link"), `${origin}/uploads/a.jpg`);
+  assert.equal(one("additional_image_link"), `${origin}/uploads/b.jpg`);
+  const { attributionFromUrl } = await import("../src/lib/analytics/attribution");
+  const read = attributionFromUrl(new URL(merchantLandingUrl()))!;
+  assert.deepEqual(
+    { utm_source: read.utm_source, utm_medium: read.utm_medium, utm_campaign: read.utm_campaign },
+    { utm_source: "google", utm_medium: "shopping", utm_campaign: "merchant_feed" },
+    "the store's own attribution reads the listing click",
+  );
+
+  // Well-formed: every tag that opens closes, and nothing is left unescaped
+  const feed = merchantFeed({ sku: "INF-001", price: 59.99, stock: 0, images: [] });
+  assert.ok(feed.startsWith('<?xml version="1.0" encoding="UTF-8"?>'));
+  assert.ok(feed.includes('<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">'));
+  assert.match(feed, /<g:availability>out_of_stock<\/g:availability>/);
+  assert.match(feed, /<g:image_link>[^<]*\/og\.png<\/g:image_link>/, "falls back to the share image when the product has none");
+  const stack: string[] = [];
+  for (const m of feed.matchAll(/<(\/?)([a-zA-Z_:]+)[^>]*>/g)) {
+    if (m[1]) assert.equal(stack.pop(), m[2], `the closing ${m[2]} tag matches the tag that is open`);
+    else stack.push(m[2]);
+  }
+  assert.deepEqual(stack, []);
+  assert.doesNotMatch(feed.replace(/&(amp|lt|gt|quot);/g, ""), /&/, "no bare ampersand");
+  assert.ok(!merchantFeed(null).includes("<item>"), "no product yet: an empty channel");
+});
+
+test("the Organization markup adds business identity only when Store settings publish it", async () => {
+  const { organizationSchema } = await import("../src/lib/seo/structured-data");
+  const bare = organizationSchema() as Record<string, unknown>;
+  assert.deepEqual(Object.keys(bare), ["@type", "@id", "name", "url", "logo", "hasMerchantReturnPolicy"]);
+  const emailOnly = organizationSchema({ supportEmail: "support@kitvoy.com", legalName: "  ", address: "", sameAs: ["", "not a url"] }) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(emailOnly), ["@type", "@id", "name", "url", "logo", "hasMerchantReturnPolicy", "email", "contactPoint"], "blank fields publish nothing");
+  assert.deepEqual(emailOnly.contactPoint, { "@type": "ContactPoint", contactType: "customer support", email: "support@kitvoy.com", areaServed: "US", availableLanguage: "en" });
+  const full = organizationSchema({
+    supportEmail: "support@kitvoy.com", supportPhone: "+1 505 555 0100", legalName: "Example Holdings LLC",
+    address: "1 Main St, Santa Fe, NM 87501, United States", sameAs: ["https://www.facebook.com/kitvoy", "", "http://insecure.example"],
+  }) as Record<string, unknown>;
+  assert.equal(full.legalName, "Example Holdings LLC");
+  assert.equal(full.address, "1 Main St, Santa Fe, NM 87501, United States");
+  assert.equal(full.telephone, "+1 505 555 0100");
+  assert.deepEqual(full.sameAs, ["https://www.facebook.com/kitvoy"], "only real https profile links");
+  assert.equal((full.contactPoint as Record<string, unknown>).telephone, "+1 505 555 0100");
 });
 
 const confirmationPayload = {

@@ -17,6 +17,7 @@ export async function FooterWrapper() {
         tiktokEnabled: settings.tiktokEnabled,
         tiktokUrl: settings.tiktokUrl,
       }}
+      business={{ legalName: settings.legalName, address: settings.businessAddress }}
     />
   );
 }

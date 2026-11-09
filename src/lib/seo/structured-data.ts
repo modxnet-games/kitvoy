@@ -1,5 +1,5 @@
 import { storePolicies } from "@/config/policies";
-import { productSeo } from "@/config/seo";
+import { merchantListing, productSeo } from "@/config/seo";
 import { siteConfig } from "@/config/site";
 import { REVIEWS_SHOWN_FIRST, type ReviewSummary } from "@/lib/reviews";
 import type { ProductDisplay } from "@/types/product";
@@ -7,22 +7,44 @@ import type { ProductDisplay } from "@/types/product";
 const absolute = (path: string) => new URL(path, siteConfig.url).toString();
 const { shipping } = storePolicies;
 
-/** Brand entity: name, logo and (when published in Store settings) the support email. */
-export function organizationSchema(supportEmail?: string) {
+/** What Store settings publish about the business; every field is optional and left out when empty. */
+export interface OrganizationDetails {
+  supportEmail?: string;
+  supportPhone?: string;
+  /** The registered business that operates the store */
+  legalName?: string;
+  /** Its address, on one line */
+  address?: string;
+  /** The store's own social profiles */
+  sameAs?: string[];
+}
+
+/** Brand entity: name, logo, and whatever contact and business details Store settings publish. */
+export function organizationSchema(details: OrganizationDetails = {}) {
+  const supportEmail = details.supportEmail?.trim() || undefined;
+  const supportPhone = details.supportPhone?.trim() || undefined;
+  const legalName = details.legalName?.trim() || undefined;
+  const address = details.address?.trim() || undefined;
+  const sameAs = (details.sameAs ?? []).map((u) => u.trim()).filter((u) => /^https:\/\//.test(u));
   return {
     "@type": "Organization",
     "@id": absolute("/#organization"),
     name: siteConfig.name,
+    ...(legalName ? { legalName } : {}),
     url: absolute("/"),
     logo: absolute("/apple-icon.png"),
+    ...(address ? { address } : {}),
+    ...(sameAs.length ? { sameAs } : {}),
     hasMerchantReturnPolicy: returnPolicySchema(),
-    ...(supportEmail
+    ...(supportEmail ? { email: supportEmail } : {}),
+    ...(supportPhone ? { telephone: supportPhone } : {}),
+    ...(supportEmail || supportPhone
       ? {
-          email: supportEmail,
           contactPoint: {
             "@type": "ContactPoint",
             contactType: "customer support",
-            email: supportEmail,
+            ...(supportEmail ? { email: supportEmail } : {}),
+            ...(supportPhone ? { telephone: supportPhone } : {}),
             areaServed: "US",
             availableLanguage: "en",
           },
@@ -58,6 +80,7 @@ export function productSchema(product: ProductDisplay, reviews?: ReviewSummary |
     sku: product.sku,
     category: productSeo.category,
     brand: { "@type": "Brand", name: siteConfig.name },
+    material: merchantListing.material,
     additionalProperty: productSeo.facts.map((f) => ({ "@type": "PropertyValue", name: f.name, value: f.value })),
     offers: {
       "@type": "Offer",

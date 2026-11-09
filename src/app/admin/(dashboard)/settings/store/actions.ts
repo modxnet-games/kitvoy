@@ -14,6 +14,8 @@ const STRING_FIELDS: (keyof StoreSocialSettings)[] = [
   "tiktokUrl",
   "supportEmail",
   "supportPhone",
+  "legalName",
+  "businessAddress",
 ];
 
 const BOOLEAN_FIELDS: (keyof StoreSocialSettings)[] = [
@@ -42,6 +44,7 @@ export async function saveStoreSettingsAction(formData: FormData) {
 
   // Revalidate layouts that consume these settings
   revalidatePath("/");
+  revalidatePath("/support");
   revalidatePath("/admin/settings/store");
 
   return { success: true };

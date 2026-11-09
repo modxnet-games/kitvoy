@@ -16,6 +16,11 @@ export interface StoreSocialSettings {
 
   supportEmail: string;
   supportPhone: string;
+
+  /** The registered business behind the store, e.g. "Example LLC"; shown in the footer, on Help and in search markup once set */
+  legalName: string;
+  /** Its business address on one line */
+  businessAddress: string;
 }
 
 const STORE_SETTINGS_KEY = "storeSettings";
@@ -36,6 +41,9 @@ const STORE_SETTINGS_DEFAULTS: StoreSocialSettings = {
 
   supportEmail: "",
   supportPhone: "",
+
+  legalName: "",
+  businessAddress: "",
 };
 
 export async function getStoreSettings(): Promise<StoreSocialSettings> {

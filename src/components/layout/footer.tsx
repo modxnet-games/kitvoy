@@ -10,7 +10,7 @@ type FooterSocialProps = {
   instagramEnabled: boolean; instagramUrl: string;
   tiktokEnabled: boolean; tiktokUrl: string;
 };
-export function Footer({ social }: { social?: FooterSocialProps }) {
+export function Footer({ social, business }: { social?: FooterSocialProps; business?: { legalName: string; address: string } }) {
   const whatsapp = social?.whatsappLink || (social?.whatsappNumber ? "https://wa.me/" + social.whatsappNumber.replace(/[^0-9]/g, "") : "");
   const socials = [
     social?.facebookEnabled && social.facebookUrl && { href: social.facebookUrl, label: "Facebook", icon: Facebook },
@@ -24,6 +24,6 @@ export function Footer({ social }: { social?: FooterSocialProps }) {
       <nav aria-label="Help and policies"><h2>Here to help</h2>{policyLinks.map(l => <Link key={l.href} href={l.href}>{l.label}</Link>)}<Link href="/support#contact">Contact</Link></nav>
       <nav aria-label="Your account"><h2>Your Kitvoy</h2><Link href="/account/orders">Track your order <ArrowUpRight size={14} /></Link><Link href="/account">My account</Link>{socials.map(({ href, label, icon: Icon }) => <a key={label} href={href} target="_blank" rel="noreferrer"><Icon size={15} />{label}</a>)}</nav>
     </div>
-    <div className="footer-bottom"><p>© {new Date().getFullYear()} Kitvoy. All rights reserved.</p><span>United States · USD</span><a href="https://oussamahitte.com" target="_blank" rel="noreferrer">Design & development by oussamahitte.com</a></div>
+    <div className="footer-bottom">{business?.legalName && <p className="footer-identity">Kitvoy is operated by {business.legalName}{business.address && <>, {business.address}</>}.</p>}<p>© {new Date().getFullYear()} Kitvoy. All rights reserved.</p><span>United States · USD</span><a href="https://oussamahitte.com" target="_blank" rel="noreferrer">Design & development by oussamahitte.com</a></div>
   </div></footer>;
 }

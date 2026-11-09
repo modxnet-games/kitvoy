@@ -45,7 +45,20 @@ export default async function HomePage() {
   // The reviews section and the rating markup come from the same approved reviews
   const reviews = product ? await getProductReviewSummary(product.id) : null;
   const structured = graph(
-    organizationSchema(settings?.supportEmail || undefined),
+    organizationSchema({
+      supportEmail: settings?.supportEmail,
+      supportPhone: settings?.supportPhone,
+      legalName: settings?.legalName,
+      address: settings?.businessAddress,
+      // Only the profiles the owner switched on in Store settings
+      sameAs: settings
+        ? [
+            settings.facebookEnabled ? settings.facebookUrl : "",
+            settings.instagramEnabled ? settings.instagramUrl : "",
+            settings.tiktokEnabled ? settings.tiktokUrl : "",
+          ]
+        : [],
+    }),
     websiteSchema(),
     ...(product ? [productSchema(product, reviews), faqSchema(storefrontFaqs((product.shippingTax ?? 0) === 0, product.price))] : []),
   );

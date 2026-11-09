@@ -24,7 +24,9 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/orders", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "order.errorGeneric" }) }));
   await page.route("**/api/checkout/**", route => route.abort());
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Low tire pressure? Take care of it yourself." })).toBeVisible();
+  // One h1, and it names the product as well as carrying the headline
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 1, name: "Cordless digital tire inflator Low tire pressure? Take care of it yourself." })).toBeVisible();
 });
 
 for (const width of [360, 390, 768, 1440]) {

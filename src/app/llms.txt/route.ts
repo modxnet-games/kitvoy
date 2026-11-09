@@ -55,6 +55,7 @@ export async function GET() {
     "",
     `- [Help & information](${url("/support")})`,
     `- Support email: ${settings?.supportEmail || storePolicies.supportEmail}`,
+    ...(settings?.legalName ? [`- Operated by: ${settings.legalName}${settings.businessAddress ? `, ${settings.businessAddress}` : ""}`] : []),
     "",
   );
 

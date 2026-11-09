@@ -27,7 +27,10 @@
 .kitvoy-home h2 { font-size: clamp(32px, 3.2vw, 44px); }
 .hero { display: grid; grid-template-columns: .92fr 1.08fr; grid-template-rows: auto 1fr; gap: 0 62px; padding-block: 38px 36px; }
 .hero-copy { padding-top: 34px; }
-.hero h1 { margin-top: 17px; font-size: clamp(56px, 5.3vw, 76px); }
+/* The hero h1 wraps the product name (.eyebrow) and the headline (.hero-title); each part carries its own type styles */
+.hero h1 { font-weight: inherit; letter-spacing: inherit; line-height: inherit; }
+.hero h1 .eyebrow, .hero-title { display: block; }
+.hero-title { margin-top: 17px; font-size: clamp(56px, 5.3vw, 76px); font-weight: 750; letter-spacing: -.055em; line-height: 1.06; }
 .hero-description { margin-top: 24px; font-size: 20px; line-height: 1.5; letter-spacing: -.025em; }
 .hero-note { margin-top: 12px; font-size: 14px; color: #666a67; }
 .product-gallery { grid-column: 2; grid-row: 1 / 3; min-width: 0; }
@@ -187,6 +190,7 @@
 .footer-top nav a { display: flex; align-items: center; gap: 5px; min-height: 36px; font-size: 12px; color: #666a67; }
 .footer-top nav a:hover { text-decoration: underline; color: #171918; }
 .footer-bottom { border-top: 1px solid #e7e5df; padding-block: 23px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 10px; color: #666a67; }
+.footer-identity { flex-basis: 100%; }
 .mobile-buy-bar { display: none; }
 /* Keep the WhatsApp button clear of the mobile buy bar while it is showing */
 .whatsapp-fab { transition: bottom .2s ease; }
@@ -316,12 +320,12 @@
   .how-visual:hover > img { transform: translateY(-6px) scale(1.02); }
 }
 
-@media (min-width: 1600px) { .hero h1 { font-size: 80px; } }
+@media (min-width: 1600px) { .hero-title { font-size: 80px; } }
 @media (max-width: 1100px) {
   .store-container { width: calc(100% - 64px); }
   .hero { gap: 0 35px; }
   .hero-copy { padding-top: 12px; }
-  .hero h1 { font-size: 56px; }
+  .hero-title { font-size: 56px; }
   .hero-description { font-size: 18px; margin-top: 18px; }
   .hero-note { font-size: 12px; }
   .hero-purchase { padding-top: 19px; }
@@ -340,7 +344,7 @@
   .desktop-nav { margin-left: 0; gap: 20px; }
   .nav-purchase { display: none; }
   .hero { gap: 0 24px; }
-  .hero h1 { font-size: 45px; }
+  .hero-title { font-size: 45px; }
   .hero-description { font-size: 16px; }
   .hero .eyebrow { font-size: 9px; }
   .hero-cta { min-width: 0; width: 100%; }
@@ -380,7 +384,7 @@
   .hero { display: flex; flex-direction: column; padding-block: 24px 28px; gap: 0; }
   .hero-copy { padding-top: 0; }
   .hero .eyebrow { font-size: 10px; letter-spacing: .14em; }
-  .hero h1 { font-size: clamp(43px, 12.3vw, 62px); margin-top: 12px; line-height: 1.02; }
+  .hero-title { font-size: clamp(43px, 12.3vw, 62px); margin-top: 12px; line-height: 1.02; }
   .hero-description { margin-top: 16px; font-size: 16px; line-height: 1.45; }
   .hero-description br { display: none; }
   .hero-note { font-size: 11px; margin-top: 8px; }

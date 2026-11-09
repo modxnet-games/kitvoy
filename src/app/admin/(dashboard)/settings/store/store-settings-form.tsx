@@ -266,6 +266,51 @@ export function StoreSettingsForm({ settings }: Props) {
         </div>
       </section>
 
+      <section className="space-y-4 rounded-xl border bg-card p-6">
+        <div>
+          <h2 className="text-lg font-semibold">Business identity</h2>
+          <p className="text-sm text-muted-foreground">
+            Who operates the store. Once filled in, it shows in the footer of
+            every page, on the Help page and in the store&apos;s search markup.
+            Google Merchant Center expects a store to say who runs it: use the
+            same legal name and address as in Merchant Center and your payment
+            accounts. Leave empty to show nothing.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label
+              htmlFor="legalName"
+              className="mb-1.5 block text-sm font-medium"
+            >
+              Legal business name
+            </label>
+            <Input
+              id="legalName"
+              name="legalName"
+              value={values.legalName}
+              onChange={(e) => updateField("legalName", e.target.value)}
+              placeholder="Your Company LLC"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="businessAddress"
+              className="mb-1.5 block text-sm font-medium"
+            >
+              Business address
+            </label>
+            <Input
+              id="businessAddress"
+              name="businessAddress"
+              value={values.businessAddress}
+              onChange={(e) => updateField("businessAddress", e.target.value)}
+              placeholder="Street, City, State ZIP, United States"
+            />
+          </div>
+        </div>
+      </section>
+
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={isPending}>
           {isPending ? (

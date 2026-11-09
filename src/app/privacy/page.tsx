@@ -21,7 +21,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Account details:</strong> if you create an account, your email address and a securely hashed password, or the basic profile Google shares if you sign in with Google.</li>
           <li><strong>Messages:</strong> anything you send us when you contact support.</li>
           <li><strong>Technical information:</strong> your IP address, browser and device type, which our hosting and security providers process to deliver and protect the site.</li>
-          <li><strong>Ad measurement:</strong> the Meta Pixel records the pages you view on kitvoy.com and, when you place an order, the order total and items, along with cookie and device identifiers (see Cookies below).</li>
+          <li><strong>Ad measurement:</strong> the Meta Pixel records the pages you view on kitvoy.com, items added to the cart, the start of checkout and, when you place an order, the order total and items, along with cookie and device identifiers (see Cookies below). When you start checkout or complete an order, our server also sends Meta the same event with your email address, phone number, name, city, state and ZIP code in hashed (one-way encoded) form, plus your IP address, browser type and Meta&apos;s cookie identifiers, so Meta can match the sale to the ad that led to it.</li>
         </ul>
         <p>We don&apos;t collect or store your card or bank details. Payments are handled by Stripe and PayPal.</p>
       </section>
@@ -46,14 +46,14 @@ export default function PrivacyPolicyPage() {
           <li><strong>Email and notification providers</strong> (Brevo, and Google Firebase for our team&apos;s order alerts) deliver order confirmation, shipping and support emails and notify us of new orders.</li>
           <li><strong>Hosting and security providers</strong> (including Cloudflare) host the site and protect it from abuse.</li>
           <li><strong>Google</strong>, if you choose to sign in with Google.</li>
-          <li><strong>Meta Platforms</strong> receives page-view and purchase events from the Meta Pixel to measure and target our ads, and uses them under its own privacy policy.</li>
+          <li><strong>Meta Platforms</strong> receives page-view, add-to-cart, checkout and purchase events from the Meta Pixel and from our server (the Conversions API), including hashed contact details and your IP address, to measure and target our ads, and uses them under its own privacy policy.</li>
         </ul>
         <p>We may also disclose information when the law requires it. Some of these providers may process information outside the United States.</p>
       </section>
       <section aria-labelledby="cookies">
         <h2 id="cookies">Cookies and browser storage</h2>
         <p>We use essential cookies to keep you signed in, and your browser&apos;s local storage to remember your cart.</p>
-        <p>We also use the Meta Pixel, an advertising tool that sets cookies and sends Meta the pages you visit here and, when you buy, the order total and items. We don&apos;t load it on our admin pages, and we don&apos;t load it at all if your browser sends a Global Privacy Control signal. You can also opt out by blocking third-party cookies in your browser, by changing your ad preferences in your Facebook or Instagram settings, or by emailing <a className="text-link" href={`mailto:${email}`}>{email}</a>.</p>
+        <p>We also use the Meta Pixel, an advertising tool that sets cookies and sends Meta the pages you visit here, items you add to the cart and, when you buy, the order total and items; our server sends Meta the checkout and purchase events as well, with hashed contact details (see above). If you arrive from an ad, we keep the ad&apos;s campaign tags and Meta&apos;s click identifier in a first-party cookie for 30 days and record them with your order, so we know which ad brought you. We don&apos;t load the pixel on our admin pages, and we don&apos;t load it at all if your browser sends a Global Privacy Control signal. You can also opt out by blocking third-party cookies in your browser, by changing your ad preferences in your Facebook or Instagram settings, or by emailing <a className="text-link" href={`mailto:${email}`}>{email}</a>.</p>
       </section>
       <section aria-labelledby="keep">
         <h2 id="keep">How long we keep it</h2>

@@ -29,6 +29,14 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
   const orderReference = formatOrderReference(order.id);
   const isPaid = order.paymentStatus === "paid";
   const address = order.shippingAddress as unknown as ShippingAddress | null;
+  const utm: [string, string | null][] = [
+    ["Source", order.utmSource],
+    ["Medium", order.utmMedium],
+    ["Campaign", order.utmCampaign],
+    ["Ad (content)", order.utmContent],
+    ["Term", order.utmTerm],
+  ];
+  const hasAttribution = utm.some(([, v]) => v) || !!order.fbclid;
   const [sentEmails, reviewCount] = await Promise.all([
     listSentEmails({ orderId: order.id }).catch(() => []),
     prisma.review.count({ where: { orderId: order.id } }).catch(() => 0),
@@ -215,6 +223,34 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
                 )}
               </div>
             </dl>
+          </div>
+
+          <div className="rounded-xl border bg-card p-6">
+            <h2 className="font-semibold">Attribution</h2>
+            {hasAttribution ? (
+              <dl className="mt-4 space-y-3 text-sm">
+                {utm.filter(([, v]) => v).map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="font-medium break-all">{value}</dd>
+                  </div>
+                ))}
+                {order.fbclid && (
+                  <div>
+                    <dt className="text-muted-foreground">Meta click</dt>
+                    <dd className="text-xs text-muted-foreground">Arrived from a Meta ad (fbclid recorded)</dd>
+                  </div>
+                )}
+                {order.metaPurchaseSentAt && (
+                  <div>
+                    <dt className="text-muted-foreground">Meta Purchase (server)</dt>
+                    <dd className="text-xs text-muted-foreground">Sent {new Date(order.metaPurchaseSentAt).toLocaleString()}</dd>
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">No ad parameters on this visit (direct, search or a link without UTM tags).</p>
+            )}
           </div>
         </div>
       </div>

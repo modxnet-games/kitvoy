@@ -488,23 +488,113 @@ test("My orders offers a review only for delivered paid orders, until every prod
   assert.equal(orderReviewState({ ...delivered, items: [{ productId: null }] }), null, "nothing reviewable");
 });
 
-test("Meta Pixel Purchase sends the paid total in USD with the order reference, and skips admin pages", async () => {
-  const { trackPurchase, isUntrackedPath, hasPrivacyOptOut } = await import("../src/lib/analytics/meta-pixel");
+test("Meta Pixel events carry an event_id, Purchase counts once per order, and admin pages are skipped", async () => {
+  const pixel = await import("../src/lib/analytics/meta-pixel");
   const calls: unknown[][] = [];
-  const g = globalThis as unknown as { window?: { fbq?: (...a: unknown[]) => void } };
+  const store = new Map<string, string>();
+  const g = globalThis as unknown as { window?: object; localStorage?: object };
   const hadWindow = "window" in g;
+  const hadStorage = "localStorage" in g;
   g.window = { fbq: (...a: unknown[]) => { calls.push(a); } };
+  g.localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } };
   try {
-    trackPurchase({ orderReference: "KTV-ABCD1234", value: 99.99, skus: ["INF-001"], quantity: 2 });
-    assert.deepEqual(calls, [["track", "Purchase", { currency: "USD", value: 99.99, content_ids: ["INF-001"], content_type: "product", num_items: 2 }, { eventID: "KTV-ABCD1234" }]]);
+    const contents = [{ id: "INF-001", quantity: 2, item_price: 59.99 }];
+    assert.equal(pixel.trackPurchase({ orderReference: "KTV-ABCD1234", value: 99.99, contents }), true);
+    assert.deepEqual(calls, [["track", "Purchase", { currency: "USD", value: 99.99, content_ids: ["INF-001"], content_type: "product", contents, num_items: 2, order_id: "KTV-ABCD1234" }, { eventID: "KTV-ABCD1234" }]]);
+    assert.equal(pixel.trackPurchase({ orderReference: "KTV-ABCD1234", value: 99.99, contents }), false, "a refreshed thank-you page never counts the order again");
+    assert.equal(calls.length, 1);
+
+    const id = pixel.trackInitiateCheckout([{ product: { id: "p1", sku: "INF-001", name: "Inflator", price: 59.99 }, quantity: 2 }], 99.99);
+    assert.match(id ?? "", /^[0-9a-f-]{36}$/, "InitiateCheckout gets a UUID event_id");
+    const ic = calls[1] as [string, string, Record<string, unknown>, { eventID: string }];
+    assert.equal(ic[1], "InitiateCheckout");
+    assert.deepEqual(ic[2], { currency: "USD", value: 99.99, content_ids: ["INF-001"], content_type: "product", contents, num_items: 2 });
+    assert.equal(ic[3].eventID, id);
+
+    pixel.trackAddToCart([{ product: { id: "p1", sku: "INF-001", name: "Inflator", price: 59.99 }, quantity: 1 }], 59.99);
+    pixel.trackViewContent({ id: "p1", sku: "INF-001", name: "Inflator", price: 59.99 });
+    assert.deepEqual(calls.slice(2).map((c) => c[1]), ["AddToCart", "ViewContent"]);
+    for (const c of calls) {
+      assert.equal(typeof c[1], "string");
+      assert.ok((c[1] as string).length > 0, "no event may go out without a name");
+      assert.ok(typeof (c[3] as { eventID?: string }).eventID === "string" && (c[3] as { eventID: string }).eventID.length > 0, "every event has an event_id");
+    }
+    assert.equal(pixel.track("" as never), null, "an empty event name is refused, not sent as __missing_event");
+    assert.equal(calls.length, 4);
+
     g.window = {};
-    assert.doesNotThrow(() => trackPurchase({ orderReference: "KTV-X", value: 1, skus: [], quantity: 1 }), "no pixel loaded (opted out) is a no-op");
+    assert.equal(pixel.trackPurchase({ orderReference: "KTV-X", value: 1, contents: [] }), false, "no pixel loaded (opted out) is a no-op");
   } finally {
     if (!hadWindow) delete g.window;
+    if (!hadStorage) delete g.localStorage;
   }
-  assert.equal(isUntrackedPath("/admin/orders"), true);
-  assert.equal(isUntrackedPath("/checkout"), false);
-  assert.equal(typeof hasPrivacyOptOut(), "boolean");
+  assert.equal(pixel.isUntrackedPath("/admin/orders"), true);
+  assert.equal(pixel.isUntrackedPath("/checkout"), false);
+  assert.equal(typeof pixel.hasPrivacyOptOut(), "boolean");
+});
+
+test("Conversions API user_data is normalised and hashed the way Meta requires, browser ids left in clear", async () => {
+  const capi = await import("../src/lib/analytics/meta-capi");
+  const { createHash } = await import("node:crypto");
+  const sha = (v: string) => createHash("sha256").update(v).digest("hex");
+  assert.equal(capi.normalizeEmail("  Jane.Doe@Example.COM "), "jane.doe@example.com");
+  assert.equal(capi.normalizePhone("(202) 555-0143"), "12025550143", "US numbers get the country code");
+  assert.equal(capi.normalizePhone("+1 202 555 0143"), "12025550143");
+  assert.equal(capi.normalizeName("O'Brien-Smith "), "obriensmith");
+  assert.equal(capi.normalizeName("St. Louis"), "stlouis");
+  assert.equal(capi.normalizeState("DC"), "dc");
+  assert.equal(capi.normalizeZip("20001-1234"), "20001");
+  assert.deepEqual(capi.splitName("Jane Q. Public"), { first: "Jane", last: "Public" });
+
+  const user = capi.buildUserData(
+    { email: "Jane@Example.com", phone: "(202) 555-0143", fullName: "Jane Public", city: "Washington", state: "DC", zip: "20001-1234", country: "US", externalId: "user_1" },
+    { fbp: "fb.1.1700000000000.123456789", fbc: "fb.1.1700000000000.AbC-123", clientIp: "203.0.113.9", userAgent: "Mozilla/5.0" },
+  );
+  assert.deepEqual(user, {
+    em: [sha("jane@example.com")],
+    ph: [sha("12025550143")],
+    fn: [sha("jane")],
+    ln: [sha("public")],
+    ct: [sha("washington")],
+    st: [sha("dc")],
+    zp: [sha("20001")],
+    country: [sha("us")],
+    external_id: [sha("user_1")],
+    client_ip_address: "203.0.113.9",
+    client_user_agent: "Mozilla/5.0",
+    fbc: "fb.1.1700000000000.AbC-123",
+    fbp: "fb.1.1700000000000.123456789",
+  });
+  const sparse = capi.buildUserData({ phone: "12" }, {});
+  assert.deepEqual(Object.keys(sparse), ["country"], "unknown fields are left out rather than hashed empty");
+  const origin = (process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://kitvoy.com").replace(/\/$/, "");
+  assert.equal(capi.toEventSourceUrl("/checkout?x=1", "/checkout"), `${origin}/checkout?x=1`);
+  assert.equal(capi.toEventSourceUrl("https://evil.example/", "/checkout"), `${origin}/checkout`, "only the store's own pages");
+  assert.equal(capi.getMetaCapiConfig(), null, "no token in the test environment means nothing is sent");
+});
+
+test("ad attribution is read from the landing URL, kept in a first-party cookie and turned into Meta's fbc", async () => {
+  const a = await import("../src/lib/analytics/attribution");
+  const landing = a.attributionFromUrl(new URL("https://kitvoy.com/?utm_source=facebook&utm_medium=paid&utm_campaign=launch&utm_content=c1_tire_light_hook&fbclid=IwAR1abc_-x"), 1700000000000);
+  assert.deepEqual(landing, {
+    utm_source: "facebook", utm_medium: "paid", utm_campaign: "launch", utm_content: "c1_tire_light_hook",
+    fbclid: "IwAR1abc_-x", fbclidAt: 1700000000000,
+    landing: "/?utm_source=facebook&utm_medium=paid&utm_campaign=launch&utm_content=c1_tire_light_hook&fbclid=IwAR1abc_-x", at: 1700000000000,
+  });
+  assert.equal(a.attributionFromUrl(new URL("https://kitvoy.com/cart")), null, "no ad parameters, no cookie");
+  assert.deepEqual(a.parseAttribution(a.serializeAttribution(landing!)), landing, "round-trips through the cookie");
+  assert.equal(a.parseAttribution("not json"), null);
+  assert.equal(a.buildFbc("IwAR1abc_-x", 1700000000000), "fb.1.1700000000000.IwAR1abc_-x");
+
+  const cookies = new Map([[a.ATTRIBUTION_COOKIE, { value: a.serializeAttribution(landing!) }], ["_fbp", { value: "fb.1.1700000000000.42" }]]);
+  const headers = new Headers({ "cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "10.0.0.1, 203.0.113.9", "user-agent": "UA" });
+  const order = a.readOrderAttribution({ get: (k) => cookies.get(k) }, headers);
+  assert.deepEqual(order, {
+    utm_source: "facebook", utm_medium: "paid", utm_campaign: "launch", utm_content: "c1_tire_light_hook",
+    fbclid: "IwAR1abc_-x", landing: landing!.landing,
+    fbp: "fb.1.1700000000000.42", fbc: "fb.1.1700000000000.IwAR1abc_-x", clientIp: "203.0.113.9", userAgent: "UA",
+  });
+  assert.equal(a.validFbp("garbage"), undefined);
 });
 
 test("the inline Stripe form never names payment method types and confirms orders only from the verified webhook", async () => {

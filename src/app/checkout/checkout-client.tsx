@@ -19,7 +19,7 @@ import { US_STATES } from "@/lib/us-address";
 import { useMounted } from "@/hooks/use-mounted";
 import { CheckoutSkeleton } from "@/components/checkout/checkout-skeleton";
 import { formatPrice } from "@/lib/formatters";
-import { trackPurchase } from "@/lib/analytics/meta-pixel";
+import { newEventId, toContents, trackInitiateCheckout, trackPurchase } from "@/lib/analytics/meta-pixel";
 import { cn } from "@/lib/utils";
 
 interface CheckoutClientProps {
@@ -103,12 +103,38 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer 
     if (error) errorRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [error]);
 
+  // Meta's InitiateCheckout when the customer arrives with a cart: once per
+  // cart per tab, and its event_id travels with the order so the server copy
+  // de-duplicates against it
+  const checkoutEventId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!mounted || items.length === 0) return;
+    const key = `kitvoy-checkout-started:${cartKey}`;
+    try {
+      const seen = sessionStorage.getItem(key);
+      if (seen) {
+        checkoutEventId.current = seen;
+        return;
+      }
+    } catch {
+      // Storage unavailable: send it once per page load instead
+    }
+    const eventId = newEventId();
+    checkoutEventId.current = eventId;
+    trackInitiateCheckout(items, subtotal + getShippingForItems(items), eventId);
+    try {
+      sessionStorage.setItem(key, eventId);
+    } catch {
+      // ignore
+    }
+  }, [mounted, cartKey, items, subtotal]);
+
   const handleDetails = async (data: CheckoutFormData) => {
     if (isSubmitting) return;
     if (!canPay) { setError(t("checkout.paymentUnavailable")); return; }
     setError(null);
     setIsSubmitting(true);
-    const result = await placeOrder(data, items);
+    const result = await placeOrder(data, items, { initiateCheckoutEventId: checkoutEventId.current });
     setIsSubmitting(false);
 
     if (!result.ok) {
@@ -123,12 +149,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer 
   const handlePaid = () => {
     if (!pending) return;
     // The server's total for this order, which is the amount paid
-    trackPurchase({
-      orderReference: pending.orderReference,
-      value: pending.totals.total,
-      skus: items.map((i) => i.product.sku),
-      quantity: items.reduce((n, i) => n + i.quantity, 0),
-    });
+    trackPurchase({ orderReference: pending.orderReference, value: pending.totals.total, contents: toContents(items) });
     clearCart();
     router.push(`/checkout/success?ref=${encodeURIComponent(pending.orderReference)}`);
   };

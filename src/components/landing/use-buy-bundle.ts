@@ -4,6 +4,8 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 import { cartDrawerControl, useCartStore } from "@/store/cart-store";
+import { trackAddToCart } from "@/lib/analytics/meta-pixel";
+import { getLineTotal } from "@/lib/bundles";
 import type { ProductDisplay } from "@/types/product";
 
 /**
@@ -33,6 +35,7 @@ export function useBuyBundle(product: ProductDisplay | null) {
         cartDrawerControl.skipNextOpen = true;
         addItem(product, quantity);
       }
+      trackAddToCart([{ product, quantity }], getLineTotal(product.price, quantity));
       router.push("/checkout");
     },
     [product, router, addItem, updateQuantity],

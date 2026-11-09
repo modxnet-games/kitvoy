@@ -9,6 +9,19 @@ const orderReference = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
 
 type StoredAddress = { address1?: string; address2?: string; city?: string; state?: string; zip?: string };
 
+/** The ad that drove the order, on the PaymentIntent so the Stripe Dashboard shows it too (no personal data). */
+function attributionMetadata(order: { utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; utmContent: string | null; utmTerm: string | null; fbclid: string | null }) {
+  const entries: [string, string | null][] = [
+    ["utm_source", order.utmSource],
+    ["utm_medium", order.utmMedium],
+    ["utm_campaign", order.utmCampaign],
+    ["utm_content", order.utmContent],
+    ["utm_term", order.utmTerm],
+    ["fbclid", order.fbclid],
+  ];
+  return Object.fromEntries(entries.filter((e): e is [string, string] => !!e[1]).map(([k, v]) => [k, v.slice(0, 500)]));
+}
+
 /**
  * POST /api/checkout/stripe  { orderId }
  *
@@ -77,7 +90,7 @@ export async function POST(request: Request) {
         currency: "usd",
         automatic_payment_methods: { enabled: true },
         description: `Kitvoy order ${orderReference(order.id)}`,
-        metadata: { orderId: order.id, orderReference: orderReference(order.id) },
+        metadata: { orderId: order.id, orderReference: orderReference(order.id), ...attributionMetadata(order) },
         shipping,
       },
       // Keyed on the intent it replaces, so a canceled intent never comes back
@@ -125,13 +138,14 @@ export async function GET(request: Request) {
 
     const productIds = order.items.flatMap((i) => (i.productId ? [i.productId] : []));
     const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, sku: true } });
+    const skuOf = new Map(products.map((p) => [p.id, p.sku]));
     const status = intent.status === "succeeded" ? "paid" : intent.status === "processing" ? "processing" : "open";
     return NextResponse.json({
       status,
       orderReference: orderReference(order.id),
       total: order.total,
-      skus: products.map((p) => p.sku),
-      quantity: order.items.reduce((n, i) => n + i.quantity, 0),
+      // What the Purchase event reports, line by line, keyed like the server event (SKU, else product id)
+      contents: order.items.map((i) => ({ id: (i.productId && skuOf.get(i.productId)) || i.productId || "unknown", quantity: i.quantity, item_price: i.unitPrice })),
     });
   } catch (err) {
     // A made-up or foreign id is a bad request, not an outage

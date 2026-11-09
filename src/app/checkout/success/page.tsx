@@ -10,7 +10,7 @@ import { useCartStore } from "@/store/cart-store";
 import { buttonVariants } from "@/components/ui/button";
 import { trackPurchase } from "@/lib/analytics/meta-pixel";
 
-type StripeResult = { status: "paid" | "processing" | "open"; orderReference: string; total: number; skus: string[]; quantity: number };
+type StripeResult = { status: "paid" | "processing" | "open"; orderReference: string; total: number; contents: { id: string; quantity: number; item_price?: number }[] };
 
 /**
  * Asks the server whether the Stripe payment the customer came back from
@@ -59,7 +59,7 @@ function SuccessContent() {
     if (!stripe || stripe.status === "failed" || celebrated.current) return;
     celebrated.current = true;
     clearCart();
-    trackPurchase({ orderReference: stripe.orderReference, value: stripe.total, skus: stripe.skus, quantity: stripe.quantity });
+    trackPurchase({ orderReference: stripe.orderReference, value: stripe.total, contents: stripe.contents ?? [] });
   }, [stripe, clearCart]);
 
   const audioPlayed = useRef(false);

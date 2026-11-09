@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sendPurchaseEvent } from "@/lib/analytics/meta-capi";
 import { sendOrderNotification } from "@/lib/email";
 import { isCjConfigured } from "@/config/fulfillment";
 import { sendOrderToCj } from "@/lib/fulfillment/cj";
@@ -94,6 +95,9 @@ export async function afterOrderPaid(orderId: string, options: { testPayment?: b
   void deliverOrderConfirmation(order.id).then((r) => {
     if (!r.sent) console.warn(`[orders] ${reference} confirmation email not sent: ${r.reason}`);
   });
+
+  // Meta's server-side Purchase (same event_id as the browser's). Once per order; never throws.
+  void sendPurchaseEvent(order.id).catch((err) => console.error(`[meta-capi] ${reference} Purchase error:`, err instanceof Error ? err.message : err));
 
   try {
     const email = await sendOrderNotification({

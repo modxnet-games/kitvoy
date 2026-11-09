@@ -12,6 +12,7 @@ import { Price, QuantitySelector } from "@/components/storefront";
 import { CheckoutForm } from "@/components/checkout";
 import type { CheckoutFormData } from "@/components/checkout";
 import { getLineTotal } from "@/lib/bundles";
+import { trackAddToCart } from "@/lib/analytics/meta-pixel";
 import { placeOrder } from "@/lib/client/place-order";
 
 interface ProductDetailsClientProps {
@@ -30,6 +31,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
 
   const handleAddToCart = () => {
     addItem(product, quantity);
+    trackAddToCart([{ product, quantity }], getLineTotal(product.price, quantity));
   };
 
   const handleBuyNowSubmit = async (data: CheckoutFormData) => {

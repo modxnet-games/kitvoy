@@ -14,6 +14,8 @@ export type PlaceOrderResult =
 export async function placeOrder(
   details: CheckoutDetails,
   items: { product: ProductDisplay; quantity: number }[],
+  /** The browser's Meta InitiateCheckout event_id, so the server can send the matching event */
+  tracking?: { initiateCheckoutEventId?: string | null },
 ): Promise<PlaceOrderResult> {
   try {
     const res = await fetch("/api/orders", {
@@ -22,6 +24,10 @@ export async function placeOrder(
       body: JSON.stringify({
         ...details,
         items: items.map((i) => ({ product: i.product, quantity: i.quantity })),
+        tracking: {
+          initiateCheckoutEventId: tracking?.initiateCheckoutEventId ?? undefined,
+          eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
+        },
       }),
     });
     const json = await res.json();

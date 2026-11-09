@@ -172,6 +172,17 @@ model Order {
   deliveredAt       DateTime?
   /// When the post-delivery review request email was claimed for sending; set once
   reviewRequestSentAt DateTime?
+  /// Which ad brought the customer (from the landing URL, kept 30 days in a cookie)
+  utmSource         String?
+  utmMedium         String?
+  utmCampaign       String?
+  utmContent        String?
+  utmTerm           String?
+  fbclid            String?
+  /// Meta Conversions API inputs captured at checkout: fbp, fbc, clientIp, userAgent, landing, eventSourceUrl, initiateCheckoutEventId
+  attribution       Json?
+  /// When the server-side Meta Purchase event was claimed for sending; one per order
+  metaPurchaseSentAt DateTime?
   userId            String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -186,6 +197,7 @@ model Order {
   @@index([paymentRef])
   @@index([stripePaymentIntentId])
   @@index([fulfillmentStatus])
+  @@index([utmCampaign])
   @@map("orders")
 }
 

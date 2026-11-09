@@ -4,6 +4,7 @@ import {
   type StockValidationItem,
 } from "@/lib/stock";
 import type { ProductDisplay } from "@/types/product";
+import type { OrderAttribution } from "@/lib/analytics/attribution";
 import { getLineTotal } from "@/lib/bundles";
 import { toCents, type OrderTotals } from "@/lib/payments/money";
 import {
@@ -29,6 +30,8 @@ export interface CreateOrderInput {
   items: CartItemPayload[];
   /** When set, links the order to the authenticated customer. */
   userId?: string;
+  /** Ad attribution and Conversions API inputs read from the request (cookies, IP, user agent) */
+  attribution?: OrderAttribution;
 }
 
 export type CreateOrderResult =
@@ -190,6 +193,15 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       paymentMethod: input.paymentMethod,
       paymentStatus: "unpaid",
       ...(input.userId && { userId: input.userId }),
+      ...(input.attribution && {
+        utmSource: input.attribution.utm_source ?? null,
+        utmMedium: input.attribution.utm_medium ?? null,
+        utmCampaign: input.attribution.utm_campaign ?? null,
+        utmContent: input.attribution.utm_content ?? null,
+        utmTerm: input.attribution.utm_term ?? null,
+        fbclid: input.attribution.fbclid ?? null,
+        attribution: { ...input.attribution },
+      }),
       items: {
         create: pricedItems.map((item) => ({
           productId: item.productId,

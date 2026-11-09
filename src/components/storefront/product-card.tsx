@@ -5,6 +5,7 @@ import { Star, ShoppingBag } from "lucide-react";
 
 import type { ProductDisplay } from "@/types/product";
 import { useCartStore } from "@/store/cart-store";
+import { trackAddToCart } from "@/lib/analytics/meta-pixel";
 import { useLanguage } from "@/contexts/language-context";
 import { Price } from "./price";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
     addItem(product, 1);
+    trackAddToCart([{ product, quantity: 1 }], product.price);
   };
 
   const discountPercent = hasDiscount

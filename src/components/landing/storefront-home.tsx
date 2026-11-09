@@ -15,6 +15,8 @@ import { useCartStore } from "@/store/cart-store";
 import { useStorefrontUI } from "@/store/storefront-ui";
 import { usePointerTilt } from "@/hooks/use-pointer-tilt";
 import { PayLaterMessage, PayLaterProvider } from "@/components/payments/pay-later-message";
+import { TrackViewContent } from "@/components/analytics/track-view-content";
+import { trackAddToCart } from "@/lib/analytics/meta-pixel";
 import { CustomerReviews } from "./customer-reviews";
 
 const SOURCE_PHOTO = "/kitvoy/inflator.jpg";
@@ -130,13 +132,14 @@ export function StorefrontHome({ product, reviews, paypalClientId = null, winter
   function addBundle() {
     if (!product || !canBuy) return;
     setOffer(product, quantity);
+    trackAddToCart([{ product, quantity }], getLineTotal(product.price, quantity));
     openCart();
   }
 
   const faqs = storefrontFaqs(freeShipping, price);
   const twoPack = price != null && product && product.stock >= 2 ? getLineTotal(price, 2) : null;
 
-  return <PayLaterProvider clientId={paypalClientId}><div ref={page} className="kitvoy-home">
+  return <PayLaterProvider clientId={paypalClientId}><div ref={page} className="kitvoy-home"><TrackViewContent product={product} />
     <section className="store-container hero" aria-labelledby="hero-heading">
       <div className="hero-copy">
         <p className="eyebrow">Cordless digital tire inflator</p>

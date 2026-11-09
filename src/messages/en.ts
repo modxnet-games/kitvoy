@@ -276,7 +276,7 @@ export const en = {
         title: "Cancel order",
         short: "Cancel",
         withinFiveHours: "You can cancel within the first 5 hours after placing the order.",
-        paidNote: "Need to cancel? Paid orders can’t be canceled online. Contact us through your PayPal receipt and we’ll arrange a refund.",
+        paidNote: "Need to cancel? Paid orders can’t be canceled online. Email support@kitvoy.com with your order number and we’ll arrange a refund.",
         reference: "Order",
         message:
           "Cancellation is allowed only within the first 5 hours. After that, the order may already be processed.",

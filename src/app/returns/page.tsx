@@ -40,7 +40,7 @@ export default function ReturnsPolicyPage() {
       </section>
       <section aria-labelledby="refunds">
         <h2 id="refunds">Refunds</h2>
-        <p>Once we receive and check your return, we refund the price you paid to your original payment method through PayPal. Your bank or card issuer may take a few extra days to show it. For bundles, the refund is based on the per-unit price you paid for the returned items.</p>
+        <p>Once we receive and check your return, we refund the price you paid to your original payment method, the card or PayPal account you paid with. Your bank or card issuer may take a few extra days to show it. For bundles, the refund is based on the per-unit price you paid for the returned items.</p>
       </section>
       <section aria-labelledby="not-eligible">
         <h2 id="not-eligible">What can&apos;t be returned</h2>

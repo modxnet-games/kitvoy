@@ -31,6 +31,7 @@ export function GoogleSignInButton({ redirectUrl, className }: GoogleSignInButto
   return (
     <a
       href={`/api/auth/google?redirect=${encodeURIComponent(redirectUrl)}`}
+      rel="nofollow"
       onClick={(e) => {
         // One trip to Google at a time
         if (opening) e.preventDefault();

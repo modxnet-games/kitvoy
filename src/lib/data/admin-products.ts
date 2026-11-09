@@ -107,6 +107,7 @@ export async function createProduct(data: {
   return prisma.product.create({
     data: {
       ...productData,
+      contentUpdatedAt: new Date(),
       images: {
         create: cleanUrls.map((url, index) => ({ url, order: index })),
       },
@@ -139,12 +140,31 @@ export async function updateProduct(
   const { imageUrls, ...productData } = data;
   const validUrls = sanitizeImageUrls(imageUrls);
 
+  // The sitemap's lastmod follows what shoppers see, so a stock or SKU edit doesn't count
+  const before = await prisma.product.findUnique({
+    where: { id },
+    select: { name: true, slug: true, shortDescription: true, description: true, details: true, price: true, shippingTax: true, compareAtPrice: true, badge: true, images: { select: { url: true }, orderBy: { order: "asc" } } },
+  });
+  const contentChanged =
+    !before ||
+    before.name !== productData.name ||
+    before.slug !== productData.slug ||
+    before.shortDescription !== productData.shortDescription ||
+    before.description !== productData.description ||
+    before.details !== productData.details ||
+    before.price !== productData.price ||
+    before.shippingTax !== productData.shippingTax ||
+    before.compareAtPrice !== productData.compareAtPrice ||
+    before.badge !== productData.badge ||
+    before.images.map((i) => i.url).join(" | ") !== validUrls.join(" | ");
+
   await prisma.$transaction([
     prisma.productImage.deleteMany({ where: { productId: id } }),
     prisma.product.update({
       where: { id },
       data: {
         ...productData,
+        ...(contentChanged && { contentUpdatedAt: new Date() }),
         images: {
           create: validUrls.map((url, index) => ({
             url,

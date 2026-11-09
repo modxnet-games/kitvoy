@@ -635,3 +635,37 @@ test("the inline Stripe form never names payment method types and confirms order
   const paypalOptions = await readFile("src/components/payments/pay-later-message.tsx", "utf8");
   assert.match(paypalOptions, /disableFunding: "card"/);
 });
+
+test("robots.txt blocks only non-pages, so every noindex page stays readable to crawlers", async () => {
+  const { default: robots } = await import("../src/app/robots");
+  const { rules, sitemap } = robots();
+  const rule = Array.isArray(rules) ? rules[0] : rules;
+  assert.deepEqual(rule.disallow, ["/api/", "/cdn-cgi/"]);
+  assert.equal(rule.allow, "/");
+  assert.match(String(sitemap), /\/sitemap\.xml$/);
+
+  const { readFile } = await import("node:fs/promises");
+  // A noindex page blocked in robots.txt can't show its noindex; these must not be disallowed
+  for (const file of ["src/app/admin/layout.tsx", "src/app/checkout/layout.tsx", "src/app/cart/layout.tsx", "src/app/account/layout.tsx", "src/app/not-found.tsx"]) {
+    assert.match(await readFile(file, "utf8"), /robots: \{ index: false/, `${file} says noindex`);
+  }
+  const sitemapSource = await readFile("src/app/sitemap.ts", "utf8");
+  assert.ok(!/["'`]\/(cart|checkout|login|register|account|admin|api|review)/.test(sitemapSource), "the sitemap lists no private or transactional URL");
+  assert.ok(!sitemapSource.includes("updatedAt: true"), "lastmod must not follow product.updatedAt, which moves on every sale");
+});
+
+test("sitemap lastmod is a plain calendar day that no server time zone can shift", async () => {
+  const { toIsoDay, latestDay } = await import("../src/lib/seo/lastmod");
+  const { storePolicies } = await import("../src/config/policies");
+  const { pageLastModified } = await import("../src/config/seo");
+  assert.equal(toIsoDay("November 9, 2026"), "2026-11-09");
+  assert.equal(toIsoDay("2026-11-02"), "2026-11-02");
+  assert.equal(toIsoDay(new Date("2026-11-07T19:45:52.461Z")), "2026-11-07");
+  assert.equal(toIsoDay("not a date"), undefined);
+  assert.equal(toIsoDay(null), undefined);
+  assert.equal(latestDay("2026-11-02", null, new Date("2026-11-07T19:45:52Z"), undefined), "2026-11-07");
+  assert.equal(latestDay("2026-11-02", null), "2026-11-02");
+  assert.equal(latestDay(null, undefined), undefined);
+  assert.match(toIsoDay(storePolicies.effectiveDate) ?? "", /^\d{4}-\d{2}-\d{2}$/, "the policies' effective date is a real date");
+  for (const day of Object.values(pageLastModified)) assert.match(day, /^\d{4}-\d{2}-\d{2}$/);
+});

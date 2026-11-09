@@ -63,6 +63,8 @@ model Product {
   reviews          Review[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  /// When what shoppers see last changed (name, copy, price, images). The sitemap's lastmod uses this; updatedAt also moves on every sale because stock changes
+  contentUpdatedAt DateTime?
 
   @@index([categoryId])
   @@index([slug])

@@ -27,6 +27,19 @@ export const productSeo = {
   ],
 } as const;
 
+/**
+ * When each page's visible copy last changed, for the sitemap's lastmod.
+ * Bump a date only when what a visitor reads on that page changes: not for
+ * styling, tracking or refactors. Product edits made in the admin and newly
+ * published reviews move the homepage's date on their own (see sitemap.ts).
+ */
+export const pageLastModified = {
+  /** Landing copy, FAQ and bundle pricing (2-pack lead offer) */
+  home: "2026-11-02",
+  /** Help page: privacy paragraph now mentions ad measurement */
+  support: "2026-11-03",
+} as const;
+
 /** The product's database copy, matching the verified specs above. */
 export const verifiedProductCopy = {
   shortDescription: "A compact cordless tire inflator with a digital pressure gauge, an integrated LED light and USB charging.",

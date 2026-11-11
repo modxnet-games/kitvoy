@@ -23,20 +23,23 @@
 #
 # --db-push     back up PostgreSQL, then apply the Prisma schema (additive changes only)
 # --allow-peak  deploy between 23:00 and 06:00 UTC (US evening), which is refused otherwise
+# --pm2-time    turn on timestamps in the PM2 logs with this reload (needed once; PM2 remembers it)
 #
 # It never prints secrets, never sources .env into the PM2 shell, and reloads
 # only the kitvoy process.
 set -euo pipefail
 
-BUNDLE="${1:?usage: release.sh <bundle> <branch> [--db-push] [--allow-peak]}"
-BRANCH="${2:?usage: release.sh <bundle> <branch> [--db-push] [--allow-peak]}"
+BUNDLE="${1:?usage: release.sh <bundle> <branch> [--db-push] [--allow-peak] [--pm2-time]}"
+BRANCH="${2:?usage: release.sh <bundle> <branch> [--db-push] [--allow-peak] [--pm2-time]}"
 shift 2
 DB_PUSH=0
 ALLOW_PEAK=0
+PM2_FLAGS=()
 for arg in "$@"; do
   case "$arg" in
     --db-push) DB_PUSH=1 ;;
     --allow-peak) ALLOW_PEAK=1 ;;
+    --pm2-time) PM2_FLAGS+=(--time) ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -126,7 +129,7 @@ http() { curl -s -o /dev/null -m 20 -w '%{http_code}' "$@" 2>/dev/null || echo 0
 activate() {
   ln -sfn "$1" "$APP.switch"
   mv -T "$APP.switch" "$APP"
-  pm2 reload "$PM2_NAME" >/dev/null
+  pm2 reload "$PM2_NAME" "${PM2_FLAGS[@]}" >/dev/null
   for _ in $(seq 1 40); do
     [ "$(http "$ORIGIN/")" = "200" ] && return 0
     sleep 1

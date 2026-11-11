@@ -14,6 +14,8 @@ interface PayPalPaymentProps {
   onPaid: () => void;
   /** Lets the page lock the other payment option while PayPal confirms */
   onProcessingChange?: (processing: boolean) => void;
+  /** Checkout log: what happened with PayPal, never who */
+  onEvent?: (event: "paypal_clicked" | "paypal_approved" | "paypal_canceled" | "paypal_error") => void;
   /** True while a card payment runs, so a second payment can't start here */
   disabled?: boolean;
 }
@@ -32,7 +34,7 @@ async function callPayPalRoute(method: "POST" | "PUT", orderId: string) {
   return json;
 }
 
-function Buttons({ orderId, onPaid, onError, onProcessingChange, disabled }: Omit<PayPalPaymentProps, "clientId"> & { onError: (key: string) => void }) {
+function Buttons({ orderId, onPaid, onError, onProcessingChange, onEvent, disabled }: Omit<PayPalPaymentProps, "clientId"> & { onError: (key: string) => void }) {
   const [{ isPending, isRejected }] = usePayPalScriptReducer();
   const [capturing, setCapturing] = useState(false);
   const setBusy = (busy: boolean) => {
@@ -58,6 +60,7 @@ function Buttons({ orderId, onPaid, onError, onProcessingChange, disabled }: Omi
         disabled={disabled}
         forceReRender={[orderId]}
         createOrder={async () => {
+          onEvent?.("paypal_clicked");
           const { id } = await callPayPalRoute("POST", orderId);
           return id as string;
         }}
@@ -65,15 +68,20 @@ function Buttons({ orderId, onPaid, onError, onProcessingChange, disabled }: Omi
           setBusy(true);
           try {
             await callPayPalRoute("PUT", orderId);
+            onEvent?.("paypal_approved");
             onPaid();
           } catch (err) {
             setBusy(false);
             onError(toMessageKey((err as Error).message));
           }
         }}
-        onCancel={() => onError("checkout.paymentCanceled")}
+        onCancel={() => {
+          onEvent?.("paypal_canceled");
+          onError("checkout.paymentCanceled");
+        }}
         onError={(err) => {
           console.error("[paypal]", err);
+          onEvent?.("paypal_error");
           onError(toMessageKey(err instanceof Error ? err.message : ""));
         }}
       />
@@ -82,7 +90,7 @@ function Buttons({ orderId, onPaid, onError, onProcessingChange, disabled }: Omi
 }
 
 /** PayPal Smart Buttons: PayPal (and Pay Later). Cards go through the Stripe form, so PayPal's card button is off. */
-export function PayPalPayment({ clientId, orderId, onPaid, onProcessingChange, disabled }: PayPalPaymentProps) {
+export function PayPalPayment({ clientId, orderId, onPaid, onProcessingChange, onEvent, disabled }: PayPalPaymentProps) {
   const { t } = useLanguage();
   const [error, setError] = useState<string | null>(null);
 
@@ -95,7 +103,7 @@ export function PayPalPayment({ clientId, orderId, onPaid, onProcessingChange, d
         </div>
       )}
       <PayPalScriptProvider options={paypalScriptOptions(clientId)}>
-        <Buttons orderId={orderId} onPaid={onPaid} onError={(key) => setError(key)} onProcessingChange={onProcessingChange} disabled={disabled} />
+        <Buttons orderId={orderId} onPaid={onPaid} onError={(key) => setError(key)} onProcessingChange={onProcessingChange} onEvent={onEvent} disabled={disabled} />
       </PayPalScriptProvider>
     </div>
   );

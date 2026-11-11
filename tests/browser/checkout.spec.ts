@@ -16,15 +16,24 @@ const details = {
   zip: "20001",
 };
 
-type Watch = { orderPosts: Request[]; metaRequests: string[] };
+type Watch = { orderPosts: Request[]; metaRequests: string[]; events: { e: string; [key: string]: unknown }[]; eventBodies: string[] };
 
 /** Counts order saves and catches any request to Meta. */
 function watch(page: Page): Watch {
-  const seen: Watch = { orderPosts: [], metaRequests: [] };
+  const seen: Watch = { orderPosts: [], metaRequests: [], events: [], eventBodies: [] };
   page.on("request", (request) => {
     const url = request.url();
     if (request.method() === "POST" && new URL(url).pathname === "/api/orders") seen.orderPosts.push(request);
     if (/facebook\.com\/tr|connect\.facebook\.net|graph\.facebook\.com/.test(url)) seen.metaRequests.push(url);
+    if (request.method() === "POST" && new URL(url).pathname === "/api/checkout/events") {
+      const body = request.postData() ?? "";
+      seen.eventBodies.push(body);
+      try {
+        seen.events.push(JSON.parse(body));
+      } catch {
+        // counted in eventBodies
+      }
+    }
   });
   return seen;
 }
@@ -92,6 +101,7 @@ test("a reload on the payment step comes back to the payment step, on the same o
   await expect(page.locator("[aria-labelledby=ship-to-heading]")).toContainText(details.fullName);
   await expect(page.locator("#checkout-email")).toHaveCount(0);
   await expectNoSidewaysScroll(page);
+  await expect.poll(() => seen.events.some((event) => event.e === "checkout_restored" && event.ref === order.orderReference)).toBe(true);
   expect(seen.orderPosts).toHaveLength(1);
 
   // Edit, change the address, continue: the same order is updated, not duplicated
@@ -166,14 +176,28 @@ test("an incomplete card shows its error beside the Pay button, on screen", asyn
   await expect(error).toBeInViewport({ ratio: 1 });
   await expect(pay).toBeInViewport();
   // Directly above the button, not at the far end of the card form
-  const [errorBox, payBox] = [await error.boundingBox(), await pay.boundingBox()];
-  expect(errorBox && payBox).toBeTruthy();
-  expect(payBox!.y - (errorBox!.y + errorBox!.height)).toBeGreaterThanOrEqual(0);
-  expect(payBox!.y - (errorBox!.y + errorBox!.height)).toBeLessThan(48);
+  // (both measured in the same frame: the page may still be scrolling the error into view)
+  const gap = await page.evaluate(() => {
+    const box = document.querySelector("[data-payment-error]")!.getBoundingClientRect();
+    const button = [...document.querySelectorAll("button")].find((b) => /^Pay \$/.test((b.textContent ?? "").trim()))!.getBoundingClientRect();
+    return button.top - box.bottom;
+  });
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThan(48);
   await expect(error).toBeFocused();
   // The button is usable again straight away
   await expect(pay).toBeEnabled();
   expect(seen.metaRequests).toEqual([]);
+
+  // The checkout log got each step, tied to the order reference, and nothing that was typed into the form
+  await expect.poll(() => seen.events.map((event) => event.e)).toEqual(expect.arrayContaining(["checkout_opened", "details_saved", "stripe_ready", "pay_clicked", "pay_validation_error"]));
+  const failure = seen.events.find((event) => event.e === "pay_validation_error")!;
+  expect(failure.ref).toMatch(/^KTV-[A-Z0-9]{8}$/);
+  expect(failure.step).toBe(2);
+  expect(String(failure.code)).toMatch(/^[a-z_]+$/);
+  for (const body of seen.eventBodies) {
+    for (const value of Object.values(details)) expect(body).not.toContain(value);
+  }
 });
 
 test("on a phone the card form and Pay button sit high, and the page keeps its height while loading", async ({ page }) => {

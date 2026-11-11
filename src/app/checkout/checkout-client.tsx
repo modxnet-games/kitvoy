@@ -18,6 +18,7 @@ import { PayPalRedirect } from "@/components/checkout/paypal-redirect";
 import { StripePayment, preloadStripe } from "@/components/checkout/stripe-payment";
 import type { OrderTotals } from "@/lib/payments/money";
 import { placeOrder } from "@/lib/client/place-order";
+import { logCheckoutEvent } from "@/lib/client/checkout-log";
 import { forgetCheckoutOnServer, resumeCheckout, type ResumeResponse } from "@/lib/client/resume-checkout";
 import {
   clearCheckoutRecord,
@@ -212,6 +213,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
         setSessionToken(null);
         clearCheckoutRecord();
         if (!thisCheckout) return undefined;
+        logCheckoutEvent(boot.paypal ? "paypal_approved" : "checkout_restored", { ref: res.orderReference, code: res.status });
         trackPurchase({ orderReference: res.orderReference, value: res.total, contents: res.contents });
         clearCart();
         router.replace(`/checkout/success?ref=${encodeURIComponent(res.orderReference)}${res.status === "processing" ? "&state=processing" : ""}`);
@@ -231,8 +233,12 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
         setSessionToken(res.resumeToken);
         saveCheckoutOrder(res.resumeToken, res.orderReference);
       }
+      logCheckoutEvent("checkout_restored", { ref: res.orderReference, step: 2, code: boot.link ? "link" : boot.token ? "session" : "cookie" });
       // Back from PayPal and still unpaid: say so, next to the ways to pay
-      if (boot.paypal) setNotice(boot.paypal === "cancel" ? "checkout.paymentCanceled" : "checkout.paypalNotCompleted");
+      if (boot.paypal) {
+        logCheckoutEvent("paypal_returned", { ref: res.orderReference, step: 2, code: boot.paypal });
+        setNotice(boot.paypal === "cancel" ? "checkout.paymentCanceled" : "checkout.paypalNotCompleted");
+      }
       setDetails({ ...res.details, paymentMethod: "paypal" });
       setCreated({ orderId: res.orderId, orderReference: res.orderReference, cartKey: cartKeyOf(res.items), totals: res.totals });
       setRestoredIntent(res.clientSecret ? { orderId: res.orderId, clientSecret: res.clientSecret } : null);
@@ -304,6 +310,28 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
     }
   }, [paymentOrderId]);
 
+  // The checkout log: opened once per page load, and every time the payment step is hidden or shown again
+  // (an in-app browser going to the background is what used to lose the checkout)
+  const openedLogged = useRef(false);
+  const paymentReference = pending?.orderReference ?? null;
+  const hasItems = items.length > 0;
+  useEffect(() => {
+    if (!mounted || phase !== "ready" || !hasItems || openedLogged.current) return;
+    openedLogged.current = true;
+    logCheckoutEvent("checkout_opened", { ref: paymentReference ?? undefined, step: paymentReference ? 2 : 1, code: boot.draft ? "draft" : undefined });
+  }, [mounted, phase, hasItems, paymentReference, boot]);
+  useEffect(() => {
+    if (!paymentReference) return;
+    let since = performance.now();
+    const onVisibility = () => {
+      const now = performance.now();
+      logCheckoutEvent(document.visibilityState === "hidden" ? "payment_hidden" : "payment_visible", { ref: paymentReference, step: 2, ms: Math.round(now - since) });
+      since = now;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [paymentReference]);
+
   const handleDetails = async (data: CheckoutFormData) => {
     if (isSubmitting) return;
     if (!canPay) { setError(t("checkout.paymentUnavailable")); return; }
@@ -326,6 +354,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
       saveCheckoutOrder(result.resumeToken, result.orderReference);
     }
     setNotice(null);
+    logCheckoutEvent("details_saved", { ref: result.orderReference, step: 1, code: result.reused ? "reused" : "new" });
     // Meta's InitiateCheckout: once per order, with the order reference as its event_id (the server sends the same)
     trackInitiateCheckout(result.orderReference, items, result.totals.total);
     setRestoredIntent(null);
@@ -474,6 +503,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       initialClientSecret={restoredIntent?.orderId === pending.orderId ? restoredIntent.clientSecret : null}
                       onPaid={handlePaid}
                       onProcessingChange={(busy) => setProcessing(busy ? "stripe" : null)}
+                      onEvent={(event, data) => logCheckoutEvent(event, { ref: pending.orderReference, step: 2, ...data })}
                       disabled={processing === "paypal"}
                     />
                   )}
@@ -494,6 +524,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       orderId={pending.orderId}
                       sessionToken={sessionToken}
                       onProcessingChange={(busy) => setProcessing(busy ? "paypal" : null)}
+                      onRedirect={() => logCheckoutEvent("paypal_redirected", { ref: pending.orderReference, step: 2 })}
                       disabled={processing === "stripe"}
                     />
                   )}
@@ -503,6 +534,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       orderId={pending.orderId}
                       onPaid={handlePaid}
                       onProcessingChange={(busy) => setProcessing(busy ? "paypal" : null)}
+                      onEvent={(event) => logCheckoutEvent(event, { ref: pending.orderReference, step: 2 })}
                       disabled={processing === "stripe"}
                     />
                   )}
@@ -512,7 +544,9 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                     </p>
                   )}
                   {/* The way out of an in-app browser: the same payment step in the phone's own browser */}
-                  {inApp && <OpenInBrowser app={inApp} sessionToken={sessionToken} />}
+                  {inApp && (
+                    <OpenInBrowser app={inApp} sessionToken={sessionToken} onOpen={() => logCheckoutEvent("open_in_browser", { ref: pending.orderReference, step: 2 })} />
+                  )}
                 </section>
               </div>
             ) : (

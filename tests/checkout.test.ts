@@ -17,6 +17,7 @@ import {
   withoutResumeLink,
 } from "../src/lib/client/checkout-storage";
 import { detectInAppBrowser, externalBrowserUrl } from "../src/lib/in-app-browser";
+import { CHECKOUT_EVENTS, formatCheckoutEvent, sanitizeCheckoutEvent } from "../src/lib/checkout/events";
 import { paypalEventTarget, settlePayPalOrder, type PayPalOrder, type SettleDeps, type SettleOrder } from "../src/lib/payments/paypal-settle";
 import { paypalMode } from "../src/lib/checkout/payment-options";
 import { orderLinesKey } from "../src/lib/orders";
@@ -489,4 +490,38 @@ test("coming back from PayPal is recognised and its parameters are removed from 
   assert.equal(withoutResumeLink(`https://kitvoy.com/checkout?r=${token}&pp=return&token=5AB12345CD678901E&PayerID=ABCDEFGH`), "/checkout");
   // A `token` parameter that isn't PayPal's stays
   assert.equal(withoutResumeLink("https://kitvoy.com/account?token=abc"), "/account?token=abc");
+});
+
+/* ---------- the checkout log ---------- */
+
+test("the checkout log takes only listed events and fields of a known shape, so no personal data can reach it", () => {
+  for (const name of ["checkout_opened", "details_saved", "stripe_ready", "stripe_load_error", "pay_clicked", "pay_validation_error", "checkout_restored", "paypal_redirected"]) {
+    assert.ok((CHECKOUT_EVENTS as readonly string[]).includes(name), name);
+  }
+  assert.deepEqual(
+    sanitizeCheckoutEvent({ e: "pay_validation_error", ref: "KTV-ZA4OG2CG", app: "facebook", step: 2, ms: 1234.4, code: "incomplete_number", w: 384, sid: "k3j9x0aa" }),
+    { e: "pay_validation_error", ref: "KTV-ZA4OG2CG", app: "facebook", step: 2, ms: 1234, code: "incomplete_number", w: 384, sid: "k3j9x0aa" },
+  );
+  // Unknown events, and anything that isn't an object, are dropped whole
+  for (const bad of [null, "pay_clicked", [], {}, { e: "purchase" }, { e: 42 }, { e: "pay_clicked; drop" }]) assert.equal(sanitizeCheckoutEvent(bad), null);
+
+  // Free text, wrong shapes and unknown keys never get through, whatever a caller sends
+  const hostile = sanitizeCheckoutEvent({
+    e: "pay_error",
+    ref: "KTV-ZA4OG2CG<script>",
+    app: "Dan's phone",
+    step: 3,
+    ms: -5,
+    code: "card declined for dan@example.com",
+    w: "wide",
+    sid: "has spaces",
+    email: "dan@example.com",
+    name: "Dan",
+    address: "512 Galaxy Ct",
+    userAgent: "Mozilla/5.0",
+  });
+  assert.deepEqual(hostile, { e: "pay_error" });
+
+  const line = formatCheckoutEvent({ e: "stripe_ready", ref: "KTV-ZA4OG2CG", ms: 1800, w: 390 }, new Date("2026-11-11T17:00:00.000Z"));
+  assert.equal(line, '[checkout] {"t":"2026-11-11T17:00:00.000Z","e":"stripe_ready","ref":"KTV-ZA4OG2CG","ms":1800,"w":390}');
 });

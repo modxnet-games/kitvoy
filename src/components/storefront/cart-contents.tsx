@@ -10,6 +10,23 @@ import { getCartQuoteAction } from "@/app/cart/actions";
 import { useMounted } from "@/hooks/use-mounted";
 import { ProductLineImage } from "./product-line-image";
 
+type CartQuote = { id: string; price: number; stock: number; shippingTax: number }[];
+
+/**
+ * Current prices and stock for the cart. A plain route with a stable URL, so a
+ * page that was loaded before a deploy still gets its answer afterwards; the
+ * server action is kept as the fallback.
+ */
+async function fetchCartQuote(ids: string[]): Promise<CartQuote> {
+  try {
+    const res = await fetch("/api/cart/quote?ids=" + encodeURIComponent(ids.join(",")), { cache: "no-store" });
+    if (res.ok) return (await res.json()) as CartQuote;
+  } catch {
+    // fall through
+  }
+  return getCartQuoteAction(ids);
+}
+
 export function CartContents({ onNavigate }: { onNavigate?: () => void }) {
   const mounted = useMounted();
   const items = useCartStore(s => s.items);
@@ -25,7 +42,7 @@ export function CartContents({ onNavigate }: { onNavigate?: () => void }) {
   useEffect(() => {
     if (!ids) return;
     let active = true;
-    getCartQuoteAction(ids.split(",")).then(products => {
+    fetchCartQuote(ids.split(",")).then(products => {
       if (!active) return;
       const changed = useCartStore.getState().items.some(item => {
         const current = products.find(p => p.id === item.product.id);

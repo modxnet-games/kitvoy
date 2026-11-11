@@ -120,7 +120,22 @@ export function validateOrderInput(input: unknown): { valid: false; error: strin
   };
 }
 
-export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
+type PricedItem = {
+  productId: string;
+  productName: string;
+  productSlug: string;
+  unitPrice: number;
+  shippingTax: number;
+  quantity: number;
+  lineTotal: number;
+};
+
+type PricedOrder = { items: PricedItem[]; subtotal: number; shippingCost: number; total: number };
+
+type OrderFailure = { success: false; error: string; errorKey?: string };
+
+/** Checks stock and prices the cart from the database, never from what the browser sent. */
+async function priceOrder(input: CreateOrderInput): Promise<{ ok: true; priced: PricedOrder } | { ok: false; failure: OrderFailure }> {
   const stockItems: StockValidationItem[] = input.items.map((i) => ({
     productId: i.product.id,
     productName: i.product.name,
@@ -129,11 +144,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
   const stockValidation = await validateStockForCheckout(stockItems);
   if (!stockValidation.valid && stockValidation.errorKey) {
-    return {
-      success: false,
-      error: stockValidation.errorKey,
-      errorKey: stockValidation.errorKey,
-    };
+    return { ok: false, failure: { success: false, error: stockValidation.errorKey, errorKey: stockValidation.errorKey } };
   }
 
   const productIds = Array.from(new Set(input.items.map((i) => i.product.id)));
@@ -143,21 +154,13 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   });
   const productMap = new Map(products.map((p) => [p.id, p]));
 
-  const pricedItems: Array<{
-    productId: string;
-    productName: string;
-    productSlug: string;
-    unitPrice: number;
-    shippingTax: number;
-    quantity: number;
-    lineTotal: number;
-  }> = [];
+  const items: PricedItem[] = [];
   for (const item of input.items) {
     const product = productMap.get(item.product.id);
     if (!product) {
-      return { success: false, error: "Product not found" };
+      return { ok: false, failure: { success: false, error: "Product not found" } };
     }
-    pricedItems.push({
+    items.push({
       productId: product.id,
       productName: product.name,
       productSlug: product.slug,
@@ -169,11 +172,25 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   }
 
   // Work in cents so the stored total is exactly what Stripe and PayPal charge
-  const subtotalCents = pricedItems.reduce((sum, i) => sum + toCents(i.lineTotal), 0);
-  const shippingCents = pricedItems.reduce((sum, i) => sum + toCents(i.shippingTax * i.quantity), 0);
-  const subtotal = subtotalCents / 100;
-  const shippingCost = shippingCents / 100;
-  const total = (subtotalCents + shippingCents) / 100;
+  const subtotalCents = items.reduce((sum, i) => sum + toCents(i.lineTotal), 0);
+  const shippingCents = items.reduce((sum, i) => sum + toCents(i.shippingTax * i.quantity), 0);
+  return {
+    ok: true,
+    priced: {
+      items,
+      subtotal: subtotalCents / 100,
+      shippingCost: shippingCents / 100,
+      total: (subtotalCents + shippingCents) / 100,
+    },
+  };
+}
+
+const orderReferenceOf = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
+
+export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
+  const pricing = await priceOrder(input);
+  if (!pricing.ok) return pricing.failure;
+  const { items: pricedItems, subtotal, shippingCost, total } = pricing.priced;
 
   // Stock is reserved when the payment is captured (see completePaidOrder),
   // so abandoned checkouts don't drain inventory.
@@ -216,12 +233,107 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     include: { items: true },
   });
 
-  const orderReference = `KTV-${order.id.slice(-8).toUpperCase()}`;
-
   return {
     success: true,
     orderId: order.id,
-    orderReference,
+    orderReference: orderReferenceOf(order.id),
     totals: { subtotal, shippingCost, total },
+  };
+}
+
+/** The lines of an order as one comparable string, whatever order they were saved in. */
+export function orderLinesKey(lines: { productId: string | null; quantity: number; unitPrice: number }[]): string {
+  return lines
+    .map((l) => `${l.productId ?? ""}x${l.quantity}@${toCents(l.unitPrice)}`)
+    .sort()
+    .join(",");
+}
+
+export type UpdateOrderResult =
+  | { success: true; orderId: string; orderReference: string; totals: OrderTotals; totalChanged: boolean; detailsChanged: boolean }
+  | { success: false; error: string; errorKey?: string; notReusable?: boolean };
+
+/**
+ * Saves new details (and a changed cart) on the open order of a checkout that
+ * was already started, so a reload, the Edit button or a retry never leaves a
+ * second order behind. Only an order that is still PENDING and unpaid is
+ * touched; the write re-checks that, so a payment landing at the same moment
+ * wins and the caller creates a new order instead (`notReusable`).
+ */
+export async function updatePendingOrder(
+  existing: {
+    id: string;
+    total: number;
+    customerName: string;
+    email: string | null;
+    phone: string;
+    location: string;
+    attribution: unknown;
+    items: { productId: string | null; quantity: number; unitPrice: number }[];
+  },
+  input: CreateOrderInput,
+): Promise<UpdateOrderResult> {
+  const pricing = await priceOrder(input);
+  if (!pricing.ok) return pricing.failure;
+  const { items: pricedItems, subtotal, shippingCost, total } = pricing.priced;
+
+  const location = formatAddressLine(input.shippingAddress);
+  const itemsChanged = orderLinesKey(existing.items) !== orderLinesKey(pricedItems);
+  const totalChanged = toCents(existing.total) !== toCents(total);
+  const detailsChanged =
+    existing.customerName !== input.customerName ||
+    (existing.email ?? "") !== input.email ||
+    existing.phone !== input.phone ||
+    existing.location !== location;
+
+  // The ad click and browser ids saved when the checkout started stay; a retry only fills in what was missing (fbp, fbc)
+  const before = (existing.attribution ?? {}) as Record<string, unknown>;
+  const merged = { ...(input.attribution ?? {}), ...before };
+  const attribution = Object.keys(merged).length > Object.keys(before).length ? merged : null;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.order.updateMany({
+      where: { id: existing.id, status: "PENDING", paymentStatus: "unpaid" },
+      data: {
+        customerName: input.customerName,
+        email: input.email,
+        phone: input.phone,
+        location,
+        shippingAddress: { ...input.shippingAddress },
+        subtotal,
+        shippingCost,
+        total,
+        ...(input.userId && { userId: input.userId }),
+        ...(attribution && { attribution }),
+        // A PayPal order opened for the old amount must never be captured for the new one
+        ...(totalChanged && { paymentRef: null }),
+      },
+    });
+    if (count === 0) return false;
+    if (itemsChanged) {
+      await tx.orderItem.deleteMany({ where: { orderId: existing.id } });
+      await tx.orderItem.createMany({
+        data: pricedItems.map((item) => ({
+          orderId: existing.id,
+          productId: item.productId,
+          productName: item.productName,
+          productSlug: item.productSlug,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          lineTotal: item.lineTotal,
+        })),
+      });
+    }
+    return true;
+  });
+  if (!updated) return { success: false, error: "ORDER_NOT_REUSABLE", notReusable: true };
+
+  return {
+    success: true,
+    orderId: existing.id,
+    orderReference: orderReferenceOf(existing.id),
+    totals: { subtotal, shippingCost, total },
+    totalChanged,
+    detailsChanged,
   };
 }

@@ -113,7 +113,10 @@ test("reduced motion and automated accessibility", async ({ page }) => {
 test("failed quote blocks checkout and can be retried", async ({ page }) => {
   let fail = true;
   await page.route("**/*", route => {
-    if (fail && route.request().method() === "POST" && route.request().headers()["next-action"]) return route.abort();
+    // The quote comes from /api/cart/quote, with the older server action as its fallback: fail both
+    const quote = new URL(route.request().url()).pathname === "/api/cart/quote";
+    const action = route.request().method() === "POST" && !!route.request().headers()["next-action"];
+    if (fail && (quote || action)) return route.abort();
     return route.continue();
   });
   await choose(page, 1);

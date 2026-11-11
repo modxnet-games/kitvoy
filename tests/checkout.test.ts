@@ -1,0 +1,340 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import type Stripe from "stripe";
+
+import { hashCheckoutToken, isCheckoutToken, isOpenOrder, newCheckoutToken, HANDOFF_LINK_TTL_MS, SESSION_TTL_MS } from "../src/lib/checkout/resume-token";
+import {
+  CHECKOUT_STORAGE_KEY,
+  cleanDraft,
+  clearCheckoutRecord,
+  parseCheckoutRecord,
+  readCheckoutRecord,
+  resumeLinkFromUrl,
+  saveCheckoutDraft,
+  saveCheckoutOrder,
+  withoutResumeLink,
+} from "../src/lib/client/checkout-storage";
+import { detectInAppBrowser } from "../src/lib/in-app-browser";
+import { offerPayPalButtons } from "../src/lib/checkout/payment-options";
+import { orderLinesKey } from "../src/lib/orders";
+import { ensureOrderPaymentIntent, intentMatchesOrder, intentMetadata, intentShipping, type IntentOrder } from "../src/lib/payments/stripe-intent";
+import { buildOrderEvent, unitPricePaid } from "../src/lib/analytics/meta-capi";
+import { toContents } from "../src/lib/analytics/meta-pixel";
+
+const sha256 = (value: string) => createHash("sha256").update(value, "utf8").digest("hex");
+
+/* ---------- resume tokens ---------- */
+
+test("checkout tokens are random, URL-safe, and only their hash is storable", () => {
+  const a = newCheckoutToken();
+  const b = newCheckoutToken();
+  assert.notEqual(a, b);
+  assert.match(a, /^[A-Za-z0-9_-]{43}$/, "256 bits, base64url");
+  assert.ok(isCheckoutToken(a));
+  for (const bad of ["", "short", a + "x", a.slice(1), `${a.slice(0, 42)}!`, null, undefined, 42, { token: a }]) {
+    assert.equal(isCheckoutToken(bad), false);
+  }
+  assert.match(hashCheckoutToken(a), /^[0-9a-f]{64}$/);
+  assert.equal(hashCheckoutToken(a), hashCheckoutToken(a));
+  assert.notEqual(hashCheckoutToken(a), hashCheckoutToken(b));
+  assert.ok(!hashCheckoutToken(a).includes(a), "the stored value never contains the token");
+  assert.ok(HANDOFF_LINK_TTL_MS <= 15 * 60 * 1000, "links in URLs are short-lived");
+  assert.equal(SESSION_TTL_MS, 48 * 60 * 60 * 1000);
+});
+
+test("only a pending, unpaid order is reused by a retry", () => {
+  assert.equal(isOpenOrder({ status: "PENDING", paymentStatus: "unpaid" }), true);
+  assert.equal(isOpenOrder({ status: "PENDING", paymentStatus: "paid" }), false);
+  assert.equal(isOpenOrder({ status: "CONFIRMED", paymentStatus: "paid" }), false);
+  assert.equal(isOpenOrder({ status: "CANCELED", paymentStatus: "unpaid" }), false);
+});
+
+/* ---------- what the browser keeps ---------- */
+
+const draft = { email: "test@example.com", fullName: "Test Customer", phone: "(202) 555-0143", address1: "123 Test St", city: "Washington", state: "DC", zip: "20001" };
+const token = newCheckoutToken();
+const NOW = 1_800_000_000_000;
+
+test("the stored checkout holds a draft before the order exists and only token + reference after", () => {
+  const before = parseCheckoutRecord(JSON.stringify({ v: 1, savedAt: NOW, draft }), NOW);
+  assert.deepEqual(before, { v: 1, savedAt: NOW, draft });
+
+  // Once an order exists nothing personal is kept, even if a draft was left in the stored value
+  const after = parseCheckoutRecord(JSON.stringify({ v: 1, savedAt: NOW, token, orderReference: "KTV-ABCD1234", draft }), NOW);
+  assert.deepEqual(after, { v: 1, savedAt: NOW, token, orderReference: "KTV-ABCD1234" });
+  assert.equal(JSON.stringify(after).includes("example.com"), false);
+
+  // 48 hours, then gone
+  assert.equal(parseCheckoutRecord(JSON.stringify({ v: 1, savedAt: NOW - SESSION_TTL_MS - 1, draft }), NOW), null);
+  assert.ok(parseCheckoutRecord(JSON.stringify({ v: 1, savedAt: NOW - SESSION_TTL_MS + 1000, draft }), NOW));
+  assert.equal(parseCheckoutRecord(JSON.stringify({ v: 1, savedAt: NOW + 10 * 60_000, draft }), NOW), null, "a timestamp from the future is not trusted");
+
+  for (const bad of [null, "", "not json", "{}", JSON.stringify({ v: 2, savedAt: NOW, draft }), JSON.stringify({ v: 1, savedAt: "now", draft }), JSON.stringify({ v: 1, savedAt: NOW })]) {
+    assert.equal(parseCheckoutRecord(bad, NOW), null);
+  }
+  // A token without a valid reference (or the reverse) is not an order record
+  assert.equal(parseCheckoutRecord(JSON.stringify({ v: 1, savedAt: NOW, token, orderReference: "nope" }), NOW), null);
+  assert.equal(parseCheckoutRecord(JSON.stringify({ v: 1, savedAt: NOW, token: "nope", orderReference: "KTV-ABCD1234" }), NOW), null);
+});
+
+test("a draft keeps only the form's own fields", () => {
+  const { zip: _zip, ...withoutZip } = draft;
+  void _zip;
+  // Unknown keys, blanks and non-strings are dropped
+  assert.deepEqual(cleanDraft({ ...draft, address2: "  ", cardNumber: "4242", password: "x", zip: 20001 }), withoutZip);
+  assert.deepEqual(cleanDraft(null), {});
+  assert.equal(cleanDraft({ fullName: "x".repeat(500) }).fullName?.length, 200);
+});
+
+test("saving the order drops the draft, and later typing is not stored", () => {
+  const store = new Map<string, string>();
+  const g = globalThis as unknown as { localStorage?: object };
+  const had = "localStorage" in g;
+  g.localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => { store.set(k, v); },
+    removeItem: (k: string) => { store.delete(k); },
+  };
+  try {
+    saveCheckoutDraft(draft);
+    assert.deepEqual(readCheckoutRecord()?.draft, draft);
+
+    saveCheckoutOrder(token, "KTV-ABCD1234");
+    const stored = store.get(CHECKOUT_STORAGE_KEY) ?? "";
+    assert.equal(stored.includes("Test Customer"), false, "the draft is gone the moment the order exists");
+    assert.equal(stored.includes("example.com"), false);
+    assert.deepEqual(Object.keys(JSON.parse(stored)).sort(), ["orderReference", "savedAt", "token", "v"]);
+
+    saveCheckoutDraft({ ...draft, fullName: "Edited Name" });
+    assert.equal((store.get(CHECKOUT_STORAGE_KEY) ?? "").includes("Edited Name"), false, "after the order exists the browser keeps no details");
+    assert.equal(readCheckoutRecord()?.token, token);
+
+    clearCheckoutRecord();
+    assert.equal(store.has(CHECKOUT_STORAGE_KEY), false, "paid: nothing stays");
+    saveCheckoutOrder("bad-token", "KTV-ABCD1234");
+    assert.equal(store.has(CHECKOUT_STORAGE_KEY), false);
+  } finally {
+    if (!had) delete g.localStorage;
+  }
+});
+
+test("a resume link's token is read from the query or the fragment and then removed from the URL", () => {
+  assert.equal(resumeLinkFromUrl(`https://kitvoy.com/checkout?r=${token}`), token);
+  assert.equal(resumeLinkFromUrl(`https://kitvoy.com/checkout#r=${token}`), token);
+  assert.equal(resumeLinkFromUrl(`https://kitvoy.com/checkout?pp=return&r=${token}&token=5AB&PayerID=X`), token);
+  assert.equal(resumeLinkFromUrl("https://kitvoy.com/checkout?r=tooshort"), null);
+  assert.equal(resumeLinkFromUrl("https://kitvoy.com/checkout"), null);
+
+  assert.equal(withoutResumeLink(`https://kitvoy.com/checkout?r=${token}`), "/checkout");
+  assert.equal(withoutResumeLink(`https://kitvoy.com/checkout?pp=return&r=${token}`), "/checkout?pp=return");
+  assert.equal(withoutResumeLink(`https://kitvoy.com/checkout#r=${token}`), "/checkout");
+  assert.equal(withoutResumeLink("https://kitvoy.com/checkout?utm_source=facebook#bundles"), "/checkout?utm_source=facebook#bundles");
+});
+
+/* ---------- Meta's in-app browsers ---------- */
+
+test("Facebook, Messenger, Instagram and Threads web views are detected; real browsers are not", () => {
+  const cases: [string, ReturnType<typeof detectInAppBrowser>][] = [
+    ["Mozilla/5.0 (Linux; Android 17; SM-A166U Build/CP2A.260605.016) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/156.0.8078.47 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/574.0.0.40.71;IABMV/1;]", "facebook"],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22A3354 [FBAN/FBIOS;FBAV/480.0.0.38.107;FBBV/1;FBDV/iPhone15,3]", "facebook"],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22A3354 [FBAN/MessengerLiteForiOS;FBAV/470.0.0.31.108]", "facebook"],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 27_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/24B119 Instagram 454.1.0.41.71 (iPhone15,3; iOS 27_2; en_US; en; scale=3.00; 1290x2796; IABMV/1; 1106185088) Safari/604.1", "instagram"],
+    ["Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0 Mobile Safari/537.36 Barcelona 350.0.0.30.109 Android (34/14; 420dpi)", "threads"],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22A3354 Barcelona 350.0.0 Instagram 350.0.0 (iPhone15,3)", "threads"],
+    ["Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36", null],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", null],
+    ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", null],
+    ["", null],
+  ];
+  for (const [ua, expected] of cases) assert.equal(detectInAppBrowser(ua), expected, ua.slice(-60));
+  assert.equal(detectInAppBrowser(null), null);
+});
+
+test("PayPal's pop-up buttons are hidden in in-app browsers, unless PayPal is the only way to pay", () => {
+  assert.equal(offerPayPalButtons({ paypalConfigured: true, cardConfigured: true, inAppBrowser: false }), true);
+  assert.equal(offerPayPalButtons({ paypalConfigured: true, cardConfigured: true, inAppBrowser: true }), false);
+  assert.equal(offerPayPalButtons({ paypalConfigured: true, cardConfigured: false, inAppBrowser: true }), true);
+  assert.equal(offerPayPalButtons({ paypalConfigured: false, cardConfigured: true, inAppBrowser: false }), false);
+});
+
+/* ---------- one order, one PaymentIntent ---------- */
+
+test("order lines compare the same whatever order they were saved in", () => {
+  const a = [{ productId: "p1", quantity: 2, unitPrice: 59.99 }, { productId: "p2", quantity: 1, unitPrice: 10 }];
+  assert.equal(orderLinesKey(a), orderLinesKey([...a].reverse()));
+  assert.notEqual(orderLinesKey(a), orderLinesKey([{ ...a[0], quantity: 3 }, a[1]]));
+  assert.notEqual(orderLinesKey(a), orderLinesKey([{ ...a[0], unitPrice: 49.99 }, a[1]]));
+});
+
+const order: IntentOrder = {
+  id: "cmw9wrjyz00044ku7za4og2cg",
+  total: 59.99,
+  customerName: "Test Customer",
+  phone: "(202) 555-0143",
+  location: "123 Test St, Washington, DC 20001",
+  shippingAddress: { address1: "123 Test St", address2: "", city: "Washington", state: "DC", zip: "20001", country: "US" },
+  stripePaymentIntentId: "pi_old",
+  utmSource: "facebook",
+  utmMedium: "paid",
+  utmCampaign: "launch",
+  utmContent: null,
+  utmTerm: null,
+  fbclid: null,
+};
+
+/** An intent as Stripe would return it for `order`. */
+const intentFor = (o: IntentOrder, overrides: Partial<Stripe.PaymentIntent> = {}) =>
+  ({
+    id: "pi_old",
+    status: "requires_payment_method",
+    amount: Math.round(o.total * 100),
+    client_secret: "pi_old_secret_x",
+    shipping: { name: o.customerName, phone: o.phone, address: { line1: "123 Test St", line2: null, city: "Washington", state: "DC", postal_code: "20001", country: "US" } },
+    ...overrides,
+  }) as unknown as Stripe.PaymentIntent;
+
+/** A stand-in for the Stripe client that records what the helper asked of it. */
+function fakeStripe(existing: Stripe.PaymentIntent | Error, behaviour: { updateFails?: boolean } = {}) {
+  const calls: { op: string; args: unknown[] }[] = [];
+  const stripe = {
+    paymentIntents: {
+      retrieve: async (...args: unknown[]) => {
+        calls.push({ op: "retrieve", args });
+        if (existing instanceof Error) throw existing;
+        return existing;
+      },
+      update: async (...args: unknown[]) => {
+        calls.push({ op: "update", args });
+        if (behaviour.updateFails) throw new Error("This PaymentIntent could not be updated");
+        return { ...(existing as Stripe.PaymentIntent), ...(args[1] as object), client_secret: "pi_old_secret_x" };
+      },
+      cancel: async (...args: unknown[]) => {
+        calls.push({ op: "cancel", args });
+        return {};
+      },
+      create: async (...args: unknown[]) => {
+        calls.push({ op: "create", args });
+        return { id: "pi_new", client_secret: "pi_new_secret_y", status: "requires_payment_method" };
+      },
+    },
+  } as unknown as Pick<Stripe, "paymentIntents">;
+  return { stripe, calls, ops: () => calls.map((c) => c.op) };
+}
+
+test("an open intent that still matches the order is reused untouched", async () => {
+  const { stripe, ops } = fakeStripe(intentFor(order));
+  const saved: string[] = [];
+  const result = await ensureOrderPaymentIntent(stripe, order, async (_o, id) => { saved.push(id); });
+  assert.deepEqual(result, { ok: true, clientSecret: "pi_old_secret_x", intentId: "pi_old" });
+  assert.deepEqual(ops(), ["retrieve"], "no update, no cancel, no second intent");
+  assert.deepEqual(saved, []);
+});
+
+test("a changed total or address updates the same intent in place", async () => {
+  const pair = { ...order, total: 99.99 };
+  const { stripe, calls, ops } = fakeStripe(intentFor(order));
+  const result = await ensureOrderPaymentIntent(stripe, pair, async () => {});
+  assert.equal(result.ok && result.intentId, "pi_old");
+  assert.deepEqual(ops(), ["retrieve", "update"]);
+  assert.equal((calls[1].args[1] as { amount: number }).amount, 9999);
+
+  const moved = { ...order, shippingAddress: { address1: "9 Other Rd", address2: "Apt 2", city: "Austin", state: "TX", zip: "73301" } };
+  assert.equal(intentMatchesOrder(intentFor(order), moved), false);
+  const second = fakeStripe(intentFor(order));
+  await ensureOrderPaymentIntent(second.stripe, moved, async () => {});
+  assert.deepEqual(second.ops(), ["retrieve", "update"]);
+  assert.equal((second.calls[1].args[1] as { shipping: { address: { city: string } } }).shipping.address.city, "Austin");
+});
+
+test("a canceled or missing stored intent is never reused: a fresh one is created", async () => {
+  for (const existing of [intentFor(order, { status: "canceled" }), Object.assign(new Error("No such payment_intent"), { code: "resource_missing" })]) {
+    const { stripe, calls, ops } = fakeStripe(existing);
+    const saved: [string, string][] = [];
+    const result = await ensureOrderPaymentIntent(stripe, order, async (o, id) => { saved.push([o, id]); });
+    assert.deepEqual(result, { ok: true, clientSecret: "pi_new_secret_y", intentId: "pi_new" });
+    assert.deepEqual(ops(), ["retrieve", "create"], "the stored intent is left alone, not canceled or updated");
+    assert.deepEqual(saved, [[order.id, "pi_new"]], "the order now points at the fresh intent");
+    const [params, options] = calls[1].args as [{ amount: number; metadata: Record<string, string> }, { idempotencyKey: string }];
+    assert.equal(params.amount, 5999);
+    assert.equal(params.metadata.orderReference, "KTV-ZA4OG2CG");
+    assert.match(options.idempotencyKey, /^pi-cmw9wrjyz00044ku7za4og2cg-5999-pi_old-[0-9a-f]{12}$/);
+  }
+});
+
+test("an intent Stripe refuses to update is replaced, and one that is paid or settling is left for the webhook", async () => {
+  const refused = fakeStripe(intentFor(order), { updateFails: true });
+  const result = await ensureOrderPaymentIntent(refused.stripe, { ...order, total: 99.99 }, async () => {});
+  assert.equal(result.ok && result.intentId, "pi_new");
+  assert.deepEqual(refused.ops(), ["retrieve", "update", "cancel", "create"]);
+
+  for (const status of ["succeeded", "processing", "requires_capture"] as const) {
+    const settled = fakeStripe(intentFor(order, { status }));
+    assert.deepEqual(await ensureOrderPaymentIntent(settled.stripe, order, async () => {}), { ok: false, intentStatus: status });
+    assert.deepEqual(settled.ops(), ["retrieve"]);
+  }
+
+  // Stripe being down is an error, not a reason to create a duplicate
+  const down = fakeStripe(new Error("connection reset"));
+  await assert.rejects(() => ensureOrderPaymentIntent(down.stripe, order, async () => {}));
+  assert.deepEqual(down.ops(), ["retrieve"]);
+});
+
+test("the intent carries the order ids and ad attribution, and no personal data in its metadata", () => {
+  assert.deepEqual(intentMetadata(order), { orderId: order.id, orderReference: "KTV-ZA4OG2CG", utm_source: "facebook", utm_medium: "paid", utm_campaign: "launch" });
+  assert.equal(JSON.stringify(intentMetadata(order)).includes("Test Customer"), false);
+  assert.deepEqual(intentShipping(order).address, { line1: "123 Test St", line2: undefined, city: "Washington", state: "DC", postal_code: "20001", country: "US" });
+});
+
+/* ---------- Meta events ---------- */
+
+test("bundle lines report what one unit really cost", () => {
+  assert.equal(unitPricePaid(59.99, 1), 59.99);
+  assert.equal(unitPricePaid(99.99, 2), 50, "two for $99.99 is $50.00 each, not $59.99");
+  assert.equal(unitPricePaid(134.98, 3), 44.99);
+  assert.equal(unitPricePaid(0, 0), 0);
+
+  const product = { id: "p1", sku: "INF-001", name: "Inflator", price: 59.99 };
+  assert.deepEqual(toContents([{ product, quantity: 1 }]), [{ id: "INF-001", quantity: 1, item_price: 59.99 }]);
+  assert.deepEqual(toContents([{ product, quantity: 2 }]), [{ id: "INF-001", quantity: 2, item_price: 50 }]);
+  assert.deepEqual(toContents([{ product, quantity: 3 }]), [{ id: "INF-001", quantity: 3, item_price: 44.99 }]);
+});
+
+test("the server Purchase and InitiateCheckout use the order reference as event_id and carry the order's own fbp/fbc and hashed contact", () => {
+  const paid = {
+    id: "cmw9wrjyz00044ku7za4og2cg",
+    email: "Test@Example.com ",
+    phone: "(202) 555-0143",
+    customerName: "Test Customer",
+    shippingAddress: { city: "Washington", state: "DC", zip: "20001", country: "US" },
+    // Saved when the checkout started, in the customer's own browser
+    attribution: { fbp: "fb.1.1794267000000.1234567890", fbc: "fb.1.1794267000000.IwAR0abc", clientIp: "203.0.113.7", userAgent: "Mozilla/5.0 test", eventSourceUrl: "/checkout" },
+    userId: null,
+    total: 99.99,
+  };
+  const contents = [{ id: "INF-001", quantity: 2, item_price: 50 }];
+
+  const purchase = buildOrderEvent("Purchase", paid, contents, 1_794_267_900);
+  assert.equal(purchase.event_name, "Purchase");
+  assert.equal(purchase.event_id, "KTV-ZA4OG2CG", "the same id the browser pixel sends");
+  assert.equal(purchase.action_source, "website");
+  assert.match(purchase.event_source_url, /^https?:\/\/[^/]+\/checkout$/);
+  assert.equal(purchase.user_data.fbp, "fb.1.1794267000000.1234567890");
+  assert.equal(purchase.user_data.fbc, "fb.1.1794267000000.IwAR0abc");
+  assert.deepEqual(purchase.user_data.em, [sha256("test@example.com")]);
+  assert.deepEqual(purchase.user_data.ph, [sha256("12025550143")]);
+  assert.equal(purchase.user_data.client_ip_address, "203.0.113.7");
+  assert.equal(JSON.stringify(purchase).includes("example.com"), false, "no raw email leaves the server");
+  assert.equal(JSON.stringify(purchase).includes("555-0143"), false, "no raw phone leaves the server");
+  assert.deepEqual(purchase.custom_data, { currency: "USD", value: 99.99, content_type: "product", content_ids: ["INF-001"], contents, num_items: 2, order_id: "KTV-ZA4OG2CG" });
+
+  const started = buildOrderEvent("InitiateCheckout", paid, contents, 1_794_267_800);
+  assert.equal(started.event_id, "KTV-ZA4OG2CG", "a retried checkout repeats the id, so Meta counts it once");
+  assert.equal("order_id" in started.custom_data, false);
+  assert.equal(started.user_data.fbp, purchase.user_data.fbp);
+
+  // An order with no browser ids (pixel blocked) still sends, with what it has
+  const bare = buildOrderEvent("Purchase", { ...paid, attribution: null }, contents, 1);
+  assert.equal(bare.user_data.fbp, undefined);
+  assert.deepEqual(bare.user_data.em, [sha256("test@example.com")]);
+});

@@ -52,7 +52,7 @@ export default function PrivacyPolicyPage() {
       </section>
       <section aria-labelledby="cookies">
         <h2 id="cookies">Cookies and browser storage</h2>
-        <p>We use essential cookies to keep you signed in, and your browser&apos;s local storage to remember your cart.</p>
+        <p>We use essential cookies to keep you signed in and to hold a checkout you have started, and your browser&apos;s local storage to remember your cart. While you fill in the checkout, what you type is kept in your browser so a reload doesn&apos;t wipe it; once your order is created only a random checkout code and your order reference stay there, for up to 48 hours or until you pay.</p>
         <p>We also use the Meta Pixel, an advertising tool that sets cookies and sends Meta the pages you visit here, items you add to the cart and, when you buy, the order total and items; our server sends Meta the checkout and purchase events as well, with hashed contact details (see above). If you arrive from an ad, we keep the ad&apos;s campaign tags and Meta&apos;s click identifier in a first-party cookie for 30 days and record them with your order, so we know which ad brought you. We don&apos;t load the pixel on our admin pages, and we don&apos;t load it at all if your browser sends a Global Privacy Control signal. You can also opt out by blocking third-party cookies in your browser, by changing your ad preferences in your Facebook or Instagram settings, or by emailing <a className="text-link" href={`mailto:${email}`}>{email}</a>.</p>
       </section>
       <section aria-labelledby="keep">

@@ -9,6 +9,8 @@ import { useLanguage } from "@/contexts/language-context";
 import { useCartStore } from "@/store/cart-store";
 import { buttonVariants } from "@/components/ui/button";
 import { trackPurchase } from "@/lib/analytics/meta-pixel";
+import { clearCheckoutRecord } from "@/lib/client/checkout-storage";
+import { forgetCheckoutOnServer } from "@/lib/client/resume-checkout";
 
 type StripeResult = { status: "paid" | "processing" | "open"; orderReference: string; total: number; contents: { id: string; quantity: number; item_price?: number }[] };
 
@@ -48,7 +50,7 @@ function SuccessContent() {
   const stripe = useStripeResult(intentId);
   const checking = !!intentId && stripe === null;
   const failed = stripe?.status === "failed";
-  const processing = stripe?.status === "processing";
+  const processing = stripe?.status === "processing" || searchParams.get("state") === "processing";
   const orderReference = stripe && stripe.status !== "failed" ? stripe.orderReference : refParam;
   const clearCart = useCartStore((s) => s.clearCart);
   const celebrated = useRef(false);
@@ -61,6 +63,15 @@ function SuccessContent() {
     clearCart();
     trackPurchase({ orderReference: stripe.orderReference, value: stripe.total, contents: stripe.contents ?? [] });
   }, [stripe, clearCart]);
+
+  // Paid (or settling): forget the checkout on this browser, so the next visit starts a fresh one
+  const forgotten = useRef(false);
+  useEffect(() => {
+    if (checking || failed || forgotten.current) return;
+    forgotten.current = true;
+    clearCheckoutRecord();
+    forgetCheckoutOnServer();
+  }, [checking, failed]);
 
   const audioPlayed = useRef(false);
   useEffect(() => {

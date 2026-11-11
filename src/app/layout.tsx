@@ -62,7 +62,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        {!isAdminOrderPrint && (
+        {!isAdminOrderPrint && META_PIXEL_ID && (
           <>
             <MetaPixel />
             {/* Meta Pixel fallback for browsers without JavaScript */}

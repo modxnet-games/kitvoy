@@ -105,6 +105,16 @@ export async function getProductBySlug(
   });
 }
 
+/** Products for the lines of an order, e.g. to rebuild a cart on another browser. */
+export async function getProductsByIds(ids: string[]): Promise<ProductDisplay[]> {
+  if (ids.length === 0) return [];
+  const products = await prisma.product.findMany({
+    where: { id: { in: ids } },
+    include: productInclude,
+  });
+  return products.map((p) => toProductDisplay({ ...p, images: p.images }));
+}
+
 export async function getAllProductSlugs(): Promise<{ slug: string }[]> {
   try {
     const products = await prisma.product.findMany({

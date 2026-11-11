@@ -21,6 +21,7 @@ export function getMetaCapiConfig(): { pixelId: string; accessToken: string; tes
   const accessToken = process.env.META_CAPI_ACCESS_TOKEN?.trim();
   if (!accessToken) return null;
   const pixelId = process.env.META_PIXEL_ID?.trim() || META_PIXEL_ID;
+  if (!pixelId) return null;
   const testEventCode = process.env.META_TEST_EVENT_CODE?.trim() || undefined;
   return { pixelId, accessToken, testEventCode };
 }
@@ -217,22 +218,89 @@ export async function sendMetaEvent(event: MetaServerEvent, label: string): Prom
 
 type StoredAddress = { city?: string; state?: string; zip?: string; country?: string };
 
+/** What one unit actually cost: the line total split across its quantity, so bundles report their real price. */
+export function unitPricePaid(lineTotal: number, quantity: number): number {
+  return quantity > 0 ? Math.round(Math.round(lineTotal * 100) / quantity) / 100 : 0;
+}
+
+type OrderLine = { productId: string | null; quantity: number; unitPrice: number; lineTotal: number };
+
 /** The order's lines as Meta contents, by SKU (falling back to the product id). */
-async function orderContents(items: { productId: string | null; quantity: number; unitPrice: number }[]): Promise<MetaContent[]> {
+export async function orderContents(items: OrderLine[]): Promise<MetaContent[]> {
   const ids = items.flatMap((i) => (i.productId ? [i.productId] : []));
   const products = ids.length ? await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, sku: true } }) : [];
   const skuOf = new Map(products.map((p) => [p.id, p.sku]));
   return items.map((i) => ({
     id: (i.productId && skuOf.get(i.productId)) || i.productId || "unknown",
     quantity: i.quantity,
-    item_price: round2(i.unitPrice),
+    item_price: unitPricePaid(i.lineTotal, i.quantity),
   }));
+}
+
+/** The parts of an order a server event is built from. */
+export interface EventOrder {
+  id: string;
+  email: string | null;
+  phone: string;
+  customerName: string;
+  shippingAddress: unknown;
+  attribution: unknown;
+  userId: string | null;
+  total: number;
+}
+
+/**
+ * A Purchase or InitiateCheckout for an order. Both use the order reference
+ * as event_id, the same id the browser pixel sends, so Meta keeps one of each
+ * pair and a retried checkout can't count twice. user_data carries the hashed
+ * email and phone plus the fbp/fbc saved on the order when it was created,
+ * wherever the payment is later confirmed from (webhook, another browser).
+ */
+export function buildOrderEvent(
+  name: "Purchase" | "InitiateCheckout",
+  order: EventOrder,
+  contents: MetaContent[],
+  eventTime: number,
+): MetaServerEvent {
+  const reference = orderReference(order.id);
+  const attribution = (order.attribution ?? {}) as OrderAttribution;
+  const address = (order.shippingAddress ?? {}) as StoredAddress;
+  return {
+    event_name: name,
+    event_id: reference,
+    event_time: eventTime,
+    event_source_url: toEventSourceUrl(attribution.eventSourceUrl, "/checkout"),
+    action_source: "website",
+    user_data: buildUserData(
+      {
+        email: order.email,
+        phone: order.phone,
+        fullName: order.customerName,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        country: address.country ?? "US",
+        externalId: order.userId ?? order.id,
+      },
+      attribution,
+    ),
+    custom_data: {
+      currency: "USD",
+      value: round2(order.total),
+      content_type: "product",
+      content_ids: contents.map((c) => c.id),
+      contents,
+      num_items: contents.reduce((n, c) => n + c.quantity, 0),
+      ...(name === "Purchase" && { order_id: reference }),
+    },
+  };
 }
 
 /**
  * Server-side Purchase for a paid order. Claims the order first
- * (metaPurchaseSentAt), so Stripe retries and the PayPal path can never send
- * two; a failed send releases the claim for the next attempt.
+ * (metaPurchaseSentAt), so Stripe retries, the PayPal webhook and the PayPal
+ * return path can never send two; a failed send releases the claim for the
+ * next attempt.
  */
 export async function sendPurchaseEvent(orderId: string): Promise<void> {
   if (!getMetaCapiConfig()) return;
@@ -252,39 +320,7 @@ export async function sendPurchaseEvent(orderId: string): Promise<void> {
   });
   if (count === 0) return; // Already sent
 
-  const attribution = (order.attribution ?? {}) as OrderAttribution;
-  const address = (order.shippingAddress ?? {}) as StoredAddress;
-  const contents = await orderContents(order.items);
-  const event: MetaServerEvent = {
-    event_name: "Purchase",
-    event_id: reference,
-    event_time: Math.floor(Date.now() / 1000),
-    event_source_url: toEventSourceUrl(attribution.eventSourceUrl, "/checkout"),
-    action_source: "website",
-    user_data: buildUserData(
-      {
-        email: order.email,
-        phone: order.phone,
-        fullName: order.customerName,
-        city: address.city,
-        state: address.state,
-        zip: address.zip,
-        country: address.country ?? "US",
-        externalId: order.userId ?? order.id,
-      },
-      attribution,
-    ),
-    custom_data: {
-      currency: "USD",
-      value: round2(order.total),
-      content_type: "product",
-      content_ids: contents.map((c) => c.id),
-      contents,
-      num_items: contents.reduce((n, c) => n + c.quantity, 0),
-      order_id: reference,
-    },
-  };
-
+  const event = buildOrderEvent("Purchase", order, await orderContents(order.items), Math.floor(Date.now() / 1000));
   const sent = await sendMetaEvent(event, reference);
   if (!sent) {
     await prisma.order
@@ -294,48 +330,14 @@ export async function sendPurchaseEvent(orderId: string): Promise<void> {
 }
 
 /**
- * Server-side InitiateCheckout, sent when the checkout details create the
- * order, with the browser event's id so the two are one to Meta. Skipped when
- * the browser didn't send an id (pixel blocked), since the server copy would
- * then be a second event, not a backup.
+ * Server-side InitiateCheckout, sent once when the checkout details create
+ * the order. Saving the same checkout again (reload, Edit, a retry) updates
+ * that order and sends nothing, so retries don't inflate the count.
  */
 export async function sendInitiateCheckoutEvent(orderId: string): Promise<void> {
   if (!getMetaCapiConfig()) return;
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return;
-  const attribution = (order.attribution ?? {}) as OrderAttribution;
-  const eventId = attribution.initiateCheckoutEventId;
-  if (!eventId) return;
-
-  const address = (order.shippingAddress ?? {}) as StoredAddress;
-  const contents = await orderContents(order.items);
-  const event: MetaServerEvent = {
-    event_name: "InitiateCheckout",
-    event_id: eventId,
-    event_time: Math.floor(order.createdAt.getTime() / 1000),
-    event_source_url: toEventSourceUrl(attribution.eventSourceUrl, "/checkout"),
-    action_source: "website",
-    user_data: buildUserData(
-      {
-        email: order.email,
-        phone: order.phone,
-        fullName: order.customerName,
-        city: address.city,
-        state: address.state,
-        zip: address.zip,
-        country: address.country ?? "US",
-        externalId: order.userId ?? order.id,
-      },
-      attribution,
-    ),
-    custom_data: {
-      currency: "USD",
-      value: round2(order.total),
-      content_type: "product",
-      content_ids: contents.map((c) => c.id),
-      contents,
-      num_items: contents.reduce((n, c) => n + c.quantity, 0),
-    },
-  };
+  const event = buildOrderEvent("InitiateCheckout", order, await orderContents(order.items), Math.floor(order.createdAt.getTime() / 1000));
   await sendMetaEvent(event, orderReference(order.id));
 }

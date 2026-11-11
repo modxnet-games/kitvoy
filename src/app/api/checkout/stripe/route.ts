@@ -1,33 +1,20 @@
 import { NextResponse } from "next/server";
-import type Stripe from "stripe";
 
+import { orderContents } from "@/lib/analytics/meta-capi";
 import { prisma } from "@/lib/db";
-import { getPayableOrder, orderHasStock, toCents } from "@/lib/payments/order-payment";
-import { canUseStripeCheckout, getStripe, isOpenIntent } from "@/lib/payments/stripe";
+import { getPayableOrder, orderHasStock } from "@/lib/payments/order-payment";
+import { canUseStripeCheckout, getStripe } from "@/lib/payments/stripe";
+import { ensureOrderPaymentIntent } from "@/lib/payments/stripe-intent";
 
 const orderReference = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
-
-type StoredAddress = { address1?: string; address2?: string; city?: string; state?: string; zip?: string };
-
-/** The ad that drove the order, on the PaymentIntent so the Stripe Dashboard shows it too (no personal data). */
-function attributionMetadata(order: { utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; utmContent: string | null; utmTerm: string | null; fbclid: string | null }) {
-  const entries: [string, string | null][] = [
-    ["utm_source", order.utmSource],
-    ["utm_medium", order.utmMedium],
-    ["utm_campaign", order.utmCampaign],
-    ["utm_content", order.utmContent],
-    ["utm_term", order.utmTerm],
-    ["fbclid", order.fbclid],
-  ];
-  return Object.fromEntries(entries.filter((e): e is [string, string] => !!e[1]).map(([k, v]) => [k, v.slice(0, 500)]));
-}
 
 /**
  * POST /api/checkout/stripe  { orderId }
  *
  * Returns the client secret of the order's PaymentIntent for the Payment
- * Element, creating it on first use. The amount always comes from the order in
- * the database, never from the browser.
+ * Element, creating it on first use and reusing it afterwards (reloads,
+ * retries, edits). The amount always comes from the order in the database,
+ * never from the browser.
  *
  * Payment methods come from the Dashboard (dynamic payment methods). The order
  * is marked paid only by the webhook (/api/webhooks/stripe), never here.
@@ -50,60 +37,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "stock.notEnoughStock" }, { status: 409 });
     }
 
-    const amount = toCents(order.total);
-
-    // One intent per order: reuse it while it can still be paid, so retries and
-    // page reloads never create a second chargeable intent
-    if (order.stripePaymentIntentId) {
-      const existing = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
-      if (existing.status === "succeeded" || existing.status === "processing" || existing.status === "requires_capture") {
-        // Already paid or settling; the webhook completes the order
-        return NextResponse.json({ error: "checkout.paymentInProgress" }, { status: 409 });
-      }
-      if (isOpenIntent(existing)) {
-        if (existing.amount === amount) {
-          return NextResponse.json({ clientSecret: existing.client_secret });
-        }
-        const updated = await stripe.paymentIntents.update(existing.id, { amount });
-        return NextResponse.json({ clientSecret: updated.client_secret });
-      }
-      // Canceled: fall through and create a fresh one
+    const intent = await ensureOrderPaymentIntent(stripe, order);
+    if (!intent.ok) {
+      // Already paid or settling; the webhook completes the order
+      return NextResponse.json({ error: "checkout.paymentInProgress" }, { status: 409 });
     }
-
-    const address = (order.shippingAddress ?? {}) as StoredAddress;
-    const shipping: Stripe.PaymentIntentCreateParams.Shipping = {
-      name: order.customerName,
-      phone: order.phone,
-      address: {
-        line1: address.address1 ?? order.location,
-        line2: address.address2 || undefined,
-        city: address.city,
-        state: address.state,
-        postal_code: address.zip,
-        country: "US",
-      },
-    };
-
-    const intent = await stripe.paymentIntents.create(
-      {
-        amount,
-        currency: "usd",
-        automatic_payment_methods: { enabled: true },
-        description: `Kitvoy order ${orderReference(order.id)}`,
-        metadata: { orderId: order.id, orderReference: orderReference(order.id), ...attributionMetadata(order) },
-        shipping,
-      },
-      // Keyed on the intent it replaces, so a canceled intent never comes back
-      // from the idempotency cache and concurrent first requests share one intent
-      { idempotencyKey: `pi-${order.id}-${amount}-${order.stripePaymentIntentId ?? "first"}` },
-    );
-
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { stripePaymentIntentId: intent.id },
-    });
-
-    return NextResponse.json({ clientSecret: intent.client_secret });
+    return NextResponse.json({ clientSecret: intent.clientSecret });
   } catch (err) {
     console.error("[checkout/stripe] PaymentIntent error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "PAYMENT_INIT_FAILED" }, { status: 500 });
@@ -136,16 +75,13 @@ export async function GET(request: Request) {
       : null;
     if (!order) return NextResponse.json({ error: "INVALID_PAYMENT" }, { status: 404 });
 
-    const productIds = order.items.flatMap((i) => (i.productId ? [i.productId] : []));
-    const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, sku: true } });
-    const skuOf = new Map(products.map((p) => [p.id, p.sku]));
     const status = intent.status === "succeeded" ? "paid" : intent.status === "processing" ? "processing" : "open";
     return NextResponse.json({
       status,
       orderReference: orderReference(order.id),
       total: order.total,
-      // What the Purchase event reports, line by line, keyed like the server event (SKU, else product id)
-      contents: order.items.map((i) => ({ id: (i.productId && skuOf.get(i.productId)) || i.productId || "unknown", quantity: i.quantity, item_price: i.unitPrice })),
+      // What the Purchase event reports, line by line, exactly as the server event does
+      contents: await orderContents(order.items),
     });
   } catch (err) {
     // A made-up or foreign id is a bad request, not an outage

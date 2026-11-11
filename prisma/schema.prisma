@@ -192,6 +192,7 @@ model Order {
   items             OrderItem[]
   sentEmails        SentEmail[]
   reviews           Review[]
+  checkoutTokens    CheckoutToken[]
 
   @@index([status])
   @@index([createdAt])
@@ -201,6 +202,25 @@ model Order {
   @@index([fulfillmentStatus])
   @@index([utmCampaign])
   @@map("orders")
+}
+
+/// A browser's (or a link's) right to pick up one started checkout. Only the
+/// token's SHA-256 is stored; an order's personal details are never served to
+/// someone who holds just its KTV reference.
+model CheckoutToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  /// "session": held by the browser that is checking out (cookie and local storage), 48 hours from the last save.
+  /// "link": carried in a URL (open-in-browser hand-off, PayPal return, recovery email); short-lived, exchanged for a session.
+  kind      String
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([expiresAt])
+  @@map("checkout_tokens")
 }
 
 model OrderItem {

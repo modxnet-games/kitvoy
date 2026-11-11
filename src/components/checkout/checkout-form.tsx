@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowRight, ChevronDown } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
@@ -54,18 +54,26 @@ function formatZip(raw: string): string {
 
 interface CheckoutFormProps {
   onSubmit: (data: CheckoutFormData) => void;
+  /** Called with the current values whenever the customer changes a field */
+  onDraftChange?: (data: CheckoutFormData) => void;
   isSubmitting?: boolean;
   /** Pre-fill: the signed-in customer's name and email, or their details when they go back to edit */
   initialValues?: Partial<CheckoutFormData>;
   submitLabel?: string;
 }
 
-export function CheckoutForm({ onSubmit, isSubmitting = false, initialValues, submitLabel }: CheckoutFormProps) {
+export function CheckoutForm({ onSubmit, onDraftChange, isSubmitting = false, initialValues, submitLabel }: CheckoutFormProps) {
   const { t } = useLanguage();
   const [values, setValues] = useState<CheckoutFormData>({ ...EMPTY_FORM, ...initialValues });
   const [errors, setErrors] = useState<CheckoutErrors>({});
   const [touched, setTouched] = useState<Partial<Record<keyof CheckoutFormData, boolean>>>({});
   const summaryRef = useRef<HTMLDivElement>(null);
+
+  // Report edits (not the initial values), so a reload can bring back what was typed
+  const firstValues = useRef(values);
+  useEffect(() => {
+    if (values !== firstValues.current) onDraftChange?.(values);
+  }, [values, onDraftChange]);
 
   const setField = (field: keyof CheckoutFormData, raw: string) => {
     const value = field === "phone" ? formatPhone(raw) : field === "zip" ? formatZip(raw) : raw;

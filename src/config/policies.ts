@@ -5,7 +5,7 @@
  */
 export const storePolicies = {
   /** Shown on every policy page; update it whenever a policy's wording changes */
-  effectiveDate: "November 10, 2026",
+  effectiveDate: "November 11, 2026",
   supportEmail: "support@kitvoy.com",
   shipping: {
     /** Business days from payment to handing the order to the carrier */

@@ -1,4 +1,7 @@
+import { cookies } from "next/headers";
+
 import { getCustomer } from "@/lib/auth/customer-session";
+import { RESUME_FLAG_COOKIE } from "@/lib/checkout/resume-constants";
 import { canUseStripeCheckout, getStripePublishableKey } from "@/lib/payments/stripe";
 import { CheckoutClient } from "./checkout-client";
 
@@ -10,11 +13,14 @@ export default async function CheckoutPage() {
   const paypalClientId = process.env.PAYPAL_CLIENT_ID?.trim() || null;
   const stripePublishableKey = (await canUseStripeCheckout()) ? getStripePublishableKey() : null;
   const customer = await getCustomer().catch(() => null);
+  // A started checkout is about to be restored: show the payment step's outline rather than the empty form's
+  const resumeHint = (await cookies()).has(RESUME_FLAG_COOKIE);
   return (
     <CheckoutClient
       paypalClientId={paypalClientId}
       stripePublishableKey={stripePublishableKey}
       customer={customer && { email: customer.email, fullName: customer.fullName }}
+      resumeHint={resumeHint}
     />
   );
 }

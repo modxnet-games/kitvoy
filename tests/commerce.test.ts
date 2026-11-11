@@ -592,18 +592,21 @@ test("Meta Pixel events carry an event_id, Purchase counts once per order, and a
   g.window = { fbq: (...a: unknown[]) => { calls.push(a); } };
   g.localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } };
   try {
-    const contents = [{ id: "INF-001", quantity: 2, item_price: 59.99 }];
+    // Two for $99.99: each unit is reported at what it cost in the bundle, not at the single price
+    const contents = [{ id: "INF-001", quantity: 2, item_price: 50 }];
     assert.equal(pixel.trackPurchase({ orderReference: "KTV-ABCD1234", value: 99.99, contents }), true);
     assert.deepEqual(calls, [["track", "Purchase", { currency: "USD", value: 99.99, content_ids: ["INF-001"], content_type: "product", contents, num_items: 2, order_id: "KTV-ABCD1234" }, { eventID: "KTV-ABCD1234" }]]);
     assert.equal(pixel.trackPurchase({ orderReference: "KTV-ABCD1234", value: 99.99, contents }), false, "a refreshed thank-you page never counts the order again");
     assert.equal(calls.length, 1);
 
-    const id = pixel.trackInitiateCheckout([{ product: { id: "p1", sku: "INF-001", name: "Inflator", price: 59.99 }, quantity: 2 }], 99.99);
-    assert.match(id ?? "", /^[0-9a-f-]{36}$/, "InitiateCheckout gets a UUID event_id");
+    const pair = [{ product: { id: "p1", sku: "INF-001", name: "Inflator", price: 59.99 }, quantity: 2 }];
+    assert.equal(pixel.trackInitiateCheckout("KTV-ABCD1234", pair, 99.99), true);
     const ic = calls[1] as [string, string, Record<string, unknown>, { eventID: string }];
     assert.equal(ic[1], "InitiateCheckout");
     assert.deepEqual(ic[2], { currency: "USD", value: 99.99, content_ids: ["INF-001"], content_type: "product", contents, num_items: 2 });
-    assert.equal(ic[3].eventID, id);
+    assert.equal(ic[3].eventID, "KTV-ABCD1234", "InitiateCheckout uses the order reference as its event_id");
+    assert.equal(pixel.trackInitiateCheckout("KTV-ABCD1234", pair, 99.99), false, "saving the same checkout again never counts twice");
+    assert.equal(calls.length, 2);
 
     pixel.trackAddToCart([{ product: { id: "p1", sku: "INF-001", name: "Inflator", price: 59.99 }, quantity: 1 }], 59.99);
     pixel.trackViewContent({ id: "p1", sku: "INF-001", name: "Inflator", price: 59.99 });
@@ -696,9 +699,13 @@ test("the inline Stripe form never names payment method types and confirms order
   const route = await readFile("src/app/api/checkout/stripe/route.ts", "utf8");
   const webhook = await readFile("src/app/api/webhooks/stripe/route.ts", "utf8");
   const element = await readFile("src/components/checkout/stripe-payment.tsx", "utf8");
-  for (const source of [route, webhook, element]) assert.ok(!source.includes("payment_method_types"));
-  assert.match(route, /stripe\.paymentIntents\.create\(/);
-  assert.match(route, /automatic_payment_methods: \{ enabled: true \}/);
+  // The route hands the order to one helper that creates, reuses or replaces its PaymentIntent
+  const intentLib = await readFile("src/lib/payments/stripe-intent.ts", "utf8");
+  for (const source of [route, webhook, element, intentLib]) assert.ok(!source.includes("payment_method_types"));
+  assert.match(route, /ensureOrderPaymentIntent\(stripe, order\)/);
+  assert.match(intentLib, /stripe\.paymentIntents\.create\(/);
+  assert.match(intentLib, /automatic_payment_methods: \{ enabled: true \}/);
+  assert.ok(!intentLib.includes("completePaidOrder"), "creating an intent never marks an order paid");
   assert.ok(!route.includes("checkout.sessions"), "no hosted Checkout redirect");
   assert.ok(!route.includes("completePaidOrder"), "the PaymentIntent route must not mark orders paid");
   assert.match(element, /<PaymentElement/);

@@ -7,6 +7,7 @@
  */
 
 import { META_PIXEL_ID } from "@/config/analytics";
+import { getLineTotal } from "@/lib/bundles";
 
 type Fbq = ((...args: unknown[]) => void) & { callMethod?: (...args: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string; push?: unknown };
 
@@ -62,8 +63,13 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 /** The SKU when the product has one, else its id: the same `content_ids` the server sends. */
 export const contentId = (product: { id: string; sku: string }) => product.sku || product.id;
 
+/** `item_price` is what one unit costs at this quantity (the bundle price split across it), so quantity x item_price is the value. */
 export function toContents(items: TrackableItem[]): MetaContent[] {
-  return items.map((i) => ({ id: contentId(i.product), quantity: i.quantity, item_price: round2(i.product.price) }));
+  return items.map((i) => ({
+    id: contentId(i.product),
+    quantity: i.quantity,
+    item_price: i.quantity > 0 ? Math.round(Math.round(getLineTotal(i.product.price, i.quantity) * 100) / i.quantity) / 100 : round2(i.product.price),
+  }));
 }
 
 export const countItems = (items: TrackableItem[]) => items.reduce((n, i) => n + i.quantity, 0);
@@ -75,6 +81,8 @@ export const countItems = (items: TrackableItem[]) => items.reduce((n, i) => n +
  * window, so two bundled copies of this module still init once.
  */
 export function ensurePixel(): void {
+  // No pixel configured (a local run): nothing loads and every track() is a no-op
+  if (!META_PIXEL_ID) return;
   if (typeof window === "undefined" || window.__kitvoyPixelInit) return;
   window.__kitvoyPixelInit = true;
 
@@ -147,10 +155,30 @@ export function trackAddToCart(items: TrackableItem[], value: number): void {
   });
 }
 
-/** Returns the event_id so the order can carry it to the server for de-duplication. */
-export function trackInitiateCheckout(items: TrackableItem[], value: number, eventId: string = newEventId()): string | null {
-  if (items.length === 0) return null;
-  return track(
+const CHECKOUT_KEY = "kitvoy-checkout-tracked";
+
+/** Remembers which orders this browser already counted for an event, so a reload or a restored page can't count twice. */
+function claimOnce(storageKey: string, orderReference: string): boolean {
+  try {
+    const seen: string[] = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
+    if (seen.includes(orderReference)) return false;
+    localStorage.setItem(storageKey, JSON.stringify([...seen.slice(-19), orderReference]));
+  } catch {
+    // Storage unavailable (private mode): track once per page load instead
+  }
+  return true;
+}
+
+/**
+ * InitiateCheckout, sent when the checkout details are saved and the order
+ * exists. Its event_id is the order reference, the same id the server event
+ * uses, and each order counts once per browser: saving the same checkout
+ * again (reload, Edit, a retry) updates that order and sends nothing new.
+ */
+export function trackInitiateCheckout(orderReference: string, items: TrackableItem[], value: number): boolean {
+  if (typeof window === "undefined" || typeof window.fbq !== "function") return false;
+  if (items.length === 0 || !claimOnce(CHECKOUT_KEY, orderReference)) return false;
+  track(
     "InitiateCheckout",
     {
       currency: "USD",
@@ -160,23 +188,12 @@ export function trackInitiateCheckout(items: TrackableItem[], value: number, eve
       contents: toContents(items),
       num_items: countItems(items),
     },
-    eventId,
+    orderReference,
   );
+  return true;
 }
 
 const PURCHASE_KEY = "kitvoy-purchase-tracked";
-
-/** Remembers which orders this browser already counted, so a refresh of the thank-you page can't count twice. */
-function claimPurchase(orderReference: string): boolean {
-  try {
-    const seen: string[] = JSON.parse(localStorage.getItem(PURCHASE_KEY) ?? "[]");
-    if (seen.includes(orderReference)) return false;
-    localStorage.setItem(PURCHASE_KEY, JSON.stringify([...seen.slice(-19), orderReference]));
-  } catch {
-    // Storage unavailable (private mode): track once per page load instead
-  }
-  return true;
-}
 
 export interface PurchaseData {
   /** KTV-… reference: the event_id on both the browser and the server event */
@@ -193,7 +210,7 @@ export interface PurchaseData {
  */
 export function trackPurchase(p: PurchaseData): boolean {
   if (typeof window === "undefined" || typeof window.fbq !== "function") return false;
-  if (!claimPurchase(p.orderReference)) return false;
+  if (!claimOnce(PURCHASE_KEY, p.orderReference)) return false;
   const quantity = p.contents.reduce((n, c) => n + c.quantity, 0);
   track(
     "Purchase",

@@ -233,3 +233,112 @@ test("a sandbox test card pays, lands on the confirmation and leaves nothing of 
   await page.goto("/checkout");
   await expect(page.getByText("Your cart is empty")).toBeVisible();
 });
+
+/* ---------- Meta's in-app browsers and PayPal ---------- */
+
+// These need PayPal switched on in the preview. Any value works, because no
+// call ever reaches PayPal here: start it with
+//   PAYPAL_CLIENT_ID=sb-local-dummy PAYPAL_CLIENT_SECRET=local-dummy
+const LOCAL_PAYPAL_ID = "sb-local-dummy";
+const FACEBOOK_ANDROID =
+  "Mozilla/5.0 (Linux; Android 14; SM-A166U Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.6723.58 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/574.0.0.40.71;IABMV/1;]";
+
+const CHROME_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36";
+
+test.describe("in Facebook's in-app browser", () => {
+  test.use({ userAgent: FACEBOOK_ANDROID });
+
+  test.beforeEach(async ({ page }) => {
+    const html = await (await page.request.get("/checkout")).text();
+    test.skip(!html.includes(LOCAL_PAYPAL_ID), "PayPal isn't switched on in the local preview");
+  });
+
+  test("PayPal is a full-page redirect, and coming back without paying restores the payment step", async ({ page }) => {
+    const seen = watch(page);
+    await addOneAndOpenCheckout(page);
+    await fillDetails(page);
+    const order = await continueToPayment(page);
+
+    // No pop-up buttons here: their callback would be lost when the app reloads the page
+    const redirect = page.locator("[data-paypal-redirect]");
+    await expect(redirect).toBeVisible();
+    await expect(page.locator('iframe[name^="__zoid__paypal"], .paypal-buttons')).toHaveCount(0);
+
+    // PayPal itself is never called: the store's answer and PayPal's page are stand-ins
+    let sent: { orderId?: string; redirect?: boolean; resumeToken?: string } = {};
+    await page.route("**/api/checkout/paypal", async (route) => {
+      sent = route.request().postDataJSON();
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: "TESTPAYPALORDER01", approveUrl: "https://www.sandbox.paypal.com/checkoutnow?token=TESTPAYPALORDER01" }) });
+    });
+    await page.route("https://www.sandbox.paypal.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<title>PayPal stand-in</title><h1>PayPal stand-in</h1>" }));
+
+    await redirect.click();
+    await expect(page).toHaveURL("https://www.sandbox.paypal.com/checkoutnow?token=TESTPAYPALORDER01");
+    expect(sent.orderId).toBe(order.orderId);
+    expect(sent.redirect).toBe(true);
+    expect(sent.resumeToken).toBe(order.resumeToken);
+
+    // PayPal sends the customer back to /checkout with a short-lived link token (here: backing out)
+    const link = (await (await page.request.post("/api/checkout/link", { data: {} })).json()) as { url: string };
+    const back = new URL(link.url);
+    expect(back.pathname).toBe("/checkout");
+    expect(back.searchParams.get("r")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(back.searchParams.get("r")).not.toBe(order.resumeToken);
+    await page.goto(`/checkout?r=${back.searchParams.get("r")}&pp=cancel&token=TESTPAYPALORDER01`);
+
+    await expect(page.locator("#payment-heading")).toBeVisible();
+    await expect(page.locator("[aria-labelledby=ship-to-heading]")).toContainText(details.fullName);
+    await expect(page.getByText("Payment was canceled")).toBeVisible();
+    // The link token and PayPal's parameters are gone from the address bar
+    await expect(page).toHaveURL(/\/checkout$/);
+    expect(seen.orderPosts).toHaveLength(1);
+    expect(seen.metaRequests).toEqual([]);
+  });
+
+  test("the open-in-browser link opens the same payment step in another browser, with nothing to retype", async ({ page, browser }) => {
+    await addOneAndOpenCheckout(page);
+    await fillDetails(page);
+    const order = await continueToPayment(page);
+
+    const [made] = await Promise.all([
+      page.waitForResponse((r) => new URL(r.url()).pathname === "/api/checkout/link"),
+      page.locator("[data-open-in-browser=link]").click(),
+    ]);
+    const url = new URL(((await made.json()) as { url: string }).url);
+    // This Chrome can't launch an Android app link, so it follows the link's own fallback:
+    // the same payment step, still in this browser, with the token gone from the address bar
+    await expect(page.locator("#payment-heading")).toBeVisible();
+    await expect(page).toHaveURL(/\/checkout$/);
+    expect(url.pathname).toBe("/checkout");
+    const linkToken = url.searchParams.get("r");
+    expect(linkToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(linkToken).not.toBe(order.resumeToken);
+
+    // A different browser: no cookies, no storage, no cart
+    const other = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: CHROME_ANDROID });
+    const otherPage = await other.newPage();
+    const otherSeen = watch(otherPage);
+    await otherPage.goto(`/checkout?r=${linkToken}`);
+    await expect(otherPage.locator("#payment-heading")).toBeVisible();
+    await expect(otherPage.locator("[aria-labelledby=ship-to-heading]")).toContainText(details.fullName);
+    await expect(otherPage).toHaveURL(/\/checkout$/);
+    // Its own session, the cart rebuilt from the order, and the ordinary PayPal buttons (not the redirect)
+    const stored = JSON.parse((await storedCheckout(otherPage)) ?? "{}");
+    expect(stored.orderReference).toBe(order.orderReference);
+    expect(stored.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(stored.token).not.toBe(linkToken);
+    expect(await otherPage.evaluate(() => JSON.parse(localStorage.getItem("kitvoy-cart") ?? "{}").state?.items?.length)).toBe(1);
+    await expect(otherPage.locator("[data-paypal-redirect]")).toHaveCount(0);
+    await expect(otherPage.locator("[data-open-in-browser]")).toHaveCount(0);
+    expect(otherSeen.orderPosts).toHaveLength(0);
+    await other.close();
+
+    // A made-up link gives nothing away: the plain empty checkout
+    const stranger = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: CHROME_ANDROID });
+    const strangerPage = await stranger.newPage();
+    await strangerPage.goto(`/checkout?r=${"A".repeat(43)}`);
+    await expect(strangerPage.getByText("Your cart is empty")).toBeVisible();
+    await expect(strangerPage.getByText(details.fullName)).toHaveCount(0);
+    await stranger.close();
+  });
+});

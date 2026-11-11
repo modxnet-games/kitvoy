@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 #
-# Kitvoy release deploy. Piped to the server over SSH, so nothing is installed there:
+# Kitvoy release deploy. Copied to the server next to the bundle and run there:
 #
 #   git bundle create kitvoy.bundle <live sha>..kitvoy-main
-#   scp kitvoy.bundle root@<server>:/root/kitvoy-deploy/kitvoy.bundle
-#   ssh root@<server> 'bash -s -- /root/kitvoy-deploy/kitvoy.bundle kitvoy-main [--db-push] [--allow-peak]' < scripts/deploy/release.sh
+#   scp kitvoy.bundle scripts/deploy/release.sh root@<server>:/root/kitvoy-deploy/
+#   ssh root@<server> 'nohup bash /root/kitvoy-deploy/release.sh /root/kitvoy-deploy/kitvoy.bundle kitvoy-main [--db-push] [--allow-peak] > /root/kitvoy-deploy/deploy.log 2>&1 < /dev/null &'
+#   ssh root@<server> 'cat /root/kitvoy-deploy/deploy.log'      # ends with LIVE: <sha>, or says why it rolled back
+#
+# To go back by hand: point /var/www/kitvoy at the previous directory in
+# /var/www/kitvoy-releases (ln -sfn <dir> /var/www/kitvoy.switch && mv -T
+# /var/www/kitvoy.switch /var/www/kitvoy) and run `pm2 reload kitvoy`.
 #
 # What it does, in order:
 #   1. Builds the new version in its own directory under /var/www/kitvoy-releases.

@@ -118,11 +118,26 @@ export function resumeLinkFromUrl(url: string): string | null {
   }
 }
 
-/** The same URL without the link token, so it never lingers in the address bar, history or a referrer. */
+/** Whether the page was opened by PayPal sending the customer back: after approving ("return") or backing out ("cancel"). */
+export function paypalReturnFromUrl(url: string): "return" | "cancel" | null {
+  try {
+    const value = new URL(url, "https://kitvoy.com").searchParams.get("pp");
+    return value === "return" || value === "cancel" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What PayPal's return adds to the URL; none of it is needed once the page has read it. */
+const PAYPAL_RETURN_PARAMS = ["pp", "token", "PayerID", "ba_token"];
+
+/** The same URL without the link token (and PayPal's return parameters), so it never lingers in the address bar, history or a referrer. */
 export function withoutResumeLink(url: string): string {
   try {
     const parsed = new URL(url, "https://kitvoy.com");
+    const fromPayPal = parsed.searchParams.has("pp");
     parsed.searchParams.delete(RESUME_LINK_PARAM);
+    if (fromPayPal) for (const name of PAYPAL_RETURN_PARAMS) parsed.searchParams.delete(name);
     const hash = new URLSearchParams(parsed.hash.replace(/^#/, ""));
     if (hash.has(RESUME_LINK_PARAM)) {
       hash.delete(RESUME_LINK_PARAM);

@@ -1,31 +1,15 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/db";
 import { siteConfig } from "@/config/site";
-import {
-  afterOrderPaid,
-  completePaidOrder,
-  getPayableOrder,
-  orderHasStock,
-} from "@/lib/payments/order-payment";
-import { sendOwnerAlert } from "@/lib/email";
+import { presentedSessionToken } from "@/lib/checkout/resume-cookies";
+import { PAYPAL_LINK_TTL_MS, RESUME_LINK_PARAM } from "@/lib/checkout/resume-token";
+import { findCheckoutToken, issueCheckoutToken } from "@/lib/checkout/tokens";
+import { getPayableOrder, orderHasStock } from "@/lib/payments/order-payment";
 import { getPayPal, paypal } from "@/lib/payments/paypal";
-import { cancelOpenPaymentIntent, getStripe } from "@/lib/payments/stripe";
-
-type PayPalMoney = { value?: string; currency_code?: string };
-type PayPalCapture = {
-  id?: string;
-  status?: string;
-  amount?: PayPalMoney;
-  seller_receivable_breakdown?: { paypal_fee?: PayPalMoney };
-};
-type PayPalOrderResult = {
-  id?: string;
-  status?: string;
-  purchase_units?: { payments?: { captures?: PayPalCapture[] } }[];
-};
-
-const firstCapture = (r: PayPalOrderResult | undefined) => r?.purchase_units?.[0]?.payments?.captures?.[0];
+import { settlePayPalOrder } from "@/lib/payments/paypal-settle";
+import { getStripe } from "@/lib/payments/stripe";
 
 /** True when the order's card PaymentIntent is paid or settling. */
 async function cardPaymentInProgress(paymentIntentId: string | null): Promise<boolean> {
@@ -41,38 +25,23 @@ async function cardPaymentInProgress(paymentIntentId: string | null): Promise<bo
   }
 }
 
-/** Refunds a PayPal capture in full when the order was already paid by card, and tells the owner. */
-async function refundDuplicateCapture(
-  client: NonNullable<ReturnType<typeof getPayPal>>,
-  captureId: string,
-  orderId: string,
-  paidBy: string,
-) {
-  const reference = `KTV-${orderId.slice(-8).toUpperCase()}`;
-  try {
-    const req = new paypal.payments.CapturesRefundRequest(captureId);
-    req.payPalRequestId(`refund-duplicate-${captureId}`);
-    req.requestBody({} as never);
-    await client.execute(req);
-    await sendOwnerAlert(`Duplicate PayPal payment refunded for ${reference}`, [
-      `PayPal capture ${captureId} was refunded automatically because the order was already paid (${paidBy}).`,
-    ]);
-  } catch (err) {
-    await sendOwnerAlert(`Duplicate PayPal payment NOT refunded for ${reference}`, [
-      `PayPal capture ${captureId} paid an order that was already paid (${paidBy}), and the automatic refund failed:`,
-      err instanceof Error ? err.message : String(err),
-      "Refund it from the PayPal dashboard.",
-    ]);
-  }
-}
+type PayPalLink = { rel?: string; href?: string };
 
 /**
- * POST /api/checkout/paypal  { orderId }
- * Creates a PayPal order for a pending store order. Returns { id } for the
- * PayPal Buttons `createOrder` callback. The amount always comes from the
- * order in the database, never from the browser.
+ * POST /api/checkout/paypal  { orderId, redirect?, resumeToken? }
+ *
+ * Creates a PayPal order for a pending store order. The amount always comes
+ * from the order in the database, never from the browser.
+ *
+ * - Default: returns { id } for the PayPal Buttons `createOrder` callback
+ *   (PayPal opens in a pop-up and calls back into the page).
+ * - `redirect: true` (Meta's in-app browsers, where a pop-up loses its page):
+ *   also returns { approveUrl }. The browser goes to PayPal as a full page and
+ *   PayPal sends it back to /checkout with a short-lived link token, where the
+ *   payment is captured on the server. Only the browser holding the
+ *   checkout's session token can start this.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const client = getPayPal();
   if (!client) {
     return NextResponse.json({ error: "PAYPAL_NOT_CONFIGURED" }, { status: 503 });
@@ -95,6 +64,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "checkout.paymentInProgress" }, { status: 409 });
     }
 
+    let returnUrls: { return_url: string; cancel_url: string } | null = null;
+    if (body?.redirect === true) {
+      const session = await findCheckoutToken(presentedSessionToken(request, body?.resumeToken), "session");
+      if (!session || session.orderId !== order.id) {
+        return NextResponse.json({ error: "checkout.sessionExpired" }, { status: 403 });
+      }
+      // A token made for this trip only: the session token itself never goes into a URL
+      const link = await issueCheckoutToken(order.id, "link", PAYPAL_LINK_TTL_MS);
+      const back = `${siteConfig.url.replace(/\/$/, "")}/checkout?${RESUME_LINK_PARAM}=${link}`;
+      returnUrls = { return_url: `${back}&pp=return`, cancel_url: `${back}&pp=cancel` };
+    }
+
     const req = new paypal.orders.OrdersCreateRequest();
     req.prefer("return=representation");
     req.requestBody({
@@ -112,6 +93,7 @@ export async function POST(request: Request) {
         // The store already collected the US shipping address at checkout
         shipping_preference: "NO_SHIPPING",
         user_action: "PAY_NOW",
+        ...(returnUrls ?? {}),
       },
     });
     const res = await client.execute(req);
@@ -122,7 +104,15 @@ export async function POST(request: Request) {
       data: { paymentMethod: "paypal", paymentRef: paypalOrderId },
     });
 
-    return NextResponse.json({ id: paypalOrderId });
+    if (!returnUrls) return NextResponse.json({ id: paypalOrderId });
+
+    const links = (res.result.links ?? []) as PayPalLink[];
+    const approveUrl = links.find((l) => l.rel === "approve" || l.rel === "payer-action")?.href;
+    if (!approveUrl || !/^https:\/\/([a-z0-9-]+\.)*paypal\.com\//.test(approveUrl)) {
+      console.error("[checkout/paypal] PayPal returned no approval link for", paypalOrderId);
+      return NextResponse.json({ error: "PAYMENT_INIT_FAILED" }, { status: 502 });
+    }
+    return NextResponse.json({ id: paypalOrderId, approveUrl });
   } catch (err) {
     console.error("[checkout/paypal] create error:", err);
     return NextResponse.json({ error: "PAYMENT_INIT_FAILED" }, { status: 500 });
@@ -133,11 +123,12 @@ export async function POST(request: Request) {
  * PUT /api/checkout/paypal  { orderId }
  * Captures the approved PayPal order (PayPal Buttons `onApprove`), verifies the
  * amount, marks the store order paid (reserving stock) and runs the paid-order
- * steps: owner email, admin push and fulfillment.
+ * steps: owner email, admin push and fulfillment. The same settling runs when
+ * a checkout comes back from PayPal's redirect and from PayPal's webhook, so a
+ * capture can never happen twice.
  */
 export async function PUT(request: Request) {
-  const client = getPayPal();
-  if (!client) {
+  if (!getPayPal()) {
     return NextResponse.json({ error: "PAYPAL_NOT_CONFIGURED" }, { status: 503 });
   }
 
@@ -153,47 +144,11 @@ export async function PUT(request: Request) {
     if (order.paymentMethod !== "paypal" || !order.paymentRef) {
       return NextResponse.json({ error: "PAYPAL_ORDER_MISSING" }, { status: 409 });
     }
-    const paypalOrderId = order.paymentRef;
 
-    let paypalOrder: PayPalOrderResult | undefined;
-    try {
-      const req = new paypal.orders.OrdersCaptureRequest(paypalOrderId);
-      req.requestBody({} as never);
-      paypalOrder = (await client.execute(req)).result as PayPalOrderResult;
-    } catch (err) {
-      // Captured by an earlier attempt that didn't reach us: read the order instead
-      if (!String((err as Error)?.message ?? "").includes("ORDER_ALREADY_CAPTURED")) throw err;
-      paypalOrder = (await client.execute(new paypal.orders.OrdersGetRequest(paypalOrderId))).result as PayPalOrderResult;
-    }
-
-    const capture = firstCapture(paypalOrder);
-    const expected = order.total.toFixed(2);
-    if (
-      paypalOrder?.status !== "COMPLETED" ||
-      capture?.status !== "COMPLETED" ||
-      capture.amount?.value !== expected ||
-      capture.amount?.currency_code !== "USD"
-    ) {
-      console.error("[checkout/paypal] capture not completed:", paypalOrder?.status, capture?.status, capture?.amount);
-      return NextResponse.json({ error: "PAYMENT_NOT_COMPLETED" }, { status: 402 });
-    }
-
-    // Store the capture id: it's what a refund in PayPal needs. The fee feeds the profit figures.
-    const fee = Number(capture.seller_receivable_breakdown?.paypal_fee?.value);
-    const captureRef = capture.id ?? paypalOrderId;
-    if (await completePaidOrder(order.id, captureRef, Number.isFinite(fee) ? fee : undefined, "paypal")) {
-      // Don't make the customer wait on email/push; the server keeps running
-      void afterOrderPaid(order.id);
-      void cancelOpenPaymentIntent(order.stripePaymentIntentId);
-      return NextResponse.json({ ok: true });
-    }
-
-    // Already paid: by this capture (a retry) or by a card payment that won the race
-    const current = await prisma.order.findUnique({ where: { id: order.id }, select: { paymentRef: true } });
-    if (current?.paymentRef !== captureRef && capture.id) {
-      await refundDuplicateCapture(client, capture.id, order.id, current?.paymentRef ?? "unknown");
-    }
-    return NextResponse.json({ ok: true });
+    const settled = await settlePayPalOrder(order);
+    if (settled.status === "paid") return NextResponse.json({ ok: true });
+    console.error(`[checkout/paypal] capture not completed for ${order.id}: ${settled.reason}`);
+    return NextResponse.json({ error: "PAYMENT_NOT_COMPLETED" }, { status: 402 });
   } catch (err) {
     console.error("[checkout/paypal] capture error:", err);
     return NextResponse.json({ error: "PAYMENT_CAPTURE_FAILED" }, { status: 500 });

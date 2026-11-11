@@ -1,0 +1,2 @@
+# Shell scripts are piped to the server: they must keep Unix line endings on every machine
+*.sh text eol=lf

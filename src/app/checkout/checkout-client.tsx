@@ -12,7 +12,9 @@ import { Breadcrumbs, EmptyState } from "@/components/storefront";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { CheckoutForm, OrderSummary } from "@/components/checkout";
 import type { CheckoutFormData } from "@/components/checkout";
+import { OpenInBrowser } from "@/components/checkout/open-in-browser";
 import { PayPalPayment } from "@/components/checkout/paypal-payment";
+import { PayPalRedirect } from "@/components/checkout/paypal-redirect";
 import { StripePayment, preloadStripe } from "@/components/checkout/stripe-payment";
 import type { OrderTotals } from "@/lib/payments/money";
 import { placeOrder } from "@/lib/client/place-order";
@@ -20,6 +22,7 @@ import { forgetCheckoutOnServer, resumeCheckout, type ResumeResponse } from "@/l
 import {
   clearCheckoutRecord,
   hasResumeCookieFlag,
+  paypalReturnFromUrl,
   readCheckoutRecord,
   resumeLinkFromUrl,
   saveCheckoutDraft,
@@ -28,7 +31,7 @@ import {
   type CheckoutDraft,
 } from "@/lib/client/checkout-storage";
 import { detectInAppBrowser } from "@/lib/in-app-browser";
-import { offerPayPalButtons } from "@/lib/checkout/payment-options";
+import { paypalMode } from "@/lib/checkout/payment-options";
 import { US_STATES } from "@/lib/us-address";
 import { useMounted } from "@/hooks/use-mounted";
 import { CheckoutSkeleton } from "@/components/checkout/checkout-skeleton";
@@ -66,12 +69,14 @@ interface Boot {
   orderReference: string | null;
   /** Details typed before any order existed */
   draft: CheckoutDraft | null;
+  /** PayPal just sent the customer back: after approving, or after backing out */
+  paypal: "return" | "cancel" | null;
   /** Worth asking the server before showing the form */
   restore: boolean;
 }
 
 function readBoot(): Boot {
-  if (typeof window === "undefined") return { link: null, token: null, orderReference: null, draft: null, restore: false };
+  if (typeof window === "undefined") return { link: null, token: null, orderReference: null, draft: null, paypal: null, restore: false };
   const record = readCheckoutRecord();
   const link = resumeLinkFromUrl(window.location.href);
   const token = record?.token ?? null;
@@ -80,6 +85,7 @@ function readBoot(): Boot {
     token,
     orderReference: record?.orderReference ?? null,
     draft: record?.draft ?? null,
+    paypal: paypalReturnFromUrl(window.location.href),
     restore: !!(link || token || hasResumeCookieFlag()),
   };
 }
@@ -156,15 +162,18 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
   const [processing, setProcessing] = useState<"stripe" | "paypal" | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const paymentTopRef = useRef<HTMLElement>(null);
-  const tokenRef = useRef<string | null>(boot.token);
+  // The checkout's session token: sent when the details are saved again, so the same order is updated
+  const [sessionToken, setSessionToken] = useState<string | null>(boot.token);
+  // Said once after coming back from PayPal without a payment
+  const [notice, setNotice] = useState<string | null>(null);
   // Once the customer has typed or submitted, a late answer from the server no longer rearranges the page
   const userActed = useRef(false);
 
   // Meta's in-app browsers reload pages behind the customer's back and can't keep a pop-up connected
   const inApp = mounted ? detectInAppBrowser(navigator.userAgent) : null;
-  // PayPal's pop-up buttons lose their callback there, so they stay hidden unless PayPal is the only way to pay
-  const showPayPal = offerPayPalButtons({ paypalConfigured: !!paypalClientId, cardConfigured: !!stripePublishableKey, inAppBrowser: !!inApp });
-  const canPay = Boolean(showPayPal || stripePublishableKey);
+  // PayPal's pop-up buttons lose their callback there, so PayPal becomes a full-page redirect instead
+  const paypal = paypalMode({ paypalConfigured: !!paypalClientId, inAppBrowser: !!inApp });
+  const canPay = Boolean(paypal || stripePublishableKey);
 
   // The card form's connections and script start as soon as the checkout opens, not at the payment step
   if (stripePublishableKey) {
@@ -192,7 +201,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
       if (!res) return undefined;
 
       if (res.status === "none") {
-        tokenRef.current = null;
+        setSessionToken(null);
         if (boot.token) clearCheckoutRecord();
         return undefined;
       }
@@ -200,7 +209,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
       if (res.status !== "pending") {
         // Paid, or settling. Only celebrate the checkout this visit is about, not one paid on an earlier day
         const thisCheckout = !!boot.link || boot.orderReference === res.orderReference || res.recent;
-        tokenRef.current = null;
+        setSessionToken(null);
         clearCheckoutRecord();
         if (!thisCheckout) return undefined;
         trackPurchase({ orderReference: res.orderReference, value: res.total, contents: res.contents });
@@ -219,9 +228,11 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
         cartDrawerControl.skipNextOpen = false;
       }
       if (res.resumeToken) {
-        tokenRef.current = res.resumeToken;
+        setSessionToken(res.resumeToken);
         saveCheckoutOrder(res.resumeToken, res.orderReference);
       }
+      // Back from PayPal and still unpaid: say so, next to the ways to pay
+      if (boot.paypal) setNotice(boot.paypal === "cancel" ? "checkout.paymentCanceled" : "checkout.paypalNotCompleted");
       setDetails({ ...res.details, paymentMethod: "paypal" });
       setCreated({ orderId: res.orderId, orderReference: res.orderReference, cartKey: cartKeyOf(res.items), totals: res.totals });
       setRestoredIntent(res.clientSecret ? { orderId: res.orderId, clientSecret: res.clientSecret } : null);
@@ -300,7 +311,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
     setError(null);
     setIsSubmitting(true);
     // With this checkout's token the server updates its open order instead of creating a second one
-    const result = await placeOrder(data, items, { resumeToken: tokenRef.current });
+    const result = await placeOrder(data, items, { resumeToken: sessionToken });
     setIsSubmitting(false);
 
     if (!result.ok) {
@@ -311,9 +322,10 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
     pendingDraft.current = null;
     clearTimeout(draftTimer.current);
     if (result.resumeToken) {
-      tokenRef.current = result.resumeToken;
+      setSessionToken(result.resumeToken);
       saveCheckoutOrder(result.resumeToken, result.orderReference);
     }
+    setNotice(null);
     // Meta's InitiateCheckout: once per order, with the order reference as its event_id (the server sends the same)
     trackInitiateCheckout(result.orderReference, items, result.totals.total);
     setRestoredIntent(null);
@@ -326,7 +338,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
     // The server's total for this order, which is the amount paid
     trackPurchase({ orderReference: pending.orderReference, value: pending.totals.total, contents: toContents(items) });
     // Paid: nothing about this checkout stays in the browser
-    tokenRef.current = null;
+    setSessionToken(null);
     clearCheckoutRecord();
     forgetCheckoutOnServer();
     clearCart();
@@ -465,13 +477,27 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       disabled={processing === "paypal"}
                     />
                   )}
-                  {stripePublishableKey && showPayPal && (
+                  {notice && (
+                    <p role="status" className="flex items-start gap-3 rounded-xl border border-[#f3dcb0] bg-[#fdf6e7] px-4 py-3 text-sm text-[#7a5a12]">
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                      {t(notice)}
+                    </p>
+                  )}
+                  {stripePublishableKey && paypal && (
                     <div className="relative py-2" aria-hidden="true">
                       <div className="absolute inset-x-0 top-1/2 border-t border-[#e7e5df]" />
                       <p className="relative mx-auto w-fit bg-white px-3 text-xs font-medium uppercase tracking-wider text-[#7d817d]">{t("checkout.payOr")}</p>
                     </div>
                   )}
-                  {showPayPal && paypalClientId && (
+                  {paypal === "redirect" && (
+                    <PayPalRedirect
+                      orderId={pending.orderId}
+                      sessionToken={sessionToken}
+                      onProcessingChange={(busy) => setProcessing(busy ? "paypal" : null)}
+                      disabled={processing === "stripe"}
+                    />
+                  )}
+                  {paypal === "buttons" && paypalClientId && (
                     <PayPalPayment
                       clientId={paypalClientId}
                       orderId={pending.orderId}
@@ -485,6 +511,8 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       {t("checkout.paymentUnavailable")}
                     </p>
                   )}
+                  {/* The way out of an in-app browser: the same payment step in the phone's own browser */}
+                  {inApp && <OpenInBrowser app={inApp} sessionToken={sessionToken} />}
                 </section>
               </div>
             ) : (

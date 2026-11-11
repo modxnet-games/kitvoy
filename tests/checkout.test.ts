@@ -9,14 +9,16 @@ import {
   cleanDraft,
   clearCheckoutRecord,
   parseCheckoutRecord,
+  paypalReturnFromUrl,
   readCheckoutRecord,
   resumeLinkFromUrl,
   saveCheckoutDraft,
   saveCheckoutOrder,
   withoutResumeLink,
 } from "../src/lib/client/checkout-storage";
-import { detectInAppBrowser } from "../src/lib/in-app-browser";
-import { offerPayPalButtons } from "../src/lib/checkout/payment-options";
+import { detectInAppBrowser, externalBrowserUrl } from "../src/lib/in-app-browser";
+import { paypalEventTarget, settlePayPalOrder, type PayPalOrder, type SettleDeps, type SettleOrder } from "../src/lib/payments/paypal-settle";
+import { paypalMode } from "../src/lib/checkout/payment-options";
 import { orderLinesKey } from "../src/lib/orders";
 import { ensureOrderPaymentIntent, intentMatchesOrder, intentMetadata, intentShipping, type IntentOrder } from "../src/lib/payments/stripe-intent";
 import { buildOrderEvent, unitPricePaid } from "../src/lib/analytics/meta-capi";
@@ -127,7 +129,7 @@ test("a resume link's token is read from the query or the fragment and then remo
   assert.equal(resumeLinkFromUrl("https://kitvoy.com/checkout"), null);
 
   assert.equal(withoutResumeLink(`https://kitvoy.com/checkout?r=${token}`), "/checkout");
-  assert.equal(withoutResumeLink(`https://kitvoy.com/checkout?pp=return&r=${token}`), "/checkout?pp=return");
+  assert.equal(withoutResumeLink(`https://kitvoy.com/checkout?step=2&r=${token}`), "/checkout?step=2");
   assert.equal(withoutResumeLink(`https://kitvoy.com/checkout#r=${token}`), "/checkout");
   assert.equal(withoutResumeLink("https://kitvoy.com/checkout?utm_source=facebook#bundles"), "/checkout?utm_source=facebook#bundles");
 });
@@ -151,11 +153,11 @@ test("Facebook, Messenger, Instagram and Threads web views are detected; real br
   assert.equal(detectInAppBrowser(null), null);
 });
 
-test("PayPal's pop-up buttons are hidden in in-app browsers, unless PayPal is the only way to pay", () => {
-  assert.equal(offerPayPalButtons({ paypalConfigured: true, cardConfigured: true, inAppBrowser: false }), true);
-  assert.equal(offerPayPalButtons({ paypalConfigured: true, cardConfigured: true, inAppBrowser: true }), false);
-  assert.equal(offerPayPalButtons({ paypalConfigured: true, cardConfigured: false, inAppBrowser: true }), true);
-  assert.equal(offerPayPalButtons({ paypalConfigured: false, cardConfigured: true, inAppBrowser: false }), false);
+test("PayPal is a pop-up in real browsers and a full-page redirect in in-app browsers", () => {
+  assert.equal(paypalMode({ paypalConfigured: true, inAppBrowser: false }), "buttons");
+  assert.equal(paypalMode({ paypalConfigured: true, inAppBrowser: true }), "redirect");
+  assert.equal(paypalMode({ paypalConfigured: false, inAppBrowser: true }), null);
+  assert.equal(paypalMode({ paypalConfigured: false, inAppBrowser: false }), null);
 });
 
 /* ---------- one order, one PaymentIntent ---------- */
@@ -337,4 +339,154 @@ test("the server Purchase and InitiateCheckout use the order reference as event_
   const bare = buildOrderEvent("Purchase", { ...paid, attribution: null }, contents, 1);
   assert.equal(bare.user_data.fbp, undefined);
   assert.deepEqual(bare.user_data.em, [sha256("test@example.com")]);
+});
+
+/* ---------- PayPal: one idempotent path to "paid" ---------- */
+
+const unpaid: SettleOrder = { id: "cmw9wrjyz00044ku7za4og2cg", total: 59.99, paymentStatus: "unpaid", paymentRef: "5AB12345CD678901E", stripePaymentIntentId: "pi_1" };
+
+const paypalOrder = (status: string, overrides: { customId?: string; value?: string; captured?: boolean; captureId?: string } = {}): PayPalOrder => ({
+  id: "5AB12345CD678901E",
+  status,
+  purchase_units: [
+    {
+      custom_id: overrides.customId ?? unpaid.id,
+      amount: { value: overrides.value ?? "59.99", currency_code: "USD" },
+      payments: overrides.captured
+        ? { captures: [{ id: overrides.captureId ?? "CAP123", status: "COMPLETED", amount: { value: overrides.value ?? "59.99", currency_code: "USD" }, seller_receivable_breakdown: { paypal_fee: { value: "2.58", currency_code: "USD" } } }] }
+        : undefined,
+    },
+  ],
+});
+
+/** The outside world of settling, recorded. `paidBy` is the store order's state, shared between concurrent callers. */
+function settleWorld(remote: PayPalOrder | null, options: { cardInProgress?: boolean; alreadyPaidBy?: string } = {}) {
+  const state: { remote: PayPalOrder | null; paidBy: string | null } = { remote, paidBy: options.alreadyPaidBy ?? null };
+  const log: string[] = [];
+  const deps: SettleDeps = {
+    getOrder: async () => {
+      log.push("get");
+      return state.remote;
+    },
+    capture: async () => {
+      log.push("capture");
+      state.remote = paypalOrder("COMPLETED", { captured: true });
+      return state.remote;
+    },
+    cardPaymentInProgress: async () => options.cardInProgress ?? false,
+    complete: async (_orderId, captureRef, fee) => {
+      if (state.paidBy) return false;
+      state.paidBy = captureRef;
+      log.push(`complete:${captureRef}:${fee}`);
+      return true;
+    },
+    paidRef: async () => state.paidBy,
+    afterPaid: () => {
+      log.push("afterPaid");
+    },
+    refundDuplicate: async (captureId, _orderId, paidBy) => {
+      log.push(`refund:${captureId}:${paidBy}`);
+    },
+    forget: async () => {
+      log.push("forget");
+    },
+  };
+  return { deps, log, state };
+}
+
+test("an approved PayPal order is captured once, marks the order paid and runs the paid steps once", async () => {
+  const { deps, log } = settleWorld(paypalOrder("APPROVED"));
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, deps), { status: "paid" });
+  assert.deepEqual(log, ["get", "capture", "complete:CAP123:2.58", "afterPaid"]);
+});
+
+test("the browser and the webhook settling the same order together still capture and notify once", async () => {
+  const world = settleWorld(paypalOrder("APPROVED"));
+  const [a, b] = await Promise.all([settlePayPalOrder(unpaid, unpaid.paymentRef, world.deps), settlePayPalOrder(unpaid, unpaid.paymentRef, world.deps)]);
+  assert.deepEqual([a, b], [{ status: "paid" }, { status: "paid" }]);
+  assert.equal(world.log.filter((l) => l === "afterPaid").length, 1, "one confirmation, one Meta Purchase, one fulfillment request");
+  assert.equal(world.log.filter((l) => l.startsWith("complete:")).length, 1);
+  assert.equal(world.log.filter((l) => l.startsWith("refund:")).length, 0, "the same capture is never refunded as a duplicate");
+
+  // A later run (PayPal's retry, a reload) finds it paid and does nothing
+  const later = settleWorld(paypalOrder("COMPLETED", { captured: true }), { alreadyPaidBy: "CAP123" });
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, later.deps), { status: "paid" });
+  assert.deepEqual(later.log, ["get"]);
+  // And an order the database already shows as paid doesn't even ask PayPal
+  const done = settleWorld(paypalOrder("COMPLETED", { captured: true }));
+  assert.deepEqual(await settlePayPalOrder({ ...unpaid, paymentStatus: "paid" }, unpaid.paymentRef, done.deps), { status: "paid" });
+  assert.deepEqual(done.log, []);
+});
+
+test("a PayPal payment the store captured but never recorded is completed without capturing again", async () => {
+  const { deps, log } = settleWorld(paypalOrder("COMPLETED", { captured: true }));
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, deps), { status: "paid" });
+  assert.deepEqual(log, ["get", "complete:CAP123:2.58", "afterPaid"]);
+});
+
+test("nothing is captured unless PayPal says the buyer approved this order for this total", async () => {
+  const cases: [PayPalOrder | null, string][] = [
+    [paypalOrder("CREATED"), "not_approved"],
+    [paypalOrder("PAYER_ACTION_REQUIRED"), "not_approved"],
+    [null, "gone"],
+    [paypalOrder("APPROVED", { value: "99.99" }), "mismatch"],
+    [paypalOrder("APPROVED", { customId: "cmw9wlz3700024ku7uyi1a53z" }), "mismatch"],
+    [paypalOrder("VOIDED"), "not_completed"],
+  ];
+  for (const [remote, reason] of cases) {
+    const { deps, log } = settleWorld(remote);
+    assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, deps), { status: "open", reason });
+    assert.equal(log.includes("capture"), false, reason);
+    assert.equal(log.includes("afterPaid"), false, reason);
+    assert.equal(log.includes("forget"), reason === "mismatch", "a PayPal order for another amount is dropped from the order");
+  }
+  const none = settleWorld(paypalOrder("APPROVED"));
+  assert.deepEqual(await settlePayPalOrder({ ...unpaid, paymentRef: null }, null, none.deps), { status: "open", reason: "no_paypal_order" });
+  assert.deepEqual(none.log, []);
+
+  // A card payment already settling for the same order: PayPal isn't captured on top of it
+  const card = settleWorld(paypalOrder("APPROVED"), { cardInProgress: true });
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, card.deps), { status: "open", reason: "card_in_progress" });
+  assert.equal(card.log.includes("capture"), false);
+});
+
+test("a PayPal capture for an order a card already paid is refunded, not kept", async () => {
+  const { deps, log } = settleWorld(paypalOrder("COMPLETED", { captured: true }), { alreadyPaidBy: "pi_card" });
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, deps), { status: "paid" });
+  assert.deepEqual(log, ["get", "refund:CAP123:pi_card"]);
+});
+
+test("a PayPal notification only names what to look up", () => {
+  assert.deepEqual(
+    paypalEventTarget({ event_type: "CHECKOUT.ORDER.APPROVED", resource: { id: "5AB12345CD678901E", status: "APPROVED", purchase_units: [{ custom_id: unpaid.id }] } }),
+    { type: "CHECKOUT.ORDER.APPROVED", paypalOrderId: "5AB12345CD678901E", orderId: unpaid.id },
+  );
+  assert.deepEqual(
+    paypalEventTarget({ event_type: "PAYMENT.CAPTURE.COMPLETED", resource: { id: "CAP123", custom_id: unpaid.id, supplementary_data: { related_ids: { order_id: "5AB12345CD678901E" } } } }),
+    { type: "PAYMENT.CAPTURE.COMPLETED", paypalOrderId: "5AB12345CD678901E", orderId: unpaid.id },
+  );
+  for (const junk of [null, {}, { event_type: "BILLING.PLAN.CREATED", resource: { id: "P-1" } }, { event_type: "CHECKOUT.ORDER.APPROVED" }, { event_type: "CHECKOUT.ORDER.APPROVED", resource: { id: "'; drop table orders;--" } }]) {
+    assert.equal(paypalEventTarget(junk), null);
+  }
+});
+
+test("links out of an in-app browser ask the phone for its real browser", () => {
+  const url = `https://kitvoy.com/checkout?r=${token}`;
+  const android = externalBrowserUrl(url, "Mozilla/5.0 (Linux; Android 17; SM-A166U) Chrome/156 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/574.0;]");
+  assert.equal(android, `intent://kitvoy.com/checkout?r=${token}#Intent;scheme=https;S.browser_fallback_url=${encodeURIComponent(url)};end`);
+  assert.equal(externalBrowserUrl(url, "Mozilla/5.0 (iPhone; CPU iPhone OS 27_2 like Mac OS X) Mobile/24B119 Instagram 454.1"), `x-safari-${url}`);
+  assert.equal(externalBrowserUrl(url, "Mozilla/5.0 (Windows NT 10.0) Chrome/130"), url);
+  // Anything but https is passed through untouched, never wrapped in an app link
+  assert.equal(externalBrowserUrl("http://kitvoy.com/checkout", "Android"), "http://kitvoy.com/checkout");
+  assert.equal(externalBrowserUrl("not a url", "Android"), "not a url");
+});
+
+test("coming back from PayPal is recognised and its parameters are removed from the address bar", () => {
+  assert.equal(paypalReturnFromUrl(`https://kitvoy.com/checkout?r=${token}&pp=return&token=5AB12345CD678901E&PayerID=ABCDEFGH`), "return");
+  assert.equal(paypalReturnFromUrl(`https://kitvoy.com/checkout?r=${token}&pp=cancel&token=5AB12345CD678901E`), "cancel");
+  assert.equal(paypalReturnFromUrl("https://kitvoy.com/checkout?pp=other"), null);
+  assert.equal(paypalReturnFromUrl("https://kitvoy.com/checkout"), null);
+  assert.equal(withoutResumeLink(`https://kitvoy.com/checkout?r=${token}&pp=return&token=5AB12345CD678901E&PayerID=ABCDEFGH`), "/checkout");
+  // A `token` parameter that isn't PayPal's stays
+  assert.equal(withoutResumeLink("https://kitvoy.com/account?token=abc"), "/account?token=abc");
 });

@@ -13,6 +13,7 @@ import { isCjConfigured } from "@/config/fulfillment";
 import { listSentEmails } from "@/lib/data/sent-emails";
 import { SentEmailList } from "@/components/admin/sent-email-list";
 import { EmailCustomerCard } from "./email-customer-card";
+import { CheckoutLinkCard } from "./checkout-link-card";
 import { reviewRequestStatus } from "@/lib/reviews";
 import { prisma } from "@/lib/db";
 
@@ -153,6 +154,8 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
             reviewRequest={isPaid ? reviewRequestStatus({ deliveredAt: order.deliveredAt, reviewRequestSentAt: order.reviewRequestSentAt, hasReview: reviewCount > 0, hasEmail: !!order.email }) : null}
             cj={isCjConfigured() ? { orderId: order.fulfillmentRef, status: order.supplierStatus, error: order.fulfillmentError } : null}
           />
+
+          {!isPaid && order.status === "PENDING" && <CheckoutLinkCard orderId={order.id} />}
 
           <EmailCustomerCard orderId={order.id} orderReference={orderReference} customerEmail={order.email}>
             <SentEmailList emails={sentEmails} showOrder={false} />

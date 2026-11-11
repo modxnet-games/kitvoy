@@ -1,6 +1,8 @@
 import { orderContents, type MetaContent } from "@/lib/analytics/meta-capi";
 import { getProductsByIds } from "@/lib/data/products";
 import type { OrderTotals } from "@/lib/payments/money";
+import { getPayPal } from "@/lib/payments/paypal";
+import { settlePayPalOrder } from "@/lib/payments/paypal-settle";
 import { canUseStripeCheckout, getStripe } from "@/lib/payments/stripe";
 import { ensureOrderPaymentIntent } from "@/lib/payments/stripe-intent";
 import type { ProductDisplay } from "@/types/product";
@@ -104,6 +106,17 @@ export async function resumeCheckout(input: { session?: string | null; link?: st
     return { result: await paidResult(order, "paid", recent), sessionToken };
   }
   if (!isOpenOrder(order)) return { result: { status: "none" }, sessionToken: null };
+
+  // A PayPal payment the page never got to finish (the buyer approved, then the
+  // in-app browser reloaded or the redirect just came back): capture it now
+  if (order.paymentMethod === "paypal" && order.paymentRef && getPayPal()) {
+    try {
+      const settled = await settlePayPalOrder(order);
+      if (settled.status === "paid") return { result: await paidResult(order, "paid", true), sessionToken };
+    } catch (err) {
+      console.warn("[checkout/resume] couldn't check the PayPal order:", err instanceof Error ? err.message : err);
+    }
+  }
 
   // The card intent: reused as it is, brought up to date, or replaced when it can't be used any more
   let clientSecret: string | null = null;

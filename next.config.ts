@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
       // The bio-link page was first planned as /links
       { source: "/links", destination: "/products", permanent: false },
       // Short paths for captions and ads
-      { source: "/pet", destination: "/products#pet-care", permanent: false },
+      { source: "/pet", destination: "/products#hub-niche-pet-care", permanent: false },
       { source: "/ball", destination: "/products/pouncepop", permanent: false },
       { source: "/pouncepop", destination: "/products/pouncepop", permanent: false },
     ];

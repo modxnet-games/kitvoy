@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: "Kitvoy",
   description:
-    "Kitvoy sells one thing: a cordless tire inflator with a digital pressure gauge and LED light, shipped free across the United States.",
+    "Kitvoy picks useful little products for pets, the home and everyday comfort, and ships them free with tracking.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ogImage: "/og.png",
   // Logo mark used in the header/footer (browser favicons live in src/app: icon.svg, favicon.ico, apple-icon.png)

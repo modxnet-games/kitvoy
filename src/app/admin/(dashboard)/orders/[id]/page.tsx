@@ -8,7 +8,7 @@ import { DeleteOrderButton } from "../delete-order-button";
 import { PrintOrderButton } from "./print-order-button";
 import { FulfillmentCard } from "./fulfillment-card";
 import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
-import type { ShippingAddress } from "@/lib/us-address";
+import { countryName, countryOf, type ShippingAddress } from "@/lib/us-address";
 import { isCjConfigured } from "@/config/fulfillment";
 import { listSentEmails } from "@/lib/data/sent-emails";
 import { SentEmailList } from "@/components/admin/sent-email-list";
@@ -196,7 +196,7 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
                       <br />
                       {address.city}, {address.state} {address.zip}
                       <br />
-                      United States
+                      {countryName(countryOf(address))}
                     </>
                   ) : (
                     order.location

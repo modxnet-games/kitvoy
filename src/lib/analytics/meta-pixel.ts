@@ -7,7 +7,8 @@
  */
 
 import { META_PIXEL_ID } from "@/config/analytics";
-import { getLineTotal } from "@/lib/bundles";
+import { priceLines } from "@/lib/bundles";
+import { getCatalogProduct } from "@/config/catalog";
 
 type Fbq = ((...args: unknown[]) => void) & { callMethod?: (...args: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string; push?: unknown };
 
@@ -36,7 +37,7 @@ export interface MetaContent {
 }
 
 export interface TrackableItem {
-  product: { id: string; sku: string; name: string; price: number };
+  product: { id: string; sku: string; name: string; price: number; slug?: string };
   quantity: number;
 }
 
@@ -63,13 +64,25 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 /** The SKU when the product has one, else its id: the same `content_ids` the server sends. */
 export const contentId = (product: { id: string; sku: string }) => product.sku || product.id;
 
-/** `item_price` is what one unit costs at this quantity (the bundle price split across it), so quantity x item_price is the value. */
+/**
+ * `item_price` is what one unit costs at this quantity (the bundle price split
+ * across it), so quantity x item_price is the value. A product in several
+ * colours is one bundle, as in the cart.
+ */
 export function toContents(items: TrackableItem[]): MetaContent[] {
-  return items.map((i) => ({
+  const totals = priceLines(items.map((i) => ({ productId: i.product.id, slug: i.product.slug, unitPrice: i.product.price, quantity: i.quantity })));
+  return items.map((i, index) => ({
     id: contentId(i.product),
     quantity: i.quantity,
-    item_price: i.quantity > 0 ? Math.round(Math.round(getLineTotal(i.product.price, i.quantity) * 100) / i.quantity) / 100 : round2(i.product.price),
+    item_price: i.quantity > 0 ? Math.round(Math.round(totals[index] * 100) / i.quantity) / 100 : round2(i.product.price),
   }));
+}
+
+/** The niche the items share (config/catalog.ts), sent as content_category so the pixel learns each niche apart. */
+export function contentCategory(items: { product: { slug?: string } }[]): Record<string, string> {
+  const categories = new Set(items.map((i) => getCatalogProduct(i.product.slug)?.metaCategory ?? ""));
+  const [only] = categories;
+  return categories.size === 1 && only ? { content_category: only } : {};
 }
 
 export const countItems = (items: TrackableItem[]) => items.reduce((n, i) => n + i.quantity, 0);
@@ -132,13 +145,14 @@ export function trackPageView(pathname: string): void {
   track("PageView");
 }
 
-export function trackViewContent(product: { id: string; sku: string; name: string; price: number }): void {
+export function trackViewContent(product: { id: string; sku: string; name: string; price: number; slug?: string }): void {
   track("ViewContent", {
     currency: "USD",
     value: round2(product.price),
     content_ids: [contentId(product)],
     content_type: "product",
     content_name: product.name,
+    ...contentCategory([{ product }]),
   });
 }
 
@@ -152,6 +166,7 @@ export function trackAddToCart(items: TrackableItem[], value: number): void {
     content_type: "product",
     contents: toContents(items),
     num_items: countItems(items),
+    ...contentCategory(items),
   });
 }
 
@@ -187,6 +202,7 @@ export function trackInitiateCheckout(orderReference: string, items: TrackableIt
       content_type: "product",
       contents: toContents(items),
       num_items: countItems(items),
+      ...contentCategory(items),
     },
     orderReference,
   );

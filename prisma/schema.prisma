@@ -134,7 +134,7 @@ model Order {
   phone             String
   /// One-line address ("street, city, STATE ZIP") for admin, emails and packing slips
   location          String
-  /// Structured US address { address1, address2, city, state, zip, country } for fulfillment
+  /// Structured address { address1, address2, city, state, zip, country } for fulfillment; country is an ISO code, "US" when absent
   shippingAddress   Json?
   status            OrderStatus       @default(PENDING)
   subtotal          Float
@@ -228,8 +228,11 @@ model OrderItem {
   orderId     String
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId   String?
+  /// Includes the colour for products sold in several, e.g. "PouncePop (Blue)"
   productName String
   productSlug String
+  /// The colour bought (config/catalog.ts variant key); null for products with no choice. Fulfillment maps it to the supplier's variant
+  variantKey  String?
   unitPrice   Float
   quantity    Int
   lineTotal   Float

@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import type Stripe from "stripe";
 
+import { countryOf } from "@/lib/us-address";
+
 import { prisma } from "@/lib/db";
 import { toCents } from "@/lib/payments/money";
 import { isOpenIntent } from "@/lib/payments/stripe";
 
 const orderReference = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
 
-type StoredAddress = { address1?: string; address2?: string; city?: string; state?: string; zip?: string };
+type StoredAddress = { address1?: string; address2?: string; city?: string; state?: string; zip?: string; country?: string };
 
 /** The parts of an order its PaymentIntent is built from. */
 export interface IntentOrder {
@@ -38,7 +40,7 @@ export function intentShipping(order: IntentOrder): Stripe.PaymentIntentCreatePa
       city: address.city,
       state: address.state,
       postal_code: address.zip,
-      country: "US",
+      country: countryOf(address),
     },
   };
 }
@@ -78,7 +80,8 @@ export function intentMatchesOrder(
     text(have.address?.line2) === text(want.address.line2) &&
     text(have.address?.city) === text(want.address.city) &&
     text(have.address?.state) === text(want.address.state) &&
-    text(have.address?.postal_code) === text(want.address.postal_code)
+    text(have.address?.postal_code) === text(want.address.postal_code) &&
+    text(have.address?.country) === text(want.address.country)
   );
 }
 

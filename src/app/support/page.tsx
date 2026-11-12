@@ -5,7 +5,7 @@ import { getStoreSettings } from "@/lib/data/store-settings";
 
 export const metadata: Metadata = {
   title: "Help, Shipping & Contact",
-  description: "Free US shipping, 30-day returns, privacy and contact details for the Kitvoy cordless tire inflator store.",
+  description: "Free tracked shipping, 30-day returns, privacy and contact details for the Kitvoy store.",
   alternates: { canonical: "/support" },
 };
 export const dynamic = "force-dynamic";

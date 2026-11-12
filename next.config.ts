@@ -7,12 +7,21 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "**" },
     ],
   },
-  // Single-product store: the homepage is the shop. Temporary (307) so the
-  // catalog pages can come back if more products are added.
+  // The catalog lives at /products (the link in the social bios) and each
+  // product has its own page. Temporary (307) redirects, so a path can be
+  // given a page of its own later.
   async redirects() {
     return [
-      { source: "/shop", destination: "/", permanent: false },
-      { source: "/shop/:slug*", destination: "/", permanent: false },
+      // The old template catalog
+      { source: "/shop", destination: "/products", permanent: false },
+      { source: "/shop/cordless-tire-inflator", destination: "/inflator", permanent: false },
+      { source: "/shop/:slug*", destination: "/products", permanent: false },
+      // The bio-link page was first planned as /links
+      { source: "/links", destination: "/products", permanent: false },
+      // Short paths for captions and ads
+      { source: "/pet", destination: "/products#pet-care", permanent: false },
+      { source: "/ball", destination: "/products/pouncepop", permanent: false },
+      { source: "/pouncepop", destination: "/products/pouncepop", permanent: false },
     ];
   },
   // Private areas say noindex on the response itself, so it also covers their

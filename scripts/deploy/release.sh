@@ -144,10 +144,15 @@ check() { # check <name> <ok: 0|1> <detail>
 
 smoke() {
   FAILED=0
-  local html code chunk train
+  local html code chunk train page
   html="$(curl -s -m 20 "$ORIGIN/checkout" || true)"
   code="$(http "$ORIGIN/")"; check "origin  GET /" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   check "origin  GET / names the store" "$(curl -s -m 20 "$ORIGIN/" | grep -q 'Kitvoy' && echo 1 || echo 0)" ""
+  # The catalog, each product page and the inflator's page at its new address
+  for page in /products /products/pouncepop /inflator; do
+    code="$(http "$ORIGIN$page")"; check "origin  GET $page" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
+  done
+  check "origin  /inflator still sells the inflator" "$(curl -s -m 20 "$ORIGIN/inflator" | grep -qi 'tire inflator' && echo 1 || echo 0)" ""
   code="$(http "$ORIGIN/checkout")"; check "origin  GET /checkout" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   check "origin  /checkout renders the checkout outline" "$(printf '%s' "$html" | grep -q 'Loading checkout' && echo 1 || echo 0)" ""
   chunk="$(printf '%s' "$html" | grep -oE '/_next/static/chunks/[A-Za-z0-9._-]+\.js' | head -n 1)"

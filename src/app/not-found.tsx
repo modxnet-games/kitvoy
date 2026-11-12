@@ -18,7 +18,7 @@ export default function NotFound() {
         <p className="eyebrow">Error 404</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#171918] sm:text-4xl">We couldn&apos;t find that page.</h1>
         <p className="mt-4 max-w-md text-base text-[#666a67]">
-          The link may be old or mistyped. The cordless tire inflator, and help with an order, are one click away.
+          The link may be old or mistyped. Our products, and help with an order, are one click away.
         </p>
         <div className="mt-8 flex flex-col items-center gap-4">
           <Link href="/" className="primary-button">

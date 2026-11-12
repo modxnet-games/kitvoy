@@ -496,3 +496,6 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* The colour of a cart line, for products sold in several */
+.cart-line-variant { margin: 2px 0 0; font-size: 13px; color: #666a67; }

@@ -20,7 +20,7 @@ interface StripePaymentProps {
   /** The order's server total, shown on the pay button */
   total: number;
   /** Prefills the Payment Element's billing fields */
-  billing: { name: string; email: string; phone: string; postalCode: string };
+  billing: { name: string; email: string; phone: string; postalCode: string; country: string };
   /** The order's client secret when the page already has it (a restored checkout), which saves a round trip */
   initialClientSecret?: string | null;
   onPaid: () => void;
@@ -362,11 +362,11 @@ function PaymentForm({ orderReference, total, billing, layout, reserve, onPaid, 
           name: billing.name,
           email: billing.email,
           phone: billing.phone,
-          address: { postal_code: billing.postalCode, country: "US" },
+          address: { postal_code: billing.postalCode, country: billing.country },
         },
       },
     }),
-    [layout, billing.name, billing.email, billing.phone, billing.postalCode],
+    [layout, billing.name, billing.email, billing.phone, billing.postalCode, billing.country],
   );
 
   const setBusy = (busy: boolean) => {

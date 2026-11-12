@@ -5,10 +5,12 @@ import {
 } from "@/lib/stock";
 import type { ProductDisplay } from "@/types/product";
 import type { OrderAttribution } from "@/lib/analytics/attribution";
-import { getLineTotal } from "@/lib/bundles";
+import { priceLines } from "@/lib/bundles";
+import { countriesForCart, getCatalogProduct, getCatalogVariant } from "@/config/catalog";
 import { toCents, type OrderTotals } from "@/lib/payments/money";
 import {
   formatAddressLine,
+  isCountryCode,
   toShippingAddress,
   validateCheckoutDetails,
   type CheckoutDetails,
@@ -19,6 +21,8 @@ import {
 export interface CartItemPayload {
   product: ProductDisplay;
   quantity: number;
+  /** The colour picked, for products sold in several (config/catalog.ts) */
+  variantKey?: string;
 }
 
 export interface CreateOrderInput {
@@ -56,6 +60,12 @@ export function validateOrderInput(input: unknown): { valid: false; error: strin
     zip: str(body.zip),
     paymentMethod: body.paymentMethod === "paypal" ? "paypal" : "card",
   };
+  // A checkout page loaded before the store shipped abroad sends no country: that is a US order
+  const country = str(body.country).toUpperCase() || "US";
+  if (!isCountryCode(country)) {
+    return { valid: false, error: "validation.country" };
+  }
+  details.country = country;
 
   const firstError = Object.values(validateCheckoutDetails(details))[0];
   if (firstError) {
@@ -79,6 +89,9 @@ export function validateOrderInput(input: unknown): { valid: false; error: strin
     const slug = typeof p.slug === "string" ? p.slug : "";
     const name = typeof p.name === "string" ? p.name : "";
     const price = typeof p.price === "number" ? p.price : 0;
+    const variant = p.variant && typeof p.variant === "object" ? (p.variant as Record<string, unknown>).key : undefined;
+    const rawVariantKey = typeof it.variantKey === "string" ? it.variantKey : typeof variant === "string" ? variant : "";
+    const variantKey = /^[a-z0-9-]{1,40}$/.test(rawVariantKey) ? rawVariantKey : undefined;
 
     if (!id || !name || !slug || price <= 0) continue;
 
@@ -100,6 +113,7 @@ export function validateOrderInput(input: unknown): { valid: false; error: strin
         images: [],
       } as ProductDisplay,
       quantity,
+      ...(variantKey && { variantKey }),
     });
   }
 
@@ -124,6 +138,7 @@ type PricedItem = {
   productId: string;
   productName: string;
   productSlug: string;
+  variantKey: string | null;
   unitPrice: number;
   shippingTax: number;
   quantity: number;
@@ -134,18 +149,14 @@ type PricedOrder = { items: PricedItem[]; subtotal: number; shippingCost: number
 
 type OrderFailure = { success: false; error: string; errorKey?: string };
 
-/** Checks stock and prices the cart from the database, never from what the browser sent. */
+/**
+ * Checks stock and prices the cart from the database, never from what the
+ * browser sent. Colours are checked against the catalog, the shipping country
+ * against the countries every product in the cart ships to, and a product
+ * bought in several colours is priced as one bundle.
+ */
 async function priceOrder(input: CreateOrderInput): Promise<{ ok: true; priced: PricedOrder } | { ok: false; failure: OrderFailure }> {
-  const stockItems: StockValidationItem[] = input.items.map((i) => ({
-    productId: i.product.id,
-    productName: i.product.name,
-    quantity: i.quantity,
-  }));
-
-  const stockValidation = await validateStockForCheckout(stockItems);
-  if (!stockValidation.valid && stockValidation.errorKey) {
-    return { ok: false, failure: { success: false, error: stockValidation.errorKey, errorKey: stockValidation.errorKey } };
-  }
+  const fail = (error: string, errorKey?: string) => ({ ok: false as const, failure: { success: false as const, error, ...(errorKey && { errorKey }) } });
 
   const productIds = Array.from(new Set(input.items.map((i) => i.product.id)));
   const products = await prisma.product.findMany({
@@ -154,22 +165,58 @@ async function priceOrder(input: CreateOrderInput): Promise<{ ok: true; priced: 
   });
   const productMap = new Map(products.map((p) => [p.id, p]));
 
-  const items: PricedItem[] = [];
+  // One line per product and colour, however the browser split them
+  const lines = new Map<string, { product: (typeof products)[number]; variantKey: string | null; variantLabel: string | null; quantity: number }>();
   for (const item of input.items) {
     const product = productMap.get(item.product.id);
-    if (!product) {
-      return { ok: false, failure: { success: false, error: "Product not found" } };
+    if (!product) return fail("Product not found");
+
+    const entry = getCatalogProduct(product.slug);
+    let variantKey: string | null = null;
+    let variantLabel: string | null = null;
+    if (entry?.hasColourChoice) {
+      const variant = getCatalogVariant(product.slug, item.variantKey);
+      if (!item.variantKey || !variant) return fail("order.errorChooseColour", "order.errorChooseColour");
+      variantKey = variant.key;
+      variantLabel = variant.label;
     }
-    items.push({
-      productId: product.id,
-      productName: product.name,
-      productSlug: product.slug,
-      unitPrice: product.price,
-      shippingTax: product.shippingTax,
-      quantity: item.quantity,
-      lineTotal: getLineTotal(product.price, item.quantity),
-    });
+
+    const key = `${product.id}:${variantKey ?? ""}`;
+    const line = lines.get(key);
+    if (line) line.quantity += item.quantity;
+    else lines.set(key, { product, variantKey, variantLabel, quantity: item.quantity });
   }
+  const merged = [...lines.values()];
+
+  const allowed = countriesForCart(merged.map((l) => l.product.slug));
+  if (!allowed.includes(input.shippingAddress.country)) {
+    return fail("order.errorCountryUnavailable", "order.errorCountryUnavailable");
+  }
+
+  // Stock is kept per product, so a product's colours are counted together
+  const perProduct = new Map<string, StockValidationItem>();
+  for (const line of merged) {
+    const current = perProduct.get(line.product.id);
+    if (current) current.quantity += line.quantity;
+    else perProduct.set(line.product.id, { productId: line.product.id, productName: line.product.name, quantity: line.quantity });
+  }
+  const stockValidation = await validateStockForCheckout([...perProduct.values()]);
+  if (!stockValidation.valid && stockValidation.errorKey) {
+    return fail(stockValidation.errorKey, stockValidation.errorKey);
+  }
+
+  const totals = priceLines(merged.map((l) => ({ productId: l.product.id, slug: l.product.slug, unitPrice: l.product.price, quantity: l.quantity })));
+  const items: PricedItem[] = merged.map((line, i) => ({
+    productId: line.product.id,
+    // The colour is part of the name wherever the order is read: emails, admin, packing slip
+    productName: line.variantLabel ? `${line.product.name} (${line.variantLabel})` : line.product.name,
+    productSlug: line.product.slug,
+    variantKey: line.variantKey,
+    unitPrice: line.product.price,
+    shippingTax: line.product.shippingTax,
+    quantity: line.quantity,
+    lineTotal: totals[i],
+  }));
 
   // Work in cents so the stored total is exactly what Stripe and PayPal charge
   const subtotalCents = items.reduce((sum, i) => sum + toCents(i.lineTotal), 0);
@@ -224,6 +271,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
           productId: item.productId,
           productName: item.productName,
           productSlug: item.productSlug,
+          variantKey: item.variantKey,
           unitPrice: item.unitPrice,
           quantity: item.quantity,
           lineTotal: item.lineTotal,
@@ -242,9 +290,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 }
 
 /** The lines of an order as one comparable string, whatever order they were saved in. */
-export function orderLinesKey(lines: { productId: string | null; quantity: number; unitPrice: number }[]): string {
+export function orderLinesKey(lines: { productId: string | null; variantKey?: string | null; quantity: number; unitPrice: number }[]): string {
   return lines
-    .map((l) => `${l.productId ?? ""}x${l.quantity}@${toCents(l.unitPrice)}`)
+    .map((l) => `${l.productId ?? ""}${l.variantKey ? `:${l.variantKey}` : ""}x${l.quantity}@${toCents(l.unitPrice)}`)
     .sort()
     .join(",");
 }
@@ -269,7 +317,7 @@ export async function updatePendingOrder(
     phone: string;
     location: string;
     attribution: unknown;
-    items: { productId: string | null; quantity: number; unitPrice: number }[];
+    items: { productId: string | null; variantKey?: string | null; quantity: number; unitPrice: number }[];
   },
   input: CreateOrderInput,
 ): Promise<UpdateOrderResult> {
@@ -318,6 +366,7 @@ export async function updatePendingOrder(
           productId: item.productId,
           productName: item.productName,
           productSlug: item.productSlug,
+          variantKey: item.variantKey,
           unitPrice: item.unitPrice,
           quantity: item.quantity,
           lineTotal: item.lineTotal,

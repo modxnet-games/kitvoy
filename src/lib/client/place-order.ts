@@ -32,7 +32,7 @@ export async function placeOrder(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...details,
-        items: items.map((i) => ({ product: i.product, quantity: i.quantity })),
+        items: items.map((i) => ({ product: i.product, quantity: i.quantity, variantKey: i.product.variant?.key })),
         resumeToken: options?.resumeToken ?? undefined,
         tracking: {
           // The page, without its query: a resume link's token must not travel any further

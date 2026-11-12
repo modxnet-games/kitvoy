@@ -5,7 +5,9 @@ import { getPayPal } from "@/lib/payments/paypal";
 import { settlePayPalOrder } from "@/lib/payments/paypal-settle";
 import { canUseStripeCheckout, getStripe } from "@/lib/payments/stripe";
 import { ensureOrderPaymentIntent } from "@/lib/payments/stripe-intent";
-import type { ProductDisplay } from "@/types/product";
+import { withVariant, type ProductDisplay } from "@/types/product";
+import { getCatalogVariant } from "@/config/catalog";
+import { countryOf, type CountryCode } from "@/lib/us-address";
 
 import { SESSION_TTL_MS, isOpenOrder } from "./resume-token";
 import { findCheckoutToken, issueCheckoutToken } from "./tokens";
@@ -22,6 +24,7 @@ export interface ResumeDetails {
   city: string;
   state: string;
   zip: string;
+  country: CountryCode;
 }
 
 export type ResumeResult =
@@ -73,6 +76,7 @@ function detailsOf(order: TokenOrder): ResumeDetails {
     city: address.city ?? "",
     state: address.state ?? "",
     zip: address.zip ?? "",
+    country: countryOf(order.shippingAddress as { country?: unknown } | null),
   };
 }
 
@@ -138,7 +142,10 @@ export async function resumeCheckout(input: { session?: string | null; link?: st
   const products = new Map((await getProductsByIds(productIds)).map((p) => [p.id, p]));
   const items = order.items.flatMap((i) => {
     const product = i.productId ? products.get(i.productId) : undefined;
-    return product ? [{ product, quantity: i.quantity }] : [];
+    if (!product) return [];
+    // The line comes back in the colour it was ordered in
+    const variant = i.variantKey ? getCatalogVariant(product.slug, i.variantKey) : undefined;
+    return [{ product: variant ? withVariant(product, variant) : product, quantity: i.quantity }];
   });
   if (items.length === 0) return { result: { status: "none" }, sessionToken: null };
 

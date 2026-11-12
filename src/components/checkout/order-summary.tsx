@@ -4,12 +4,12 @@ import Link from "next/link";
 import { Package, ShieldCheck, Truck } from "lucide-react";
 
 import type { CartItem } from "@/store/cart-store";
-import { useCartStore, getShippingForItems } from "@/store/cart-store";
+import { cartLineSavings, cartLineTotals, lineKey, useCartStore, getShippingForItems } from "@/store/cart-store";
 import { useLanguage } from "@/contexts/language-context";
 import { storePolicies } from "@/config/policies";
 import { Price, ProductLineImage } from "@/components/storefront";
 import { cn } from "@/lib/utils";
-import { getLineTotal, getBundleSavings } from "@/lib/bundles";
+import { getCatalogProduct } from "@/config/catalog";
 import type { OrderTotals } from "@/lib/payments/money";
 
 interface OrderSummaryProps {
@@ -27,8 +27,12 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
   const subtotal = totals?.subtotal ?? getSubtotal();
   const shipping = totals?.shippingCost ?? getShippingForItems(items);
   const total = totals?.total ?? subtotal + shipping;
-  const savings = items.reduce((sum, item) => sum + getBundleSavings(item.product.price, item.quantity), 0);
+  const lineTotals = cartLineTotals(items);
+  const lineSavings = cartLineSavings(items);
+  const savings = lineSavings.reduce((sum, s) => sum + s, 0);
   const count = items.reduce((n, i) => n + i.quantity, 0);
+  // Only say "U.S. shipping" when nothing in the cart ships anywhere else
+  const usOnly = items.every((i) => { const entry = getCatalogProduct(i.product.slug); return !entry || Object.keys(entry.shipping).length === 1; });
 
   return (
     <div className={cn(!embedded && "rounded-2xl border border-[#e7e5df] bg-white p-6 shadow-[0_1px_2px_rgba(23,25,24,0.04)] sm:p-7", className)}>
@@ -42,10 +46,11 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
       )}
 
       <ul className={cn("divide-y divide-[#eeece6]", !embedded && "mt-5")}>
-        {items.map((item: CartItem) => {
-          const lineSavings = getBundleSavings(item.product.price, item.quantity);
+        {items.map((item: CartItem, index) => {
+          const saved = lineSavings[index];
+          const unit = getCatalogProduct(item.product.slug)?.unit;
           return (
-            <li key={item.product.id} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+            <li key={lineKey(item.product)} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
               <div className="relative shrink-0">
                 <ProductLineImage
                   className="size-[72px] rounded-xl bg-[#f0ede7]"
@@ -61,14 +66,17 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
               <div className="min-w-0 flex-1 pt-0.5">
                 <p className="text-sm font-semibold leading-snug text-[#171918]">{item.product.name}</p>
                 <p className="mt-0.5 text-sm text-[#666a67]">
-                  {item.quantity === 1 ? t("checkout.oneInflator") : t("checkout.manyInflators", { count: item.quantity })}
+                  {unit
+                    ? `${item.quantity} ${item.quantity === 1 ? unit.one : unit.many}`
+                    : item.quantity === 1 ? t("checkout.oneItem") : t("checkout.manyItems", { count: item.quantity })}
+                  {item.product.variant && ` · ${item.product.variant.label}`}
                 </p>
-                {lineSavings > 0 && (
-                  <p className="mt-1 text-xs font-medium text-[#2f7d4f]">{t("checkout.bundleSavingsLabel")} <Price value={lineSavings} /></p>
+                {saved > 0 && (
+                  <p className="mt-1 text-xs font-medium text-[#2f7d4f]">{t("checkout.bundleSavingsLabel")} <Price value={saved} /></p>
                 )}
               </div>
               <span className="shrink-0 pt-0.5 text-sm font-semibold text-[#171918]">
-                <Price value={getLineTotal(item.product.price, item.quantity)} />
+                <Price value={lineTotals[index]} />
               </span>
             </li>
           );
@@ -91,7 +99,7 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
       </dl>
 
       <ul className="mt-6 grid gap-3 border-t border-[#eeece6] pt-5 text-xs text-[#666a67]">
-        <li className="flex items-center gap-3"><Truck className="size-4 shrink-0 text-[#a83d10]" aria-hidden="true" />{shipping === 0 ? t("checkout.trustShipping") : t("checkout.trustTracked")}</li>
+        <li className="flex items-center gap-3"><Truck className="size-4 shrink-0 text-[#a83d10]" aria-hidden="true" />{shipping === 0 ? t(usOnly ? "checkout.trustShipping" : "checkout.trustShippingIntl") : t("checkout.trustTracked")}</li>
         <li className="flex items-center gap-3"><Package className="size-4 shrink-0 text-[#a83d10]" aria-hidden="true" />{t("checkout.trustReturns", { days: storePolicies.returns.windowDays })}</li>
         <li className="flex items-center gap-3"><ShieldCheck className="size-4 shrink-0 text-[#a83d10]" aria-hidden="true" />{t("checkout.trustSecure")}</li>
       </ul>

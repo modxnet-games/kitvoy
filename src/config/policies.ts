@@ -5,12 +5,12 @@
  */
 export const storePolicies = {
   /** Shown on every policy page; update it whenever a policy's wording changes */
-  effectiveDate: "November 11, 2026",
+  effectiveDate: "November 12, 2026",
   supportEmail: "support@kitvoy.com",
   shipping: {
     /** Business days from payment to handing the order to the carrier */
     processingDays: { min: 1, max: 2 },
-    /** Business days in transit once shipped */
+    /** Business days in transit once shipped, for US orders; other countries are per product in config/catalog.ts */
     deliveryDays: { min: 4, max: 9 },
     carrier: "CJPacket",
     destinations: "all 50 US states and Washington, DC",

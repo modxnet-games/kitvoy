@@ -1,4 +1,5 @@
 import { cjFulfillment, costEstimates } from "@/config/fulfillment";
+import { INFLATOR_SLUG, getCatalogProduct } from "@/config/catalog";
 import { prisma } from "@/lib/db";
 import { CJ_PAID_STATUSES } from "@/lib/fulfillment/cj-order";
 import { STORE_TIME_ZONE } from "@/lib/formatters";
@@ -82,15 +83,37 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const isPaid = (o: SalesOrder) => o.paymentStatus === "paid" && o.status !== "CANCELED";
 
+/**
+ * A stand-in for an order's CJ shipping charge until CJ reports the real one:
+ * each product's own US quote for its quantity (config/catalog.ts), or the
+ * store-wide estimate for a product the catalog has no quote for.
+ */
+function estimateShipping(items: { productSlug: string; quantity: number }[]): number {
+  const units = new Map<string, number>();
+  for (const item of items) {
+    if (cjFulfillment.variants[item.productSlug]) units.set(item.productSlug, (units.get(item.productSlug) ?? 0) + item.quantity);
+  }
+  let total = 0;
+  for (const [slug, quantity] of units) {
+    const quote = getCatalogProduct(slug)?.shipping.US?.cost;
+    if (quote && slug !== INFLATOR_SLUG) {
+      // Quoted for 1 to 3 units; each one beyond that adds what the third added
+      total += quantity <= 3 ? quote[quantity - 1] : quote[2] + (quote[2] - quote[1]) * (quantity - 3);
+    } else {
+      const { firstUnit, additionalUnit } = costEstimates.shipping;
+      total += firstUnit + additionalUnit * (quantity - 1);
+    }
+  }
+  return round2(total);
+}
+
 /** What an order cost to fulfill: recorded CJ charges and fees where present, estimates otherwise. */
 export function orderCosts(order: Pick<SalesOrder, "total" | "paymentFee" | "supplierProductCost" | "supplierShippingCost" | "items">) {
   let estimated = false;
-  let units = 0;
   let catalogCost = 0;
   for (const item of order.items) {
     const variant = cjFulfillment.variants[item.productSlug];
     if (variant) {
-      units += item.quantity;
       catalogCost += variant.unitCost * item.quantity;
     } else {
       // No known cost for this product
@@ -103,8 +126,7 @@ export function orderCosts(order: Pick<SalesOrder, "total" | "paymentFee" | "sup
   let shipping = order.supplierShippingCost;
   if (shipping == null) {
     estimated = true;
-    const { firstUnit, additionalUnit } = costEstimates.shipping;
-    shipping = units > 0 ? firstUnit + additionalUnit * (units - 1) : 0;
+    shipping = estimateShipping(order.items);
   }
 
   let fee = order.paymentFee;

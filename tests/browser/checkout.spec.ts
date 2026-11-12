@@ -39,7 +39,7 @@ function watch(page: Page): Watch {
 }
 
 async function addOneAndOpenCheckout(page: Page) {
-  await page.goto("/");
+  await page.goto("/inflator");
   await page.locator("label.bundle-option").filter({ has: page.locator('input[value="1"]') }).click();
   await page.getByRole("button", { name: /^Add 1 to cart/ }).click();
   await page.getByRole("link", { name: "Continue to checkout" }).click();

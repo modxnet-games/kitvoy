@@ -1,5 +1,6 @@
-import { cjFulfillment } from "@/config/fulfillment";
-import { US_STATES, type ShippingAddress } from "@/lib/us-address";
+import { cjFulfillment, cjLogisticFor, cjVariantFor } from "@/config/fulfillment";
+import { shipsTo } from "@/config/catalog";
+import { COUNTRY_RULES, US_STATES, countryOf, type CountryCode, type ShippingAddress } from "@/lib/us-address";
 
 /** CJ's createOrderV2 payType: 2 pays from the CJ balance, 3 only creates the order. */
 export type CjPayType = 2 | 3;
@@ -12,12 +13,12 @@ export interface CjOrderInput {
   phone: string;
   total: number;
   shippingAddress: ShippingAddress | null;
-  items: { productSlug: string | null; productName: string; quantity: number }[];
+  items: { productSlug: string | null; productName: string; quantity: number; variantKey?: string | null }[];
 }
 
 export interface CjOrderPayload {
   orderNumber: string;
-  shippingCountryCode: "US";
+  shippingCountryCode: CountryCode;
   shippingCountry: string;
   shippingProvince: string;
   shippingCity: string;
@@ -48,36 +49,46 @@ export function buildCjOrderPayload(
   options: { payType: CjPayType; sandbox: boolean },
 ): { ok: true; payload: CjOrderPayload } | { ok: false; error: string } {
   const address = order.shippingAddress;
-  if (!address?.address1 || !address.city || !address.state || !address.zip) {
-    return { ok: false, error: "The order has no complete US shipping address" };
+  const country = countryOf(address);
+  const rules = COUNTRY_RULES[country];
+  const regionNeeded = rules.region !== "optional";
+  const zipNeeded = !rules.postalOptional;
+  if (!address?.address1 || !address.city || (regionNeeded && !address.state) || (zipNeeded && !address.zip)) {
+    return { ok: false, error: "The order has no complete shipping address" };
   }
 
   const quantities = new Map<string, number>();
   for (const item of order.items) {
-    const variant = item.productSlug ? cjFulfillment.variants[item.productSlug] : undefined;
+    const variant = cjVariantFor(item.productSlug, item.variantKey);
     if (!variant) return { ok: false, error: `“${item.productName}” isn't linked to a CJ variant` };
+    if (!shipsTo(item.productSlug).includes(country)) {
+      return { ok: false, error: `“${item.productName}” doesn't ship to ${rules.name}` };
+    }
     quantities.set(variant.vid, (quantities.get(variant.vid) ?? 0) + item.quantity);
   }
   if (quantities.size === 0) return { ok: false, error: "The order has no items" };
 
-  const state = US_STATES.find((s) => s.code === address.state)?.name ?? address.state;
+  // CJ wants a province on every order: the state's full name in the US, the
+  // region as typed elsewhere, and the city where a country's addresses have none
+  const province =
+    country === "US" ? (US_STATES.find((s) => s.code === address.state)?.name ?? address.state) : address.state || address.city;
   return {
     ok: true,
     payload: {
       orderNumber: order.id,
-      shippingCountryCode: "US",
-      shippingCountry: "United States",
-      shippingProvince: clip(state, 50),
+      shippingCountryCode: country,
+      shippingCountry: rules.name,
+      shippingProvince: clip(province, 50),
       shippingCity: clip(address.city, 50),
       shippingAddress: clip(address.address1, 500),
       ...(address.address2?.trim() ? { shippingAddress2: clip(address.address2, 500) } : {}),
-      shippingZip: clip(address.zip, 20),
+      shippingZip: clip(address.zip ?? "", 20),
       shippingCustomerName: clip(order.customerName, 50),
       shippingPhone: clip(order.phone, 20),
       ...(order.email ? { email: clip(order.email, 50) } : {}),
       remark: `Kitvoy order ${order.reference}`,
       shopAmount: order.total,
-      logisticName: cjFulfillment.logisticName,
+      logisticName: cjLogisticFor(order.items.map((i) => i.productSlug), country),
       fromCountryCode: cjFulfillment.fromCountryCode,
       payType: options.payType,
       isSandbox: options.sandbox ? 1 : 0,

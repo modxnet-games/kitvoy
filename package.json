@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1",
     "lint": "eslint",
-    "test:commerce": "node --import tsx --test tests/commerce.test.ts tests/checkout.test.ts",
+    "test:commerce": "node --import tsx --test tests/commerce.test.ts tests/checkout.test.ts tests/catalog.test.ts",
     "test:browser": "playwright test",
     "preview:seed": "node scripts/seed-kitvoy-preview.mjs",
     "db:generate": "prisma generate",

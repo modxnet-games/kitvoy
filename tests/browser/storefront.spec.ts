@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
   // Fail closed on payment/order calls even if a local operator adds credentials.
   await page.route("**/api/orders", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "order.errorGeneric" }) }));
   await page.route("**/api/checkout/**", route => route.abort());
-  await page.goto("/");
+  await page.goto("/inflator");
   // One h1, and it names the product as well as carrying the headline
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await expect(page.getByRole("heading", { level: 1, name: "Cordless digital tire inflator Low tire pressure? Take care of it yourself." })).toBeVisible();
@@ -135,7 +135,7 @@ test("sign-in and checkout offer Continue with Google", async ({ page }) => {
   const login = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(login.violations).toEqual([]);
 
-  await page.goto("/");
+  await page.goto("/inflator");
   await add(page, 1);
   await page.getByRole("link", { name: "Continue to checkout" }).click();
   await expect(page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();

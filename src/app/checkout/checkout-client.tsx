@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Check, ChevronDown, Lock, PencilLine, ShoppingBag } from "lucide-react";
 
 import { useLanguage } from "@/contexts/language-context";
-import { cartDrawerControl, getShippingForItems, useCartStore } from "@/store/cart-store";
+import { cartDrawerControl, getShippingForItems, lineKey, useCartStore, type CartItem } from "@/store/cart-store";
+import { countriesForCart, getCatalogProduct, type CountryCode } from "@/config/catalog";
 import { Breadcrumbs, EmptyState } from "@/components/storefront";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { CheckoutForm, OrderSummary } from "@/components/checkout";
@@ -33,7 +34,7 @@ import {
 } from "@/lib/client/checkout-storage";
 import { detectInAppBrowser } from "@/lib/in-app-browser";
 import { paypalMode } from "@/lib/checkout/payment-options";
-import { US_STATES } from "@/lib/us-address";
+import { COUNTRY_RULES, US_STATES, isCountryCode } from "@/lib/us-address";
 import { useMounted } from "@/hooks/use-mounted";
 import { CheckoutSkeleton } from "@/components/checkout/checkout-skeleton";
 import { formatPrice } from "@/lib/formatters";
@@ -49,15 +50,17 @@ interface CheckoutClientProps {
   customer: { email: string; fullName: string } | null;
   /** The server saw this browser's checkout cookie, so a started checkout is probably about to be restored */
   resumeHint?: boolean;
+  /** Where the visitor is browsing from (Cloudflare's CF-IPCountry header), to pre-select the shipping country */
+  visitorCountry?: string | null;
 }
 
 /** `cartKey` is the cart the order was created from; its total is stale once the cart changes. */
 type PendingOrder = { orderId: string; orderReference: string; cartKey: string; totals: OrderTotals };
 
 /** The cart as one comparable string, whatever order its lines are in. */
-const cartKeyOf = (items: { product: { id: string }; quantity: number }[]) =>
+const cartKeyOf = (items: { product: { id: string; variant?: { key: string } }; quantity: number }[]) =>
   items
-    .map((i) => `${i.product.id}x${i.quantity}`)
+    .map((i) => `${lineKey(i.product)}x${i.quantity}`)
     .sort()
     .join(",");
 
@@ -144,7 +147,7 @@ function Steps({ current }: { current: 1 | 2 }) {
  * storage and an HttpOnly cookie) brings back the payment step, and saving
  * the details again updates that same order instead of creating another.
  */
-export function CheckoutClient({ paypalClientId, stripePublishableKey, customer, resumeHint = false }: CheckoutClientProps) {
+export function CheckoutClient({ paypalClientId, stripePublishableKey, customer, resumeHint = false, visitorCountry = null }: CheckoutClientProps) {
   const { t } = useLanguage();
   const router = useRouter();
   const mounted = useMounted();
@@ -223,9 +226,12 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
       // Still to pay. On another browser (or after storage was wiped) the cart comes back from the order
       const cart = useCartStore.getState();
       if (cart.items.length === 0) {
-        for (const item of res.items) {
+        // One call per product: its colours are lines of the same bundle
+        const byProduct = new Map<string, CartItem[]>();
+        for (const item of res.items) byProduct.set(item.product.id, [...(byProduct.get(item.product.id) ?? []), item]);
+        for (const lines of byProduct.values()) {
           cartDrawerControl.skipNextOpen = true;
-          cart.setOffer(item.product, item.quantity);
+          cart.setOfferLines(lines);
         }
         cartDrawerControl.skipNextOpen = false;
       }
@@ -397,10 +403,23 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
   }
 
   const stateName = details ? US_STATES.find((s) => s.code === details.state)?.name ?? details.state : "";
+  const detailsCountry: CountryCode = details?.country ?? "US";
+  // Shown after the address when it isn't a US one
+  const countrySuffix = detailsCountry === "US" ? "" : `, ${COUNTRY_RULES[detailsCountry].name}`;
+  // The address can only be in a country every item in the cart ships to
+  const shipCountries = countriesForCart(items.map((i) => i.product.slug));
+  const deliveryDays = Object.fromEntries(
+    shipCountries.map((code) => {
+      const quotes = items.flatMap((i) => { const q = getCatalogProduct(i.product.slug)?.shipping[code]; return q ? [q.days] : []; });
+      return [code, quotes.length ? { min: Math.max(...quotes.map((q) => q.min)), max: Math.max(...quotes.map((q) => q.max)) } : undefined];
+    }),
+  ) as Partial<Record<CountryCode, { min: number; max: number }>>;
   const itemCount = items.reduce((n, i) => n + i.quantity, 0);
   const displayTotal = pending ? pending.totals.total : subtotal + getShippingForItems(items);
   const step: 1 | 2 = pending ? 2 : 1;
-  const formDefaults = details ?? { ...(customer ? { email: customer.email, fullName: customer.fullName } : {}), ...(boot.draft ?? {}) };
+  const draft = boot.draft ?? {};
+  const formDefaults: Partial<CheckoutFormData> =
+    details ?? { ...(customer ? { email: customer.email, fullName: customer.fullName } : {}), ...draft, country: isCountryCode(draft.country) ? draft.country : undefined };
 
   return (
     <div className="store-container checkout-page py-8 md:py-12">
@@ -461,14 +480,14 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       </p>
                       <h2 id="ship-to-heading" className="sr-only sm:not-sr-only sm:mt-3 sm:text-sm sm:font-semibold sm:text-[#171918]">{t("checkout.shipTo")}</h2>
                       <p className="mt-1 truncate text-sm text-[#666a67] sm:hidden">
-                        {details.fullName} · {details.address1}, {details.city}, {details.state} {details.zip}
+                        {details.fullName} · {details.address1}, {details.city}, {[details.state, details.zip].filter(Boolean).join(" ")}{countrySuffix}
                       </p>
                       <address className="mt-1 hidden text-sm not-italic leading-relaxed text-[#666a67] sm:block">
                         {details.fullName}
                         <br />
                         {[details.address1, details.address2].filter(Boolean).join(", ")}
                         <br />
-                        {details.city}, {stateName} {details.zip}
+                        {details.city}, {[stateName, details.zip].filter(Boolean).join(" ")}{countrySuffix}
                         <br />
                         {details.email} · {details.phone}
                       </address>
@@ -499,7 +518,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       orderId={pending.orderId}
                       orderReference={pending.orderReference}
                       total={pending.totals.total}
-                      billing={{ name: details.fullName, email: details.email, phone: details.phone, postalCode: details.zip }}
+                      billing={{ name: details.fullName, email: details.email, phone: details.phone, postalCode: details.zip, country: detailsCountry }}
                       initialClientSecret={restoredIntent?.orderId === pending.orderId ? restoredIntent.clientSecret : null}
                       onPaid={handlePaid}
                       onProcessingChange={(busy) => setProcessing(busy ? "stripe" : null)}
@@ -563,6 +582,9 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                   isSubmitting={isSubmitting}
                   initialValues={formDefaults}
                   submitLabel={t("checkout.continueToPayment")}
+                  countries={shipCountries}
+                  visitorCountry={visitorCountry}
+                  deliveryDays={deliveryDays}
                 />
                 {/* Guests fill the form straight away; Google is the optional shortcut below it */}
                 {!customer && (

@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { getCustomer } from "@/lib/auth/customer-session";
 import { RESUME_FLAG_COOKIE } from "@/lib/checkout/resume-constants";
@@ -15,12 +15,15 @@ export default async function CheckoutPage() {
   const customer = await getCustomer().catch(() => null);
   // A started checkout is about to be restored: show the payment step's outline rather than the empty form's
   const resumeHint = (await cookies()).has(RESUME_FLAG_COOKIE);
+  // Cloudflare says which country the visitor is in; the form pre-selects it when the cart ships there
+  const visitorCountry = (await headers()).get("cf-ipcountry")?.trim().toUpperCase() || null;
   return (
     <CheckoutClient
       paypalClientId={paypalClientId}
       stripePublishableKey={stripePublishableKey}
       customer={customer && { email: customer.email, fullName: customer.fullName }}
       resumeHint={resumeHint}
+      visitorCountry={visitorCountry}
     />
   );
 }

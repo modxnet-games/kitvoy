@@ -13,7 +13,7 @@ import { RESUME_FLAG_COOKIE, RESUME_LINK_PARAM, SESSION_TTL_MS, isCheckoutToken 
  */
 export const CHECKOUT_STORAGE_KEY = "kitvoy-checkout";
 
-const DRAFT_FIELDS = ["email", "fullName", "phone", "address1", "address2", "city", "state", "zip"] as const;
+const DRAFT_FIELDS = ["email", "fullName", "phone", "address1", "address2", "city", "state", "zip", "country"] as const;
 export type CheckoutDraft = Partial<Record<(typeof DRAFT_FIELDS)[number], string>>;
 
 export interface CheckoutRecord {

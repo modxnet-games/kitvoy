@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function ReturnsPolicyPage() {
   return (
-    <PolicyPage path="/returns" title="Returns & refunds" intro={`If your inflator isn't right for you, you can return it within ${days} days of delivery.`}>
+    <PolicyPage path="/returns" title="Returns & refunds" intro={`If your order isn't right for you, you can return it within ${days} days of delivery.`}>
       <section aria-labelledby="window">
         <h2 id="window">{days}-day returns</h2>
         <p>You can return unused items in their original packaging within {days} days of the delivery date for a refund of the price you paid.</p>

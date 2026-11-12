@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getCatalogProduct, getCatalogVariant } from "@/config/catalog";
 
 import { META_PIXEL_ID } from "@/config/analytics";
 import { prisma } from "@/lib/db";
@@ -39,11 +40,22 @@ export const normalizeEmail = (email: string | undefined | null) => {
   return e.includes("@") ? e : undefined;
 };
 
-/** ph: digits only, with the country code; US numbers get their leading 1 */
+/** Dialling codes of the countries the store ships to, for numbers typed without one */
+const DIAL_CODES: Record<string, string> = { us: "1", gb: "44", de: "49", fr: "33", nl: "31", es: "34", mx: "52", cl: "56" };
+
+/** ph: digits only, with the country code; a national number gets its country's code in front */
 export const normalizePhone = (phone: string | undefined | null, country = "us") => {
-  let digits = (phone ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  const raw = (phone ?? "").trim();
+  let digits = raw.replace(/\D/g, "").replace(/^0+/, "");
   if (!digits) return undefined;
-  if (country === "us" && digits.length === 10) digits = `1${digits}`;
+  if (country === "us") {
+    if (digits.length === 10) digits = `1${digits}`;
+  } else {
+    const dial = DIAL_CODES[country];
+    // Typed with + or 00, or already starting with the code: taken as international
+    const international = raw.startsWith("+") || raw.replace(/\D/g, "").startsWith("00") || (dial ? digits.startsWith(dial) : true);
+    if (dial && !international) digits = `${dial}${digits}`;
+  }
   return digits.length >= 7 ? digits : undefined;
 };
 
@@ -223,18 +235,29 @@ export function unitPricePaid(lineTotal: number, quantity: number): number {
   return quantity > 0 ? Math.round(Math.round(lineTotal * 100) / quantity) / 100 : 0;
 }
 
-type OrderLine = { productId: string | null; quantity: number; unitPrice: number; lineTotal: number };
+type OrderLine = { productId: string | null; productSlug?: string | null; variantKey?: string | null; quantity: number; unitPrice: number; lineTotal: number };
 
-/** The order's lines as Meta contents, by SKU (falling back to the product id). */
+/**
+ * The order's lines as Meta contents. The id is the colour's SKU for products
+ * sold in several colours (the same id the browser pixel and the product feed
+ * use), else the product's SKU, falling back to the product id.
+ */
 export async function orderContents(items: OrderLine[]): Promise<MetaContent[]> {
   const ids = items.flatMap((i) => (i.productId ? [i.productId] : []));
   const products = ids.length ? await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, sku: true } }) : [];
   const skuOf = new Map(products.map((p) => [p.id, p.sku]));
   return items.map((i) => ({
-    id: (i.productId && skuOf.get(i.productId)) || i.productId || "unknown",
+    id: (i.variantKey && getCatalogVariant(i.productSlug, i.variantKey)?.sku) || (i.productId && skuOf.get(i.productId)) || i.productId || "unknown",
     quantity: i.quantity,
     item_price: unitPricePaid(i.lineTotal, i.quantity),
   }));
+}
+
+/** The niche of an order's products when they share one, so the pixel learns each niche apart. */
+export function orderContentCategory(items: { productSlug?: string | null }[]): string | undefined {
+  const categories = new Set(items.map((i) => getCatalogProduct(i.productSlug)?.metaCategory ?? ""));
+  const [only] = categories;
+  return categories.size === 1 && only ? only : undefined;
 }
 
 /** The parts of an order a server event is built from. */
@@ -247,6 +270,8 @@ export interface EventOrder {
   attribution: unknown;
   userId: string | null;
   total: number;
+  /** Sent as content_category when set */
+  contentCategory?: string;
 }
 
 /**
@@ -291,6 +316,7 @@ export function buildOrderEvent(
       content_ids: contents.map((c) => c.id),
       contents,
       num_items: contents.reduce((n, c) => n + c.quantity, 0),
+      ...(order.contentCategory && { content_category: order.contentCategory }),
       ...(name === "Purchase" && { order_id: reference }),
     },
   };
@@ -320,7 +346,7 @@ export async function sendPurchaseEvent(orderId: string): Promise<void> {
   });
   if (count === 0) return; // Already sent
 
-  const event = buildOrderEvent("Purchase", order, await orderContents(order.items), Math.floor(Date.now() / 1000));
+  const event = buildOrderEvent("Purchase", { ...order, contentCategory: orderContentCategory(order.items) }, await orderContents(order.items), Math.floor(Date.now() / 1000));
   const sent = await sendMetaEvent(event, reference);
   if (!sent) {
     await prisma.order
@@ -338,6 +364,6 @@ export async function sendInitiateCheckoutEvent(orderId: string): Promise<void> 
   if (!getMetaCapiConfig()) return;
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return;
-  const event = buildOrderEvent("InitiateCheckout", order, await orderContents(order.items), Math.floor(order.createdAt.getTime() / 1000));
+  const event = buildOrderEvent("InitiateCheckout", { ...order, contentCategory: orderContentCategory(order.items) }, await orderContents(order.items), Math.floor(order.createdAt.getTime() / 1000));
   await sendMetaEvent(event, orderReference(order.id));
 }

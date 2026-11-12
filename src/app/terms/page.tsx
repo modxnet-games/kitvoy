@@ -15,7 +15,7 @@ export default function TermsPage() {
     <PolicyPage path="/terms" title="Terms of service" intro="These terms apply when you use kitvoy.com or buy from Kitvoy. By placing an order, you agree to them.">
       <section aria-labelledby="eligibility">
         <h2 id="eligibility">Who can order</h2>
-        <p>You must be at least 18, or have a parent or guardian&apos;s permission, and order for delivery to an address in the United States.</p>
+        <p>You must be at least 18, or have a parent or guardian&apos;s permission, and order for delivery to an address in a country the product ships to (listed in our shipping policy).</p>
       </section>
       <section aria-labelledby="products">
         <h2 id="products">Products and descriptions</h2>
@@ -23,7 +23,7 @@ export default function TermsPage() {
       </section>
       <section aria-labelledby="pricing">
         <h2 id="pricing">Prices and payment</h2>
-        <p>Prices are in US dollars and include standard US shipping. Bundle discounts are shown before you add items to your cart. Payment is taken at checkout through Stripe or PayPal; we never see or store your card details.</p>
+        <p>Prices are in US dollars and include standard shipping to the countries each product ships to. Bundle discounts are shown before you add items to your cart. Payment is taken at checkout through Stripe or PayPal; we never see or store your card details.</p>
       </section>
       <section aria-labelledby="orders">
         <h2 id="orders">Orders</h2>
@@ -34,8 +34,10 @@ export default function TermsPage() {
         <p>Delivery times and costs are set out in our <Link className="text-link" href="/shipping">shipping policy</Link>. You can return unused items within {storePolicies.returns.windowDays} days of delivery under our <Link className="text-link" href="/returns">returns & refunds policy</Link>.</p>
       </section>
       <section aria-labelledby="safety">
-        <h2 id="safety">Using your inflator safely</h2>
-        <p>Read the product instructions before use. Inflate only to the pressure recommended by your vehicle or tire manufacturer, stay with the inflator while it runs, and keep it away from children. An inflator is not a repair for a damaged or punctured tire.</p>
+        <h2 id="safety">Using our products safely</h2>
+        <p>Read the product instructions before use, and follow the limits stated on the product page.</p>
+        <p><strong>Pet toys.</strong> Choose a toy that suits your pet&apos;s size, supervise play, put the toy away afterwards, and stop using it if it is damaged. A small toy can be swallowed by a larger animal; each product page says which pets it is for.</p>
+        <p><strong>Tire inflator.</strong> Inflate only to the pressure recommended by your vehicle or tire manufacturer, stay with the inflator while it runs, and keep it away from children. An inflator is not a repair for a damaged or punctured tire.</p>
       </section>
       <section aria-labelledby="warranty">
         <h2 id="warranty">Warranty and liability</h2>

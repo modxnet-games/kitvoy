@@ -290,9 +290,9 @@ test("the Merchant Center feed follows Google's product data rules and carries o
 
   // The click lands on the product page with attribution; the canonical stays clean
   const origin = (process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000").replace(/\/$/, "");
-  assert.equal(merchantLandingUrl(), `${origin}/?utm_source=google&utm_medium=shopping&utm_campaign=merchant_feed`);
+  assert.equal(merchantLandingUrl(), `${origin}/inflator?utm_source=google&utm_medium=shopping&utm_campaign=merchant_feed`, "the listing lands on the inflator page, which moved from / to /inflator");
   assert.equal(one("link"), merchantLandingUrl().replace(/&/g, "&amp;"), "ampersands are escaped in XML");
-  assert.equal(one("canonical_link"), `${origin}/`);
+  assert.equal(one("canonical_link"), `${origin}/inflator`);
   assert.equal(one("image_link"), `${origin}/uploads/a.jpg`);
   assert.equal(one("additional_image_link"), `${origin}/uploads/b.jpg`);
   const { attributionFromUrl } = await import("../src/lib/analytics/attribution");
@@ -325,7 +325,7 @@ test("the Organization markup adds business identity only when Store settings pu
   assert.deepEqual(Object.keys(bare), ["@type", "@id", "name", "url", "logo", "hasMerchantReturnPolicy"]);
   const emailOnly = organizationSchema({ supportEmail: "support@kitvoy.com", legalName: "  ", address: "", sameAs: ["", "not a url"] }) as Record<string, unknown>;
   assert.deepEqual(Object.keys(emailOnly), ["@type", "@id", "name", "url", "logo", "hasMerchantReturnPolicy", "email", "contactPoint"], "blank fields publish nothing");
-  assert.deepEqual(emailOnly.contactPoint, { "@type": "ContactPoint", contactType: "customer support", email: "support@kitvoy.com", areaServed: "US", availableLanguage: "en" });
+  assert.deepEqual(emailOnly.contactPoint, { "@type": "ContactPoint", contactType: "customer support", email: "support@kitvoy.com", areaServed: ["US", "GB", "DE", "FR", "NL", "ES", "MX", "CL"], availableLanguage: "en" });
   const full = organizationSchema({
     supportEmail: "support@kitvoy.com", supportPhone: "+1 505 555 0100", legalName: "Example Holdings LLC",
     address: "1 Main St, Santa Fe, NM 87501, United States", sameAs: ["https://www.facebook.com/kitvoy", "", "http://insecure.example"],

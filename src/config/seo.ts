@@ -66,8 +66,10 @@ export const merchantListing = {
  * published reviews move the homepage's date on their own (see sitemap.ts).
  */
 export const pageLastModified = {
-  /** Landing copy and FAQ: the product is also named as a portable air compressor, and its specs are listed */
+  /** The inflator's landing copy and FAQ (now at /inflator): also named as a portable air compressor, with its specs listed */
   home: "2026-11-10",
+  /** The storefront home and the /products catalog: first published with the multi-product store */
+  catalog: "2026-11-12",
   /** Help page: payments are by Stripe and PayPal; who operates the store, when published */
   support: "2026-11-10",
 } as const;

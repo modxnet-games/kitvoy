@@ -2,28 +2,51 @@
  * CJdropshipping fulfillment settings.
  *
  * Paid orders are created in CJ automatically when CJ_API_KEY is set. Each
- * store product is mapped to the CJ variant that ships for it; an order with an
- * unmapped product is left for manual fulfillment.
+ * store product (and each colour of it) is mapped to the CJ variant that
+ * ships for it in config/catalog.ts; an order with an unmapped product is
+ * left for manual fulfillment.
  */
+import { catalog, getCatalogProduct, getCatalogVariant, type CountryCode } from "@/config/catalog";
+
+type CjVariant = { vid: string; sku: string; name: string; unitCost: number };
+
+/** The CJ shipping method used when the catalog names none for a product and country. */
+const DEFAULT_LOGISTIC = "CJPacket Sensitive";
+
 export const cjFulfillment = {
   /**
-   * Store product slug → CJ variant (vid from CJ's product query by variant SKU).
-   * unitCost is CJ's price per unit in USD, used for profit when an order's own
-   * CJ charge isn't recorded.
+   * Store product slug → a CJ variant of it, for profit estimates when an
+   * order's own CJ charge isn't recorded. For a product with colours this is
+   * its dearest one, so an estimate never flatters the margin.
    */
-  variants: {
-    "cordless-tire-inflator": {
-      vid: "2411080301261619100",
-      sku: "CJYD218658003CX",
-      name: "Car Portable Wireless Tire Inflator — Wired Wireless Black",
-      unitCost: 12.94,
-    },
-  } as Record<string, { vid: string; sku: string; name: string; unitCost: number }>,
+  variants: Object.fromEntries(
+    catalog.map((p) => [p.slug, p.variants.reduce((a, b) => (b.cj.unitCost > a.cj.unitCost ? b : a)).cj]),
+  ) as Record<string, CjVariant>,
 
-  /** CJ shipping method; must be one CJ offers for the variant (CN → US). */
-  logisticName: process.env.CJ_LOGISTIC_NAME?.trim() || "CJPacket Sensitive",
+  /** CJ shipping method for US orders; CJ_LOGISTIC_NAME overrides it for products that name no other */
+  logisticName: process.env.CJ_LOGISTIC_NAME?.trim() || DEFAULT_LOGISTIC,
   fromCountryCode: "CN",
 };
+
+/** The CJ variant that ships for an order line: its colour's, or the product's only one. */
+export function cjVariantFor(slug: string | null | undefined, variantKey: string | null | undefined): CjVariant | undefined {
+  return getCatalogVariant(slug, variantKey)?.cj;
+}
+
+/**
+ * The CJ shipping method for an order: the one the catalog names for these
+ * products in this country. Products that disagree (or name none) fall back
+ * to the store default, which CJ offers on every route the store uses.
+ */
+export function cjLogisticFor(slugs: (string | null | undefined)[], country: CountryCode): string {
+  const methods = new Set(slugs.map((slug) => getCatalogProduct(slug)?.shipping[country]?.method ?? ""));
+  const [only] = methods;
+  if (methods.size === 1 && only) {
+    // The env override predates the catalog and was set for the US default line
+    return country === "US" && only === DEFAULT_LOGISTIC ? cjFulfillment.logisticName : only;
+  }
+  return cjFulfillment.logisticName;
+}
 
 /**
  * Stand-ins for costs an order hasn't recorded yet. Profit that uses any of

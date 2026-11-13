@@ -380,6 +380,8 @@ export interface OrderConfirmationPayload {
   total: number;
   paymentMethod?: string | null;
   shipTo: string[];
+  /** Orders outside the United States: the country's name and its days in transit (config/catalog.ts) */
+  delivery?: { country: string; days: { min: number; max: number } };
 }
 
 /**
@@ -417,7 +419,9 @@ export function buildOrderConfirmationEmail(p: OrderConfirmationPayload): { subj
   const subject = `Your ${storeName} order ${p.orderReference} is confirmed`;
   const shipping = p.shippingCost > 0 ? formatPrice(p.shippingCost) : "Free";
   const { carrier } = storePolicies.shipping;
-  const timeline = `We'll process your order within ${processingText}. Once it ships, delivery usually takes ${deliveryText} with ${carrier}, and we'll email you the tracking number.`;
+  const timeline = p.delivery
+    ? `We'll process your order within ${processingText}. Once it ships, delivery to ${p.delivery.country} usually takes ${p.delivery.days.min}–${p.delivery.days.max} days, and we'll email you the tracking number.`
+    : `We'll process your order within ${processingText}. Once it ships, delivery usually takes ${deliveryText} with ${carrier}, and we'll email you the tracking number.`;
   const date = p.orderDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: STORE_TIME_ZONE });
 
   const text = [
@@ -686,7 +690,7 @@ export function buildReviewRequestEmail(p: ReviewRequestPayload): { subject: str
   const product = p.productName.trim().toLowerCase();
   const subject = `How's your ${product} working?`;
   const delivered = p.deliveredAt.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: STORE_TIME_ZONE });
-  const intro = `Your order ${p.orderReference} was delivered on ${delivered}. Once you've had a chance to use your ${product}, would you tell other drivers how it went? It takes about a minute.`;
+  const intro = `Your order ${p.orderReference} was delivered on ${delivered}. Once you've had a chance to use your ${product}, would you tell other customers how it went? It takes about a minute.`;
   const fairness = "We post every genuine review, good or bad, after checking it for spam and personal details.";
   const help = `Something not right with your order? Reply to this email and we'll help. You can return unused items within ${storePolicies.returns.windowDays} days of delivery.`;
   const footer = `You're getting this one-time email because you ordered from ${storeName}.`;

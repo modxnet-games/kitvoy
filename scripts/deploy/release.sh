@@ -22,6 +22,8 @@
 #   4. If any check fails, switches back to the previous release and reloads again.
 #
 # --db-push     back up PostgreSQL, then apply the Prisma schema (additive changes only)
+# --seed-catalog  after the build and before the switch, add any catalog product the database
+#               doesn't have yet (prisma/seed-catalog.ts --apply: it only adds, never edits or deletes)
 # --allow-peak  deploy between 23:00 and 06:00 UTC (US evening), which is refused otherwise
 # --pm2-time    turn on timestamps in the PM2 logs with this reload (needed once; PM2 remembers it)
 #
@@ -33,11 +35,13 @@ BUNDLE="${1:?usage: release.sh <bundle> <branch> [--db-push] [--allow-peak] [--p
 BRANCH="${2:?usage: release.sh <bundle> <branch> [--db-push] [--allow-peak] [--pm2-time]}"
 shift 2
 DB_PUSH=0
+SEED_CATALOG=0
 ALLOW_PEAK=0
 PM2_FLAGS=()
 for arg in "$@"; do
   case "$arg" in
     --db-push) DB_PUSH=1 ;;
+    --seed-catalog) SEED_CATALOG=1 ;;
     --allow-peak) ALLOW_PEAK=1 ;;
     --pm2-time) PM2_FLAGS+=(--time) ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
@@ -110,6 +114,12 @@ if [ "$DB_PUSH" -eq 1 ]; then
   say "database backed up to $BACKUP ($(du -h "$BACKUP" | cut -f1))"
   npx prisma db push --skip-generate >"/root/kitvoy-dbpush.$TS.log" 2>&1 || { discard; die "prisma db push failed, see /root/kitvoy-dbpush.$TS.log"; }
   say "schema applied"
+else
+  # Read-only: a database that lacks a column the new build writes would break checkout after the switch
+  if ! npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code >/dev/null 2>&1; then
+    discard
+    die "the database is behind prisma/schema.prisma; re-run with --db-push"
+  fi
 fi
 
 # ---- 5. build, away from the live server ----
@@ -120,6 +130,17 @@ if ! npx next build >"$BUILD_LOG" 2>&1; then
   die "build failed; the live site was not touched"
 fi
 say "built ($(du -sh .next | cut -f1))"
+
+# ---- 5b. catalog products the database doesn't have yet (adds only) ----
+if [ "$SEED_CATALOG" -eq 1 ]; then
+  SEED_LOG="/root/kitvoy-seed.$TS.log"
+  if ! npx tsx prisma/seed-catalog.ts --apply >"$SEED_LOG" 2>&1; then
+    tail -n 15 "$SEED_LOG"
+    discard
+    die "catalog seed failed; the live site was not touched"
+  fi
+  say "catalog seeded: $(grep -c '^- ' "$SEED_LOG") product(s) checked, see $SEED_LOG"
+fi
 # Pages opened before the switch still ask for the previous build's scripts
 cp -rn "$CURRENT/.next/static/." "$NEW/.next/static/" 2>/dev/null || true
 
@@ -144,15 +165,22 @@ check() { # check <name> <ok: 0|1> <detail>
 
 smoke() {
   FAILED=0
-  local html code chunk train page
+  local html code chunk train page body
   html="$(curl -s -m 20 "$ORIGIN/checkout" || true)"
   code="$(http "$ORIGIN/")"; check "origin  GET /" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   check "origin  GET / names the store" "$(curl -s -m 20 "$ORIGIN/" | grep -q 'Kitvoy' && echo 1 || echo 0)" ""
-  # The catalog, each product page and the inflator's page at its new address
+  # The catalog, each product page and the inflator's page at its new address. The Product markup is
+  # only printed when the product loaded from the database, so it also proves the page can sell.
+  # Bodies are read into variables first: a grep that stops early on a pipe can fail curl under pipefail.
   for page in /products /products/pouncepop /inflator; do
     code="$(http "$ORIGIN$page")"; check "origin  GET $page" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   done
-  check "origin  /inflator still sells the inflator" "$(curl -s -m 20 "$ORIGIN/inflator" | grep -qi 'tire inflator' && echo 1 || echo 0)" ""
+  body="$(curl -s -m 20 "$ORIGIN/inflator" || true)"
+  check "origin  /inflator sells the inflator" "$([[ "$body" == *'"@type":"Product"'* ]] && echo 1 || echo 0)" ""
+  body="$(curl -s -m 20 "$ORIGIN/products/pouncepop" || true)"
+  check "origin  /products/pouncepop sells PouncePop" "$([[ "$body" == *'"@type":"ProductGroup"'* ]] && echo 1 || echo 0)" ""
+  code="$(http "$ORIGIN/products/pouncepop/hero.webp")"; check "origin  GET a PouncePop photo" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
+  body=""
   code="$(http "$ORIGIN/checkout")"; check "origin  GET /checkout" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   check "origin  /checkout renders the checkout outline" "$(printf '%s' "$html" | grep -q 'Loading checkout' && echo 1 || echo 0)" ""
   chunk="$(printf '%s' "$html" | grep -oE '/_next/static/chunks/[A-Za-z0-9._-]+\.js' | head -n 1)"

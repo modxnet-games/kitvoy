@@ -56,7 +56,7 @@ export function validateOrderInput(input: unknown): { valid: false; error: strin
     address1: str(body.address1),
     address2: str(body.address2),
     city: str(body.city),
-    state: str(body.state).toUpperCase(),
+    state: str(body.state),
     zip: str(body.zip),
     paymentMethod: body.paymentMethod === "paypal" ? "paypal" : "card",
   };
@@ -66,6 +66,8 @@ export function validateOrderInput(input: unknown): { valid: false; error: strin
     return { valid: false, error: "validation.country" };
   }
   details.country = country;
+  // US states are two-letter codes; a region typed elsewhere keeps its own spelling
+  if (country === "US") details.state = details.state.toUpperCase();
 
   const firstError = Object.values(validateCheckoutDetails(details))[0];
   if (firstError) {

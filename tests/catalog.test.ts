@@ -168,78 +168,90 @@ test("the cart and the saved order tell colours apart", () => {
   assert.equal(orderLinesKey([{ productId: "p1", quantity: 1, unitPrice: 59.99 }]), "p1x1@5999", "orders without colours keep their key");
 });
 
-test("product copy states only supplier-verified facts, with no fake urgency, reviews or 'was' prices", () => {
+test("product copy carries the owner's spec, with no fake urgency, reviews, 'was' prices, tax notes or size warnings", () => {
   for (const c of productContents) {
     const entry = getCatalogProduct(c.slug)!;
     const faqs = productFaqs(c, entry, c.database.price);
     const visible = [
-      c.name, c.eyebrow, c.headline, c.subheadline, c.fitNote, c.bundle.heading, c.bundle.intro, ...Object.values(c.bundle.tierNotes),
+      c.name, c.eyebrow, c.headline, c.subheadline, c.bundle.heading, c.bundle.intro, ...Object.values(c.bundle.tierNotes),
       ...c.benefits.flatMap((b) => [b.title, b.text]),
       ...c.gallery.flatMap((g) => [g.alt, g.label]),
       ...c.demoLoops.flatMap((d) => [d.title, d.caption, d.posterAlt]),
       c.howItWorks.heading, c.howItWorks.tip ?? "", ...c.howItWorks.steps.flatMap((s) => [s.title, s.text]),
-      c.comparison.heading, ...c.comparison.rows.flatMap((r) => [r.feature, r.ours, r.theirs]),
-      c.included.heading, ...c.included.items, ...c.included.notIncluded,
+      c.comparison.heading, c.comparison.theirs, ...c.comparison.rows.flatMap((r) => [r.feature, r.ours, r.theirs]),
+      c.included.heading, ...c.included.items, c.included.imageAlt,
       ...c.story.flatMap((s) => [s.heading, s.text, s.imageAlt]),
       ...faqs.flatMap((f) => [f.q, f.a]),
       c.seo.pageTitle, c.seo.description, c.seo.summary, ...c.seo.facts.flatMap((f) => [f.name, f.value]),
       c.merchant.title, c.merchant.description, ...c.merchant.highlights,
-      c.database.shortDescription, c.database.description, c.database.details,
+      c.database.name, c.database.shortDescription, c.database.description, c.database.details,
+      entry.shortName, entry.tagline,
     ].join(" \n ");
 
-    // Not in the supplier's written listing, so not claimed
-    assert.doesNotMatch(visible, /USB-C|Type-C|obstacle|washable|non-toxic|BPA|certified|motion[- ]activated|motion sensor|auto(matic)? (shut|standby|sleep)|\d+\s*(mAh|hours?\b|minutes? of play)/i);
-    // Water is only ever mentioned to say what the product is not
-    assert.doesNotMatch(visible.replace(/isn't rated as waterproof/g, ""), /waterproof|water[- ]resistant/i);
-    // Nothing a page may not say whatever the product
-    assert.doesNotMatch(visible, /money[- ]back|risk[- ]free|no questions asked|guarantee|bestsell|best[- ]sell|#1|only \d+ left|last units|limited (time|sale|stock)|sale ends|hurry|\d+% off today|was \$|\d[\d,]*\+? (happy )?(customers|reviews|sold)/i);
-    // No medical or behavioural promises (the roadmap's rule for every niche)
-    assert.doesNotMatch(visible, /anxiety|stress relief|calms?|cure|treat(s|ment)?\b|vet[- ]approved|vet[- ]recommended/i);
-    // Competitors are never named or copied
-    assert.doesNotMatch(visible, /calm ?tails|rolly|amazon|chewy/i);
+    // Numbers and claims the owner's spec doesn't give are not invented
+    assert.doesNotMatch(visible, /\d+\s*(mAh|hours?\b|hrs?\b|minutes?\b|mins?\b|dB\b|decibels?)|waterproof|water[- ]resistant|IP[X0-9]{2}\b|non-toxic|BPA|certified|vet[- ](approved|recommended)/i);
+    // Nothing a page may say whatever the product: invented proof, urgency or reference prices
+    assert.doesNotMatch(visible, /bestsell|best[- ]sell|#1\b|only \d+ left|last units|limited (time|sale|stock)|sale ends|hurry|\d+% off|was \$|\d[\d,]*\+? (happy )?(customers|reviews|sold)|\d(\.\d)? ?(stars?|out of 5)/i);
+    // No treatment promises (the roadmap's rule for every niche)
+    assert.doesNotMatch(visible, /anxiety|stress relief|cures?\b|treats? (anxiety|stress|boredom)|therap/i);
+    // Competitors are never named
+    assert.doesNotMatch(visible, /calm ?tails|rolly|meow ?tumble|amazon|chewy/i);
+    // The owner's rules of 2026-11-12: no tax or customs notes, no size or safety warnings
+    assert.doesNotMatch(visible, /customs|\bVAT\b|dut(y|ies)|import tax|on delivery are|charged at the door/i);
+    assert.doesNotMatch(visible, /golf|chok|swallow|not for (medium|large)|medium or large dogs|cats? only|supervis/i);
+    // American English on the page
+    assert.doesNotMatch(visible, /\bcolours?\b|\bfavourite\b|\bgrey\b/i);
 
-    // The box holds what CJ's packing list says, and the page says so in words
-    assert.ok(c.included.items.length >= 1);
-    assert.doesNotMatch(c.included.items.join(" "), /cable|charger|manual|adapter/i, "nothing the packing list doesn't name");
-    // Google's rule: every marked-up fact is readable on the page (the specifications answer carries them)
-    const specs = faqs.find((f) => f.q === "What are the specifications?");
-    assert.ok(specs, "the page states its specifications in visible text");
-    assert.match(specs.a, /42 mm/);
-    assert.match(specs.a, /USB/);
-
-    // The pet-size limit is said where people decide to buy, and in the feed
-    if (c.slug === "pouncepop") {
-      for (const text of [c.fitNote, faqs[0].a, c.merchant.description, c.database.description]) {
-        assert.match(text, /not .*medium or large dogs|don't give it to a medium or large dog/i);
-      }
-    }
-
+    assert.ok(c.gallery.length >= 3 && c.gallery.length <= 5, "the gallery holds five images at most");
+    assert.equal(new Set(c.gallery.map((g) => g.src)).size, c.gallery.length);
+    assert.equal(c.benefits.length, 4);
+    assert.equal(c.howItWorks.steps.length, 3);
     assert.ok(c.merchant.title.length <= 150);
     assert.ok(c.merchant.description.length >= 500 && c.merchant.description.length <= 5000);
     assert.ok(c.merchant.highlights.length >= 2 && c.merchant.highlights.length <= 10);
     for (const text of [c.merchant.title, c.merchant.description, ...c.merchant.highlights]) {
-      assert.doesNotMatch(text, /\$|free shipping|\bsale\b|discount|% off/i, "no price, shipping or promotional wording in listing copy");
+      assert.doesNotMatch(text, /\$|free shipping|\bsale\b|discount|% off|guarantee/i, "no price, shipping or promotional wording in listing copy");
     }
     assert.ok(c.seo.pageTitle.length <= 70);
     assert.ok(c.seo.description.length <= 160);
-    assert.equal(c.database.price, 29.99);
     assert.equal(c.demoLoops.every((d) => d.poster.length > 0), true, "a demo slot always has a still to show");
+    // Google's rule: every marked-up fact is readable on the page (the specifications answer carries them)
+    assert.ok(faqs.some((f) => f.q === "What are the specifications?"), "the page states its specifications in visible text");
+
+    if (c.slug === "pouncepop") {
+      // The owner's confirmed spec (2026-11-12), each point said somewhere on the page
+      assert.match(c.name, /Dog & Cat/);
+      assert.match(visible, /dogs? and cats?|dogs? & cats?/i);
+      for (const claim of [/USB-C/, /obstacle/i, /revers|turns? (around|back)|bounces? (back|off)/i, /touch/i, /standby|sleep|rests?/i, /wakes?/i, /bounce/i, /roll/i, /LED/, /bite-resistant/i, /pet-safe/i]) {
+        assert.match(visible, claim, `the page states ${claim}`);
+      }
+      const specs = faqs.find((f) => f.q === "What are the specifications?")!.a;
+      for (const fact of [/USB-C/, /obstacle/i, /touch/i, /standby/i, /LED/, /bite-resistant/i, /42 mm/, /orange/i, /purple/i, /blue/i, /cable/i]) {
+        assert.match(specs, fact, `the specifications answer states ${fact}`);
+      }
+      // In the box: the ball and its USB-C charging cable, nothing else
+      assert.equal(c.included.items.length, 2);
+      assert.match(c.included.items[0], /PouncePop/);
+      assert.match(c.included.items[1], /USB-C charging cable/i);
+      assert.equal(c.database.price, 29.99);
+    }
   }
 });
 
-test("the product page's shipping answer names every country it ships to and where it ships from", () => {
+test("the product page's shipping and guarantee answers come from the catalog and the policy", () => {
   const faqs = productFaqs(content, ball, 29.99);
-  const shipping = faqs.find((f) => f.q.startsWith("Where does it ship from"))!;
+  const shipping = faqs.find((f) => f.q.startsWith("How fast is shipping"))!;
   for (const code of shipsTo("pouncepop")) assert.ok(shipping.a.includes(COUNTRY_RULES[code].name), `${code} is listed`);
-  assert.match(shipping.a, /partner warehouse overseas/);
+  assert.match(shipping.a, /free and tracked/);
   assert.match(shipping.a, /United States 4–9 days/);
-  assert.ok(faqs.some((f) => /import taxes/i.test(f.q)), "import taxes are disclosed for orders outside the US");
+  assert.doesNotMatch(faqs.map((f) => `${f.q} ${f.a}`).join(" "), /customs|\bVAT\b|dut(y|ies)|import tax/i, "no tax or customs wording anywhere in the FAQ");
   const bundles = faqs.find((f) => f.q.startsWith("How do the bundle savings"))!;
   assert.match(bundles.a, /\$49\.99/);
   assert.match(bundles.a, /\$64\.99/);
   assert.match(bundles.a, /\$24\.98/);
   assert.doesNotMatch(productFaqs(content, ball).map((f) => f.a).join(" "), /\$\d/, "without a price the FAQ names no dollar amounts");
-  assert.match(faqs.at(-1)!.a, /30 days/);
+  assert.match(faqs.at(-1)!.q, /30-Day Money-Back Guarantee/);
+  assert.match(faqs.at(-1)!.a, /within 30 days of delivery/);
 });
 
 test("product markup and feed items describe each colour as its own variant of one product", async () => {
@@ -276,7 +288,7 @@ test("product markup and feed items describe each colour as its own variant of o
     assert.ok(item.includes(`<g:id>${variant.sku}</g:id>`));
     assert.ok(item.includes("<g:item_group_id>PET-001</g:item_group_id>"));
     assert.ok(item.includes(`<g:color>${variant.label}</g:color>`));
-    assert.ok(item.includes(`colour=${variant.key}`), "the listing lands with its colour picked");
+    assert.ok(item.includes(`color=${variant.key}`), "the listing lands with its colour picked");
     assert.ok(item.includes("<g:price>29.99 USD</g:price>"));
     assert.ok(item.includes("<g:identifier_exists>no</g:identifier_exists>"), "no invented GTIN or MPN");
     assert.equal(/<g:sale_price>/.test(item), false);
@@ -285,4 +297,42 @@ test("product markup and feed items describe each colour as its own variant of o
   assert.equal([...feed.matchAll(/<item>/g)].length, 3);
   assert.doesNotMatch(feed.replace(/&(amp|lt|gt|quot);/g, ""), /&/, "no bare ampersand");
   assert.equal(content.merchant.inFeed, false, "the product stays out of the live feed until the owner switches it on");
+});
+
+test("every product photo the page names is a file in public/", async () => {
+  const { existsSync } = await import("node:fs");
+  for (const c of productContents) {
+    const entry = getCatalogProduct(c.slug)!;
+    const paths = new Set([
+      ...c.gallery.map((g) => g.src),
+      ...c.demoLoops.map((d) => d.poster),
+      ...c.story.map((s) => s.image),
+      c.included.image,
+      entry.fallbackImage,
+      ...entry.variants.flatMap((v) => (v.image ? [v.image] : [])),
+    ]);
+    for (const path of paths) assert.ok(existsSync(`public${path}`), `${path} exists`);
+  }
+});
+
+test("an address with no region or postal code reaches Stripe and the customer's email without blanks", async () => {
+  const { intentShipping } = await import("../src/lib/payments/stripe-intent");
+  const { buildOrderConfirmationEmail } = await import("../src/lib/email");
+  type IntentOrder = Parameters<typeof intentShipping>[0];
+  const order = (shippingAddress: unknown) => ({ customerName: "Test Buyer", phone: "+44 7700 900123", location: "x", shippingAddress }) as unknown as IntentOrder;
+
+  const gb = intentShipping(order(toShippingAddress({ ...usDetails, country: "GB", city: "London", state: "", zip: "SW1A 1AA" }))).address!;
+  assert.equal(gb.country, "GB");
+  assert.equal(gb.state, undefined, "an empty county is left out, not sent as an empty string");
+  const cl = intentShipping(order(toShippingAddress({ ...usDetails, country: "CL", city: "Santiago", state: "RM", zip: "" }))).address!;
+  assert.equal(cl.postal_code, undefined);
+  assert.equal(cl.country, "CL");
+  // An order saved before the store shipped abroad has no country: still a US intent
+  assert.equal(intentShipping(order({ address1: "1 Main St", city: "Austin", state: "TX", zip: "73301" })).address!.country, "US");
+
+  const base = { to: "b@example.com", customerName: "Test Buyer", orderReference: "KTV-ABCDEFGH", orderDate: new Date("2026-11-13T12:00:00Z"), items: [{ productName: "PouncePop (Blue)", quantity: 1, lineTotal: 29.99 }], subtotal: 29.99, shippingCost: 0, total: 29.99, paymentMethod: "card", shipTo: ["Test Buyer", "Calle 1", "Madrid, Madrid 28001", "Spain"] };
+  const abroad = buildOrderConfirmationEmail({ ...base, delivery: { country: "Spain", days: { min: 13, max: 16 } } }).text;
+  assert.match(abroad, /delivery to Spain usually takes 13–16 days/);
+  assert.doesNotMatch(abroad, /4–9 business days/, "an order abroad is never promised the US delivery time");
+  assert.match(buildOrderConfirmationEmail(base).text, /4–9 business days/);
 });

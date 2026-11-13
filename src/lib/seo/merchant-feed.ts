@@ -86,7 +86,7 @@ export function catalogFeedItems(product: FeedProduct, entry: CatalogProduct, co
   const ships = shipsTo(entry.slug).includes("US");
   return entry.variants.map((variant) => {
     const tags = { utm_source: "google", utm_medium: "shopping", utm_campaign: "merchant_feed" };
-    const landing = entry.hasColourChoice ? merchantLandingUrl(entry.path, { colour: variant.key, ...tags }) : merchantLandingUrl(entry.path, tags);
+    const landing = entry.hasColourChoice ? merchantLandingUrl(entry.path, { color: variant.key, ...tags }) : merchantLandingUrl(entry.path, tags);
     const gallery = content.gallery.map((g) => g.src).filter((src) => src !== variant.image);
     const mainImage = variant.image ?? gallery[0] ?? product.images[0] ?? siteConfig.ogImage;
     const lines = [

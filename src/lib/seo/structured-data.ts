@@ -249,7 +249,7 @@ export function catalogProductSchema(product: ProductDisplay, entry: CatalogProd
       sku: variant.sku,
       color: variant.label,
       image: variant.image ? absolute(variant.image) : images[0],
-      offers: offer(`${url}?colour=${variant.key}`),
+      offers: offer(`${url}?color=${variant.key}`),
     })),
     ...rating,
   };

@@ -47,7 +47,7 @@ export default function ReturnsPolicyPage() {
         <p>Items that have been used, damaged after delivery, or returned without their original packaging or parts aren&apos;t eligible for a change-of-mind refund. This never affects items that arrived damaged or defective.</p>
       </section>
       <section aria-labelledby="cancel">
-        <h2 id="cancel">Cancelling an order</h2>
+        <h2 id="cancel">Canceling an order</h2>
         <p>Email us as soon as possible. If your order hasn&apos;t shipped yet, we&apos;ll cancel it and refund you in full. Once it has shipped, you can return it under this policy. Delivery details are in our <Link className="text-link" href="/shipping">shipping policy</Link>.</p>
       </section>
     </PolicyPage>

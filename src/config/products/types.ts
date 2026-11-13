@@ -3,9 +3,9 @@
  * copy; the page template (components/product/product-page.tsx) lays it out.
  * Commerce facts (price tiers, colours, countries) live in config/catalog.ts.
  *
- * Copy rules, the same as for the inflator: state only what the supplier's
- * written listing or its photos confirm, no strike-through or "was" prices,
- * no invented reviews or ratings, no countdowns or stock warnings.
+ * Copy rules: product specs come from the store owner's confirmed spec for
+ * the product (recorded at the top of its file); no strike-through or "was"
+ * prices, no invented reviews or ratings, no countdowns or stock warnings.
  */
 
 export type IconName =
@@ -59,12 +59,11 @@ export interface ProductContent {
   subheadline: string;
   /** Four scannable benefits under the headline */
   benefits: { icon: IconName; title: string; text: string }[];
+  /** The product gallery: five images at most (the template shows no more) */
   gallery: GalleryImage[];
   demoLoops: DemoLoop[];
   /** Heading above the bundle cards */
   bundle: { heading: string; intro: string; tierNotes: Record<number, string> };
-  /** Who the product is for, shown right under the buy box. Safety limits go here */
-  fitNote: string;
   howItWorks: { heading: string; steps: { icon: IconName; title: string; text: string }[]; tip?: string };
   comparison: {
     heading: string;
@@ -72,7 +71,7 @@ export interface ProductContent {
     theirs: string;
     rows: { feature: string; ours: string; theirs: string }[];
   };
-  included: { heading: string; items: string[]; notIncluded: string[]; image: string; imageAlt: string };
+  included: { heading: string; items: string[]; image: string; imageAlt: string };
   /** Longer benefit sections, each beside an image */
   story: { heading: string; text: string; image: string; imageAlt: string }[];
   /** Product questions. Shipping and returns answers are added by the template from the policy config */

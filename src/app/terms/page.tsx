@@ -35,8 +35,7 @@ export default function TermsPage() {
       </section>
       <section aria-labelledby="safety">
         <h2 id="safety">Using our products safely</h2>
-        <p>Read the product instructions before use, and follow the limits stated on the product page.</p>
-        <p><strong>Pet toys.</strong> Choose a toy that suits your pet&apos;s size, supervise play, put the toy away afterwards, and stop using it if it is damaged. A small toy can be swallowed by a larger animal; each product page says which pets it is for.</p>
+        <p>Read the product instructions before use.</p>
         <p><strong>Tire inflator.</strong> Inflate only to the pressure recommended by your vehicle or tire manufacturer, stay with the inflator while it runs, and keep it away from children. An inflator is not a repair for a damaged or punctured tire.</p>
       </section>
       <section aria-labelledby="warranty">

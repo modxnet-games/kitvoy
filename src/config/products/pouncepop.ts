@@ -1,191 +1,206 @@
 import type { ProductContent } from "./types";
 
 /**
- * PouncePop: Kitvoy's name for CJdropshipping product CJYD1693059, "Smart
- * Rolling Ball Pet Cat Toy Ball Bite-resistant Elastic Ball" (variants: orange
- * red, purple, blue; all "USB").
+ * PouncePop Smart Interactive Dog & Cat Ball: Kitvoy's name for CJdropshipping
+ * product CJYD1693059 (variants: orange red 01AZ, purple 02BY, blue 03CX).
  *
- * VERIFIED on 2026-11-12, from CJ's written listing and its own photos. Only
- * these may be stated:
- *  - It rolls and hops by itself ("smart rolling ball", "automatic jumping
- *    ball"; the retail box says "Smart Jumping Ball"). A photo labels the hop
- *    at about 3 cm.
- *  - The ring around the power button lights up when it is on (photos).
- *  - "Bite-resistant" shell (supplier's product name).
- *  - 42 mm across (photo label). 42–59 g product weight (listing).
- *  - Built-in battery, charges over USB (listing: battery attribute, "USB").
- *  - Material: plastic (listing).
- *  - Listed for cats ("Applicable object: Cat").
- *  - Packing list, word for word: "1* Elastic Ball". Nothing else.
+ * SPEC AND POSITIONING: set by the store owner on 2026-11-12, and the page
+ * follows them:
+ *  - Sold for both dogs and cats.
+ *  - USB-C fast recharging; smart obstacle avoidance (auto-reverses when it
+ *    hits walls or furniture); motion/touch activation with automatic standby
+ *    and wake-up cycles that save battery; two play modes (energetic bounce,
+ *    erratic roll); LED light ring; durable, bite-resistant, pet-safe shell.
+ *  - In the box: 1 PouncePop smart ball and 1 USB-C charging cable.
+ *  - Free tracked shipping and a 30-Day Money-Back Guarantee. No customs, VAT
+ *    or duty notes and no size warnings on the page.
  *
- * NOT VERIFIED, so not claimed anywhere on the page: USB-C or any connector
- * type, an included charging cable, obstacle avoidance, motion or touch
- * wake-up, automatic standby or a timer, play modes, battery life, charging
- * time, waterproofing or washability, noise level, any safety certification
- * or "non-toxic" claim, and suitability for medium or large dogs. At 42 mm it
- * is small enough for a bigger dog to swallow, which the page says plainly.
+ * For the record, CJ's own listing (checked the same day) states less: a
+ * self-rolling, jumping, bite-resistant plastic ball, 42 mm across, with a
+ * built-in battery charged over "USB", listed for cats, packing list
+ * "1* Elastic Ball". The points above that go beyond it rest on the owner's
+ * confirmation, not on the listing.
  *
- * To unlock a claim: get it in writing from CJ, or test a sample, then add it
- * here and to the facts below in the same change.
+ * Still not stated anywhere, because nobody has given a figure: battery life,
+ * charging time, noise level, any waterproof rating or certification.
+ *
+ * Standing rules for every product page: no strike-through or "was" prices,
+ * no invented reviews, ratings or customer counts, no countdowns or stock
+ * warnings, no competitor names, and American English.
  */
 const base = "/products/pouncepop";
 
 export const pouncepop: ProductContent = {
   slug: "pouncepop",
-  name: "PouncePop Self-Rolling Cat Ball",
-  eyebrow: "PouncePop · self-rolling cat ball",
-  headline: "The little ball that plays back.",
+  name: "PouncePop Smart Interactive Dog & Cat Ball",
+  eyebrow: "PouncePop Smart Interactive Dog & Cat Ball",
+  headline: "You work. They play. Nobody feels guilty.",
   subheadline:
-    "PouncePop rolls and hops by itself, so your cat gets a real chase even when your hands are busy. Switch it on, set it down and watch the stalking start.",
+    "That look when you open the laptop? PouncePop answers it. A smart ball that rolls, bounces and reverses off furniture by itself, so your dog or cat stays happily busy.",
   benefits: [
-    { icon: "sparkles", title: "Moves by itself", text: "It rolls and makes little hops with nobody throwing it." },
-    { icon: "zap", title: "Glows as it goes", text: "The ring around the button lights up while it's on, easy to track across the floor." },
-    { icon: "shield", title: "Bite-resistant shell", text: "Made for batting, pouncing and being carried off in triumph." },
-    { icon: "battery", title: "Rechargeable", text: "A built-in battery that charges over USB. No button cells to buy." },
+    { icon: "paw", title: "Guilt-free workdays", text: "It plays by itself, so they get a real chase while you get through your inbox." },
+    { icon: "zap", title: "Reverses off furniture", text: "Smart obstacle avoidance: it bumps a wall or a chair leg, backs up and plays on." },
+    { icon: "hand", title: "Wakes at a touch", text: "Rests on standby to save battery, then springs back to life at a paw or a nose." },
+    { icon: "shield", title: "Built for rough play", text: "A durable, bite-resistant, pet-safe shell made for pounces, paws and rough-and-tumble play." },
   ],
+  // Five images at most: the hero, the chase, smart motion, the shell and the box
   gallery: [
-    { src: `${base}/hero.webp`, alt: "PouncePop self-rolling cat ball in orange, showing its power button and clear ring", label: "PouncePop" },
-    { src: `${base}/lifestyle-cat.webp`, alt: "A cat crouched to pounce on the glowing orange PouncePop ball on a living-room floor", label: "The chase" },
-    { src: `${base}/play-motion.webp`, alt: "The PouncePop ball mid-hop above the floor as a cat's paw reaches for it", label: "Roll and hop" },
-    { src: `${base}/texture-macro.webp`, alt: "Close-up of the PouncePop's grooved shell and the clear ring around its power button", label: "The shell" },
-    { src: `${base}/scale-hand.webp`, alt: "A purple PouncePop ball resting in an open palm to show its 42 mm size", label: "Actual size" },
-    { src: `${base}/in-the-box.webp`, alt: "What comes in the box: one PouncePop ball", label: "In the box" },
+    { src: `${base}/hero.webp`, alt: "PouncePop smart ball in orange with its LED light ring glowing", label: "PouncePop" },
+    { src: `${base}/action-dog-cat.webp`, alt: "A Corgi puppy and a cat chasing the glowing PouncePop ball across a living-room floor", label: "The chase" },
+    { src: `${base}/smart-motion.webp`, alt: "The PouncePop ball bouncing back off furniture and rolling away in a new direction", label: "Smart motion" },
+    { src: `${base}/shell-detail.webp`, alt: "Close-up of the PouncePop's textured bite-resistant shell and LED light ring", label: "Shell & LED" },
+    { src: `${base}/in-the-box.webp`, alt: "What's in the box: one PouncePop smart ball and one USB-C charging cable", label: "In the box" },
   ],
   // Stills stand in until real clips of the product are filmed; set `src` to bind one
   demoLoops: [
-    { id: "roll", title: "It rolls by itself", caption: "Set it down and it's off across the floor.", src: null, poster: `${base}/lifestyle-cat.webp`, posterAlt: "A cat watching the PouncePop ball roll across the floor" },
-    { id: "hop", title: "Then it hops", caption: "Little jumps, a few centimetres high, that are hard to ignore.", src: null, poster: `${base}/play-motion.webp`, posterAlt: "The PouncePop ball in the air mid-hop" },
-    { id: "glow", title: "And it glows", caption: "The ring lights up while it's switched on.", src: null, poster: `${base}/hero.webp`, posterAlt: "The PouncePop ball with its ring lit" },
+    { id: "play", title: "It plays by itself", caption: "One nudge and it's off across the floor, bouncing and rolling.", src: null, poster: `${base}/action-dog-cat.webp`, posterAlt: "A dog and a cat chasing the PouncePop ball as it rolls by itself" },
+    { id: "reverse", title: "It reverses off furniture", caption: "Bumps into the sofa, backs up and rolls right back into the game.", src: null, poster: `${base}/smart-motion.webp`, posterAlt: "The PouncePop ball turning back from a piece of furniture" },
+    { id: "wake", title: "It wakes at a touch", caption: "One nudge and the LED ring lights up for another round.", src: null, poster: `${base}/hero.webp`, posterAlt: "The PouncePop ball with its LED ring lit" },
   ],
   bundle: {
-    heading: "One for now. One for under the sofa.",
-    intro: "Small balls go missing, and two cats rarely share. Every pack ships free, and you pick the colour of each ball.",
+    heading: "One ball is fun. Two keeps the peace.",
+    intro: "Pick your pack, then pick the color of every ball: orange, purple or blue. Free tracked shipping and a 30-Day Money-Back Guarantee on every order.",
     tierNotes: {
-      1: "One ball to start the chase.",
-      2: "One each for two pets, or a spare for when the first rolls under the sofa.",
-      3: "A full set: one in every colour, or a ball for each room.",
+      1: "One ball to end the boredom.",
+      2: "One each for the dog and the cat, or one in play while the other charges.",
+      3: "One in every color: a ball for every pet and every room in the house.",
     },
   },
-  fitNote:
-    "Made for cats, and fine for toy-size dogs with you in the room. It is 42 mm across, about the size of a golf ball, so it is not for medium or large dogs, who could swallow it.",
   howItWorks: {
     heading: "Playtime in three steps.",
     steps: [
-      { icon: "battery", title: "Charge it", text: "Top up the built-in battery over USB before the first play." },
-      { icon: "power", title: "Switch it on", text: "Press the power button in the middle of the ring. The ring lights up." },
-      { icon: "paw", title: "Set it down", text: "Put it on the floor and step back. It rolls and hops; your cat does the rest." },
+      { icon: "battery", title: "Charge it up", text: "Plug in the included USB-C cable. Fast recharging has it ready to play." },
+      { icon: "power", title: "Tap to wake", text: "Press the power button, then a touch from you or a nudge from your pet wakes it. The LED ring lights up and away it goes." },
+      { icon: "play", title: "Let them chase", text: "It bounces, rolls and reverses off walls and furniture, then rests on standby until the next nudge." },
     ],
-    tip: "It's a chase toy, not a chew toy. Put it away when playtime is over, and stop using it if the shell gets damaged.",
   },
   comparison: {
-    heading: "PouncePop vs. an ordinary toy ball.",
+    heading: "PouncePop vs. an ordinary pet toy.",
     ours: "PouncePop",
-    theirs: "Ordinary toy ball",
+    theirs: "An ordinary pet toy",
     rows: [
-      { feature: "Who moves it", ours: "It rolls and hops by itself", theirs: "You throw it, or it sits there" },
-      { feature: "Catching the eye", ours: "A ring that lights up while it's on", theirs: "No light" },
-      { feature: "Power", ours: "Built-in battery, recharged over USB", theirs: "None" },
-      { feature: "Shell", ours: "Bite-resistant, grooved for grip", theirs: "Varies" },
-      { feature: "Colours", ours: "Orange, purple or blue", theirs: "Varies" },
+      { feature: "Who starts the game", ours: "Your pet, with a nudge or a tap", theirs: "You, one throw at a time" },
+      { feature: "Movement", ours: "Two modes: energetic bounce and erratic roll", theirs: "Only moves when it's thrown" },
+      { feature: "Walls and furniture", ours: "Auto-reverses and keeps playing", theirs: "Stops where it lands" },
+      { feature: "When play pauses", ours: "Rests on standby, wakes at a touch", theirs: "Sits there until you pick it up" },
+      { feature: "Catching their eye", ours: "LED light ring", theirs: "No light" },
+      { feature: "Power", ours: "USB-C fast recharging, cable included", theirs: "Your throwing arm" },
     ],
   },
   included: {
     heading: "What's in the box.",
-    items: ["1 PouncePop ball in the colour you chose (one per ball ordered)"],
-    notIncluded: ["A USB wall charger"],
+    items: ["1x PouncePop Smart Ball in the color you choose", "1x USB-C Charging Cable"],
     image: `${base}/in-the-box.webp`,
-    imageAlt: "One orange PouncePop ball on a plain background: the full contents of the box",
+    imageAlt: "One PouncePop smart ball and one USB-C charging cable laid out on a plain surface",
   },
   story: [
     {
-      heading: "A chase that doesn't need your hands.",
-      text: "Indoor cats have energy to burn and you have a day to get through. PouncePop keeps moving by itself, rolling one way and then hopping, so there's something to stalk while you cook, work or finally sit down.",
-      image: `${base}/banner-lifestyle.webp`,
-      imageAlt: "A cat stalking the glowing PouncePop ball across a sunny living-room floor",
+      heading: "The bored-pet guilt ends here.",
+      text: "You know the look: toy at your feet, eyes on you, a meeting about to start. PouncePop takes the next round. It bounces and rolls by itself, so your dog or cat is off on a proper chase while you get your work done. Look up and they're busy, happy and far too occupied to sulk.",
+      image: `${base}/action-dog-cat.webp`,
+      imageAlt: "A dog and a cat busy chasing the PouncePop ball at home",
     },
     {
-      heading: "Small enough to bat. Tough enough to pounce on.",
-      text: "At 42 mm it's sized for paws: easy to swat, trap and carry. The grooved shell is bite-resistant and the ring around the button lights up while it's on, so it stays easy to follow.",
-      image: `${base}/texture-macro.webp`,
-      imageAlt: "The grooved shell and clear ring of the PouncePop ball up close",
+      heading: "Smart enough to back out of a corner.",
+      text: "Most balls roll to a wall and stay there. PouncePop's smart obstacle avoidance feels the bump, reverses and heads back into the room. Two play modes, an energetic bounce and an erratic roll, keep the chase unpredictable, and one nudge wakes it from standby for the next game.",
+      image: `${base}/smart-motion.webp`,
+      imageAlt: "The PouncePop ball reversing away from furniture",
+    },
+    {
+      heading: "Built for paws, pounces and evening zoomies.",
+      text: "The durable, bite-resistant shell is pet-safe and made to be pounced on, batted around and wrestled across the rug. The LED light ring gives them a glow to stalk from across the room, and USB-C fast recharging has it charged for tonight's sprint down the hallway.",
+      image: `${base}/shell-detail.webp`,
+      imageAlt: "The textured shell and LED ring of the PouncePop ball up close",
     },
   ],
   faq: [
     {
-      q: "Which pets is it for?",
-      a: "PouncePop is made for cats. It also suits toy-size dogs as long as you're in the room. It is 42 mm across, about the size of a golf ball, so please don't give it to a medium or large dog: a ball this small can be swallowed.",
+      q: "Is it for dogs or cats?",
+      a: "Both. PouncePop is made for dogs and cats alike, because it speaks to the instinct they share: if it moves, it needs chasing. Dogs nose it, herd it and pounce. Cats stalk it, bat it and ambush it from behind the sofa. At 42 mm across it's light and quick, easy to bat and chase. One of each at home? The 2-Pack gives everybody a ball of their own, in a color of their own.",
     },
     {
       q: "How does it work?",
-      a: "Press the power button in the middle of the ring and put the ball on the floor. It rolls and makes little hops by itself, and the ring lights up while it's on.",
+      a: "Charge it with the included USB-C cable, switch it on and give it a tap. The LED ring lights up and the ball starts moving by itself in two play modes: an energetic bounce and an erratic roll. Between rounds it slips into standby automatically to save battery, and the next touch from a paw or a nose starts the game again.",
     },
     {
-      q: "Will my cat chew through it?",
-      a: "The shell is bite-resistant and made for batting, pouncing and carrying. It is a chase toy rather than a chew toy, though: put it away after play, and stop using it if the shell is cracked or damaged.",
+      q: "Will it get stuck against walls or furniture?",
+      a: "No. PouncePop has smart obstacle avoidance: when it hits a wall, a table leg or the side of the sofa, it automatically reverses and rolls back into open floor. The chase keeps going, and you stay in your chair.",
     },
     {
-      q: "Does it work on carpet?",
-      a: "It has the most room to move on hard, smooth floors and low-pile rugs. A ball this small slows down in deep or shaggy carpet, so expect shorter runs there.",
+      q: "Will it stand up to teeth and rough play?",
+      a: "Yes. The shell is durable, bite-resistant and pet-safe, built for the way dogs and cats really play: pouncing, batting, grabbing and wrestling it across the floor. It takes the rough stuff and rolls straight back into the game.",
     },
     {
-      q: "Is it noisy?",
-      a: "There's a small motor inside, so you'll hear it roll and tap along on a hard floor. We don't quote a decibel figure because we don't have a measured one. If your cat plays at night, a rug softens the sound.",
+      q: "Where can it play, and is it noisy?",
+      a: "Set it down wherever your pet plays. PouncePop bounces and rolls across the room, and smart obstacle avoidance reverses it off walls and furniture so the game keeps going. As for noise, it sounds like playtime: a small ball bouncing and rolling. When the game stops it rests on standby, still and quiet, until a paw wakes it.",
     },
     {
-      q: "How long does the battery last?",
-      a: "It has a built-in rechargeable battery that charges over USB, so there are no batteries to replace. We don't publish hours per charge yet: the maker doesn't state a figure and we would rather not guess. Switch it off after play to save the charge.",
+      q: "How do I charge it?",
+      a: "Plug in the USB-C cable that comes in the box and PouncePop fast-charges, ready for the next game. There are no batteries to buy or swap. It looks after its own charge too: it rests on standby between rounds and wakes at a touch, so the battery is saved for the chase.",
     },
     {
       q: "How do I clean it?",
-      a: "Wipe it with a slightly damp cloth and dry it. Don't rinse or soak it: there are electronics and a charging port inside, and it isn't rated as waterproof.",
+      a: "A quick wipe with a soft, slightly damp cloth keeps the shell looking fresh. It takes a few seconds, and then it's ready for the next round.",
+    },
+    {
+      q: "What's in the box?",
+      a: "One PouncePop Smart Ball in the color you choose and one USB-C charging cable. With a 2-Pack or 3-Pack you pick the color of each ball: orange, purple or blue.",
     },
     {
       q: "What are the specifications?",
-      a: "A self-rolling, self-hopping ball 42 mm across, with a plastic bite-resistant shell, a light-up ring, and a built-in battery that charges over USB. It comes in orange, purple and blue. Each box holds one ball.",
+      a: "PouncePop is a smart interactive ball for dogs and cats. It has USB-C fast recharging, smart obstacle avoidance, motion/touch activation with automatic standby, two play modes (bounce and roll), an LED light ring and a bite-resistant, pet-safe shell. It measures 42 mm across and comes in orange, purple and blue. The box holds one ball and one USB-C charging cable.",
     },
   ],
   seo: {
-    pageTitle: "PouncePop Self-Rolling Cat Ball – Smart Hopping Cat Toy | Kitvoy",
+    pageTitle: "PouncePop Smart Interactive Dog & Cat Ball | Kitvoy",
     description:
-      "PouncePop is a small self-rolling, hopping ball for cats with a light-up ring and a USB-rechargeable battery. Orange, purple or blue. Free tracked shipping.",
+      "PouncePop is a smart ball for dogs and cats that bounces, rolls and reverses off furniture by itself. USB-C fast recharging. Free tracked shipping.",
     summary:
-      "A 42 mm self-rolling, self-hopping toy ball for cats, with a bite-resistant plastic shell, a ring that lights up while it is on and a built-in battery that charges over USB. Sold in orange, purple and blue. Each box holds one ball.",
-    category: "Pet Supplies > Cat Supplies > Cat Toys > Interactive Cat Toys",
-    googleCategory: "Animals & Pet Supplies > Pet Supplies > Cat Supplies > Cat Toys",
+      "PouncePop is a smart interactive ball for dogs and cats, sold by Kitvoy. It moves by itself in two play modes (energetic bounce and erratic roll), reverses automatically when it hits walls or furniture, wakes at a touch or movement and goes into standby to save battery. It has an LED light ring, a durable bite-resistant pet-safe shell and USB-C fast recharging. It is 42 mm across and comes in orange, purple and blue. Each box holds one ball and one USB-C charging cable.",
+    category: "Pet Supplies > Dog & Cat Toys > Interactive Pet Toys",
+    googleCategory: "Animals & Pet Supplies > Pet Supplies > Dog Supplies > Dog Toys",
     material: "Plastic",
+    // Every fact here is also said in the "What are the specifications?" answer
     facts: [
+      { name: "For", value: "Dogs and cats" },
+      { name: "Play modes", value: "Two: bounce and roll" },
+      { name: "Obstacle avoidance", value: "Reverses off walls and furniture" },
+      { name: "Activation", value: "Motion/touch, with automatic standby" },
+      { name: "Light", value: "LED light ring" },
+      { name: "Shell", value: "Bite-resistant, pet-safe" },
+      { name: "Charging", value: "USB-C fast recharging" },
       { name: "Diameter", value: "42 mm" },
-      { name: "Movement", value: "Rolls and hops by itself" },
-      { name: "Light", value: "Light-up ring" },
-      { name: "Shell", value: "Bite-resistant plastic" },
-      { name: "Power", value: "Built-in battery, USB charging" },
-      { name: "In the box", value: "1 ball" },
+      { name: "Colors", value: "Orange, purple, blue" },
+      { name: "In the box", value: "1 ball, 1 USB-C charging cable" },
     ],
     lastModified: "2026-11-12",
   },
   merchant: {
     inFeed: false,
-    title: "Kitvoy PouncePop Self-Rolling Cat Ball – Interactive Hopping Cat Toy with Light-Up Ring, USB Rechargeable",
+    title: "Kitvoy PouncePop Smart Interactive Dog & Cat Ball – Self-Moving Pet Toy with Obstacle Avoidance, LED Light Ring, USB-C Rechargeable",
     description:
-      "The Kitvoy PouncePop is a small interactive ball for cats that rolls and hops by itself, so your cat has something to stalk and chase without anyone throwing it. The ring around its power button lights up while it is on, which makes it easy to follow across the floor. The shell is bite-resistant plastic, grooved for grip and sized for paws at 42 mm across. A built-in battery charges over USB, so there are no batteries to replace. Made for cats; it also suits toy-size dogs under supervision. Because it is 42 mm across, it is not suitable for medium or large dogs. Each box contains one ball.",
+      "The Kitvoy PouncePop is a smart interactive ball for dogs and cats that moves by itself, so pets can chase it during solo play without anyone throwing a toy. It has two play modes, an energetic bounce and an erratic roll, which keep its movement unpredictable. Smart obstacle avoidance makes the ball reverse automatically when it hits a wall or a piece of furniture, so it rolls back into open floor and play continues. Motion and touch activation wakes the ball when a pet nudges it, and automatic standby and wake-up cycles conserve battery between play sessions. An LED light ring makes the ball easy to follow across the floor. The shell is durable, bite-resistant and pet-safe. The built-in battery recharges quickly over USB-C. The ball measures 42 mm across and is available in orange, purple and blue. Each box contains one PouncePop Smart Ball and one USB-C charging cable.",
     highlights: [
-      "Rolls and hops by itself for solo chase play",
-      "Ring around the power button lights up while it is on",
-      "Bite-resistant plastic shell, grooved for grip",
-      "42 mm across, sized for cats' paws",
-      "Built-in battery that charges over USB",
-      "Made for cats; not for medium or large dogs",
+      "Self-moving smart ball for dogs and cats, made for solo indoor play",
+      "Smart obstacle avoidance: reverses automatically when it hits walls or furniture",
+      "Motion and touch activation with automatic standby and wake-up to conserve battery",
+      "Two play modes: energetic bounce and erratic roll",
+      "LED light ring that is easy to follow across the floor",
+      "Durable, bite-resistant, pet-safe shell",
+      "USB-C fast recharging, with a USB-C charging cable in the box",
+      "Available in orange, purple and blue",
     ],
     weightGrams: 59,
   },
   database: {
-    name: "PouncePop Self-Rolling Cat Ball",
+    name: "PouncePop Smart Interactive Dog & Cat Ball",
     sku: "PET-001",
     price: 29.99,
-    shortDescription: "A small ball for cats that rolls and hops by itself, with a light-up ring and a USB-rechargeable battery.",
+    shortDescription: "A smart ball for dogs and cats that bounces, rolls and reverses off furniture by itself, with an LED light ring and USB-C fast recharging.",
     description:
-      "PouncePop rolls and hops by itself, so your cat gets a chase without anyone throwing it. The ring around the power button lights up while it is on, the shell is bite-resistant, and the built-in battery charges over USB. It is 42 mm across: made for cats, fine for toy-size dogs under supervision, and not for medium or large dogs.",
-    details: "• Rolls and hops by itself\n• Light-up ring\n• Bite-resistant plastic shell\n• 42 mm across\n• Built-in battery, USB charging\n• In the box: 1 ball",
+      "PouncePop keeps dogs and cats busy when your hands are full. It moves by itself in two play modes, an energetic bounce and an erratic roll, and smart obstacle avoidance reverses it whenever it hits a wall or furniture. A nudge or a tap wakes it, and it rests on standby between plays to save battery. The LED light ring holds their attention, the durable bite-resistant shell is pet-safe, and the battery recharges fast over USB-C with the included cable. Choose orange, purple or blue.",
+    details:
+      "• For dogs and cats\n• Two play modes: energetic bounce and erratic roll\n• Smart obstacle avoidance: auto-reverses off walls and furniture\n• Motion/touch activation with automatic standby\n• LED light ring\n• Durable, bite-resistant, pet-safe shell\n• USB-C fast recharging\n• 42 mm across\n• Colors: orange, purple, blue\n• In the box: 1x PouncePop Smart Ball, 1x USB-C Charging Cable",
     categorySlug: "pet-care",
     categoryName: "Pet Care",
     stock: 200,

@@ -39,7 +39,7 @@ export async function GET() {
         const saved = getBundleSavings(row.price, q, entry.slug);
         return `- ${q} ${q === 1 ? entry.unit.one : entry.unit.many}: ${formatPrice(total)}${saved > 0 ? ` (save ${formatPrice(saved)})` : ""}`;
       }),
-      `- Colours: ${entry.variants.map((v) => v.label).join(", ")}`,
+      `- Colors: ${entry.variants.map((v) => v.label).join(", ")}`,
       `- Ships free to: ${shipsTo(entry.slug).map((code) => COUNTRY_RULES[code].name).join(", ")}`,
       `- Availability: ${row.stock > 0 ? "in stock" : "out of stock"}`,
       ...content.seo.facts.map((f) => `- ${f.name}: ${f.value}`),

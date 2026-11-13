@@ -40,7 +40,7 @@ export default async function OrderReviewPage({ params, searchParams }: { params
     <Link href="/" className="text-link">Back to the store</Link>
     <p className="eyebrow">Order {formatOrderReference(order.id)}</p>
     <h1>{firstName ? `How's it going, ${firstName}?` : "How's it going?"}</h1>
-    <p className="review-intro">Tell other drivers what you think. Your review will be shown as {author} with a Verified Buyer badge. Reviews appear on the site after we check them for spam and personal details.</p>
+    <p className="review-intro">Tell other customers what you think. Your review will be shown as {author} with a Verified Buyer badge. Reviews appear on the site after we check them for spam and personal details.</p>
     {order.products.map(p => p.reviewed
       ? <section key={p.productId} className="review-order-card review-order-done"><h2>{p.productName}</h2><p>Thanks for your review. It will appear on kitvoy.com once we&apos;ve checked it.</p></section>
       : <OrderReviewForm key={p.productId} token={token} productId={p.productId} productName={p.productName} author={author} initialRating={initialRating} />)}

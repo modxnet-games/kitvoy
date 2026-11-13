@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -21,15 +21,15 @@ import {
   RotateCcw,
   Ruler,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
-  TriangleAlert,
   Truck,
-  X,
   Zap,
   type LucideIcon,
 } from "lucide-react";
 
 import "@/app/product-page.css";
+import { useMounted } from "@/hooks/use-mounted";
 
 import { SHIPPING_COUNTRY_CODES, type CatalogProduct, type CatalogVariant, type CountryCode } from "@/config/catalog";
 import { processingText, storePolicies } from "@/config/policies";
@@ -253,6 +253,56 @@ function shippingNotice(entry: CatalogProduct, visitorCountry: string | null | u
   return ships(entry.shipping.US ? "US" : destinations[0]);
 }
 
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+
+/** `days` business days after `from` (Saturdays and Sundays don't count). */
+function addBusinessDays(from: Date, days: number): Date {
+  const date = new Date(from);
+  let left = days;
+  while (left > 0) {
+    date.setDate(date.getDate() + 1);
+    if (date.getDay() !== 0 && date.getDay() !== 6) left -= 1;
+  }
+  return date;
+}
+
+const dateRange = (a: Date, b: Date) => (shortDate.format(a) === shortDate.format(b) ? shortDate.format(a) : `${shortDate.format(a)} – ${shortDate.format(b)}`);
+
+/**
+ * Order today, ships, arrives: real dates worked out from the store's
+ * processing time and this country's transit time (the same figures the
+ * shipping answer gives), counted in business days, as estimates. Drawn after the page loads, since the
+ * dates depend on the visitor's own clock.
+ */
+function DeliveryTimeline({ transit }: { transit: { min: number; max: number } }) {
+  const mounted = useMounted();
+  const today = useMemo(() => (mounted ? new Date() : null), [mounted]);
+
+  const { processingDays } = storePolicies.shipping;
+  const shipsFrom = today ? addBusinessDays(today, processingDays.min) : null;
+  const shipsBy = today ? addBusinessDays(today, processingDays.max) : null;
+  const steps = [
+    { icon: ShoppingBag, label: "Order today", date: today ? shortDate.format(today) : "" },
+    { icon: Package, label: "Ships", date: shipsFrom && shipsBy ? dateRange(shipsFrom, shipsBy) : "" },
+    { icon: Truck, label: "Arrives", date: shipsFrom && shipsBy ? dateRange(addBusinessDays(shipsFrom, transit.min), addBusinessDays(shipsBy, transit.max)) : "" },
+  ];
+
+  return (
+    <ol className="pp-timeline" aria-label="Estimated delivery timeline">
+      {steps.map(({ icon: Icon, label, date }) => (
+        <li key={label}>
+          <span className="pp-timeline-icon">
+            <Icon aria-hidden="true" />
+          </span>
+          <strong>{label}</strong>
+          <span className="pp-timeline-date">{date || " "}</span>
+        </li>
+      ))}
+      <li className="pp-timeline-note">Estimated dates</li>
+    </ol>
+  );
+}
+
 /**
  * The pack as cart lines. With a colour choice there is one line per colour
  * (`chosen` holds the colour of each unit); without one, a single line.
@@ -267,6 +317,9 @@ function buildLines(product: ProductDisplay, quantity: number, chosen: CatalogVa
   }
   return lines;
 }
+
+/** The gallery never shows more than this many slides, whatever the content file lists. */
+const MAX_GALLERY_SLIDES = 5;
 
 export function ProductPage({ product, entry, content, faqs, reviews, visitorCountry = null }: ProductPageProps) {
   const { tiers, variants } = entry;
@@ -295,10 +348,12 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
   const unitName = capitalise(entry.unit.one);
 
   const leadVariant = leadColour ? variants.find((v) => v.key === leadColour) : undefined;
+  // Five slides at most. A picked colour's photo takes the first slide's place rather than adding one
+  const gallery = content.gallery.slice(0, MAX_GALLERY_SLIDES);
   const slides: GalleryImage[] =
-    leadVariant?.image && content.gallery.length > 0
-      ? [{ src: leadVariant.image, alt: `${content.name}, ${leadVariant.label}`, label: leadVariant.label }, ...content.gallery.slice(1)]
-      : content.gallery;
+    leadVariant?.image && gallery.length > 0
+      ? [{ src: leadVariant.image, alt: `${content.name}, ${leadVariant.label}`, label: leadVariant.label }, ...gallery.slice(1)]
+      : gallery;
 
   const notice = shippingNotice(entry, visitorCountry);
   const viewed = product ? { id: product.id, sku: variants[0]?.sku ?? product.sku, name: content.name, price: product.price, slug: entry.slug } : null;
@@ -313,9 +368,9 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
     return () => observer.disconnect();
   }, []);
 
-  // A link that names a colour (the product feed's listings do: ?colour=blue) opens with it picked for the first unit
+  // A link that names a colour (the product feed's listings do: ?color=blue) opens with it picked for the first unit
   useEffect(() => {
-    const wanted = new URLSearchParams(window.location.search).get("colour");
+    const wanted = new URLSearchParams(window.location.search).get("color");
     if (!wanted || !hasColours || !variants.some((v) => v.key === wanted)) return;
     setColours((current) => current.map((colour, i) => (i === 0 ? wanted : colour)));
     setLeadColour(wanted);
@@ -406,7 +461,7 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
                   {lineTotal != null && (
                     <span className="pp-tier-price">
                       <b>{formatPrice(lineTotal)}</b>
-                      {tier.quantity > 1 && <small>{formatPrice(Math.round((lineTotal * 100) / tier.quantity) / 100)} each</small>}
+                      {tier.quantity > 1 && <small>{formatPrice(Math.floor(Math.round(lineTotal * 100) / tier.quantity) / 100)} each</small>}
                       {savings > 0 && <em className="pp-save">Save {formatPrice(savings)}</em>}
                     </span>
                   )}
@@ -418,7 +473,7 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
           {hasColours && (
             <div className="pp-colours" role="group" aria-labelledby="pp-colours-title">
               <p id="pp-colours-title" className="pp-colours-title">
-                {quantity === 1 ? "Colour" : "Colours"}
+                {quantity === 1 ? "Color" : "Colors"}
               </p>
               {Array.from({ length: quantity }, (_, i) => {
                 const current = variantFor(i);
@@ -470,6 +525,7 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
               )}
             </p>
           )}
+          {notice?.kind === "ships" && <DeliveryTimeline transit={notice.days} />}
 
           <ul className="pp-trust">
             <li>
@@ -478,7 +534,7 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
             </li>
             <li>
               <RotateCcw aria-hidden="true" />
-              {storePolicies.returns.windowDays}-day returns
+              {storePolicies.returns.windowDays}-Day Money-Back Guarantee
             </li>
             <li>
               <LockKeyhole aria-hidden="true" />
@@ -486,10 +542,6 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
             </li>
           </ul>
 
-          <p className="pp-fit-note" role="note">
-            <TriangleAlert aria-hidden="true" />
-            <span>{content.fitNote}</span>
-          </p>
         </div>
       </section>
 
@@ -505,8 +557,8 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
           <div>
             <Package aria-hidden="true" />
             <span>
-              <strong>{storePolicies.returns.windowDays}-day returns</strong>
-              <small>On unused items in original packaging</small>
+              <strong>{storePolicies.returns.windowDays}-Day Money-Back Guarantee</strong>
+              <small>Love it, or send it back for a refund</small>
             </span>
           </div>
           <Link href="/support">
@@ -631,19 +683,6 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
               </li>
             ))}
           </ul>
-          {content.included.notIncluded.length > 0 && (
-            <>
-              <h3 className="eyebrow pp-not-included">Not in the box</h3>
-              <ul className="pp-box-list is-not">
-                {content.included.notIncluded.map((item) => (
-                  <li key={item}>
-                    <X size={18} aria-hidden="true" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
         </div>
       </section>
 

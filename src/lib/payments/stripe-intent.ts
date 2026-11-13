@@ -37,9 +37,10 @@ export function intentShipping(order: IntentOrder): Stripe.PaymentIntentCreatePa
     address: {
       line1: address.address1 ?? order.location,
       line2: address.address2 || undefined,
-      city: address.city,
-      state: address.state,
-      postal_code: address.zip,
+      // Stripe rejects empty strings; a country with no region (or Chile with no postal code) leaves the field out
+      city: address.city || undefined,
+      state: address.state || undefined,
+      postal_code: address.zip || undefined,
       country: countryOf(address),
     },
   };

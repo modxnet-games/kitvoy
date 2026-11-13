@@ -55,7 +55,7 @@ export function CartContents({ onNavigate }: { onNavigate?: () => void }) {
   }, [ids, quoteKey, refreshCatalog]);
 
   if (!mounted) return <div className="cart-empty" role="status">Loading your cart…</div>;
-  if (!items.length) return <div className="cart-empty"><ShoppingBag size={40} strokeWidth={1.4} /><h2>Your next trip starts here.</h2><p>Your cart is empty. Find the right bundle for you.</p><Link className="primary-button" href="/products" onClick={onNavigate}>Browse products <ArrowRight size={18} /></Link></div>;
+  if (!items.length) return <div className="cart-empty"><ShoppingBag size={40} strokeWidth={1.4} /><h2>Your cart is empty.</h2><p>Browse our finds and pick the pack that suits you.</p><Link className="primary-button" href="/products" onClick={onNavigate}>Browse products <ArrowRight size={18} /></Link></div>;
 
   const lineTotals = cartLineTotals(items);
   const lineSavings = cartLineSavings(items);

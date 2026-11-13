@@ -277,12 +277,6 @@ export function CheckoutForm({
                 {t("checkout.countryNotServed", { country: unservedVisitorCountry })}
               </p>
             )}
-            {!us && (
-              <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-[#666a67]">
-                <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                {t("checkout.dutiesNote", { country: rules.name })}
-              </p>
-            )}
           </div>
         )}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-4">

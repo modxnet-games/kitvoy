@@ -92,8 +92,6 @@
 .pp-trust li { display: flex; align-items: center; justify-content: center; gap: 7px; text-align: center; line-height: 1.3; }
 .pp-trust svg { flex-shrink: 0; width: 18px; height: 18px; stroke-width: 1.5; }
 /* Who the product is for. It carries a safety limit, so it reads as a notice, not as small print */
-.pp-fit-note { display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; padding: 14px 16px; border: 1px solid #f0cdb9; border-left: 4px solid #c94b16; border-radius: 9px; background: #fff7f1; font-size: 13px; line-height: 1.6; }
-.pp-fit-note svg { flex: 0 0 20px; margin-top: 1px; color: #a83d10; }
 
 /* ── Demo loops ─────────────────────────────────────────────────────── */
 .pp-demos { margin-top: 72px; }
@@ -146,7 +144,6 @@
 .pp-included { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; margin-top: 88px; }
 .pp-included-media { position: relative; overflow: hidden; width: 100%; max-width: 520px; aspect-ratio: 1; border-radius: 13px; background: #e9e7e0; }
 .pp-included-copy h3 { margin-top: 26px; }
-.pp-included-copy h3.pp-not-included { color: #666a67; }
 .pp-box-list { display: grid; gap: 10px; margin-top: 12px; }
 .pp-box-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; line-height: 1.55; }
 .pp-box-list svg { flex: 0 0 18px; margin-top: 3px; color: #c94b16; }
@@ -329,3 +326,13 @@
   .hub-page--home .hub-card-tagline { font-size: 14px; }
   .hub-page--home .hub-card-arrow { right: 18px; bottom: 22px; }
 }
+
+/* Order today, ships, arrives: estimated dates under the buy button */
+.pp-timeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 14px 0 0; padding: 14px 10px 10px; border: 1px solid #e7e5df; border-radius: 12px; background: #fff; list-style: none; position: relative; min-height: 96px; }
+.pp-timeline li { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; font-size: 12px; line-height: 1.35; position: relative; }
+.pp-timeline li + li:not(.pp-timeline-note)::before { content: ""; position: absolute; top: 15px; right: calc(50% + 20px); width: calc(100% - 40px); border-top: 2px dotted #d9d5cb; }
+.pp-timeline-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: #fff1e8; color: #a83d10; }
+.pp-timeline-icon svg { width: 17px; height: 17px; stroke-width: 1.7; }
+.pp-timeline strong { font-weight: 650; color: #171918; }
+.pp-timeline-date { color: #666a67; font-variant-numeric: tabular-nums; }
+.pp-timeline li.pp-timeline-note { grid-column: 1 / -1; font-size: 11px; color: #8a8d89; margin-top: 2px; }

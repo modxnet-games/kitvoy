@@ -143,7 +143,6 @@ export const en = {
     phoneHint: "Only used for delivery updates.",
     shippingNote: "We ship to all 50 states and DC. Free, tracked delivery.",
     shippingNoteIntl: "Free, tracked delivery to {country}. Estimated {min}–{max} days after it ships.",
-    dutiesNote: "Import VAT or duties, if {country} charges them on parcels from abroad, are collected on delivery and are not included in the price.",
     countryLocked: "This order ships to {country}.",
     countryNotServed: "We don't deliver these items to {country} yet. Choose one of the countries in the list.",
     stepCart: "Cart",
@@ -164,7 +163,7 @@ export const en = {
     trustShipping: "Free U.S. shipping, tracked to your door",
     trustShippingIntl: "Free shipping, tracked to your door",
     trustTracked: "Tracked delivery to your door",
-    trustReturns: "{days}-day returns on unused items",
+    trustReturns: "{days}-Day Money-Back Guarantee",
     trustSecure: "Secure payment by Stripe or PayPal",
     googleShortcut: "Faster next time",
     paymentNotCompleted: "Your payment wasn't completed and you haven't been charged.",
@@ -231,7 +230,7 @@ export const en = {
     continueShopping: "Continue shopping",
     errorGeneric: "Something went wrong. Please try again.",
     errorEmptyCart: "Your cart is empty. Add items before placing an order.",
-    errorChooseColour: "Please choose a colour for each item before checking out.",
+    errorChooseColour: "Please choose a color for each item before checking out.",
     errorCountryUnavailable: "One of the items in your cart doesn't ship to that country. Choose a country from the list, or remove the item.",
   },
   auth: {
@@ -252,7 +251,7 @@ export const en = {
       orContinueWith: "or continue with email",
       googleErrors: {
         google_not_configured: "Google sign-in isn't available right now. Please sign in with your email.",
-        google_denied: "Google sign-in was cancelled. You can try again or use your email.",
+        google_denied: "Google sign-in was canceled. You can try again or use your email.",
         google_state: "That sign-in attempt expired. Please choose Continue with Google again.",
         google_unverified: "Your Google account's email address isn't verified yet. Verify it with Google, or sign in with your email.",
         google_failed: "We couldn't sign you in with Google. Please try again.",
@@ -301,7 +300,7 @@ export const en = {
       writeReview: "Write a review",
       reviewed: "Reviewed",
       reviewTitle: "How's it working?",
-      reviewText: "Tell other drivers what you think. Your review appears with a Verified Buyer badge once we've checked it.",
+      reviewText: "Tell other customers what you think. Your review appears with a Verified Buyer badge once we've checked it.",
       reviewDone: "Thanks for reviewing this order. Reviews appear on the site once we've checked them.",
       cancel: {
         title: "Cancel order",

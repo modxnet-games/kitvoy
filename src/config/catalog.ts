@@ -19,7 +19,7 @@ export const SHIPPING_COUNTRY_CODES = ["US", "GB", "DE", "FR", "NL", "ES", "MX",
 export type CountryCode = (typeof SHIPPING_COUNTRY_CODES)[number];
 
 export const NICHES = {
-  "pet-care": { name: "Pet Care", blurb: "Play and comfort for cats and small dogs." },
+  "pet-care": { name: "Pet Care", blurb: "Play and comfort for dogs and cats." },
   "home-organization": { name: "Home Organization", blurb: "Small fixes that keep a home in order." },
   "daily-health": { name: "Daily Health", blurb: "Everyday comfort, without medical promises." },
   "car-care": { name: "Car Care", blurb: "Handy things to keep in the car." },
@@ -101,7 +101,7 @@ export const catalog: CatalogProduct[] = [
     hubNumber: 1,
     niche: "pet-care",
     shortName: "PouncePop",
-    tagline: "The little ball that rolls and hops by itself.",
+    tagline: "The smart ball that plays with your dog or cat by itself.",
     unit: { one: "ball", many: "balls" },
     // $29.99 each: 2 for $49.99, 3 for $64.99, and 25% off each from the fourth
     tiers: [
@@ -111,7 +111,7 @@ export const catalog: CatalogProduct[] = [
     ],
     maxDiscount: 0.3,
     hasColourChoice: true,
-    // CJ product CJYD1693059 "Smart Rolling Ball Pet Cat Toy Ball", checked 2026-11-12
+    // CJ product CJYD1693059 "Smart Rolling Ball Pet Cat Toy Ball", variants checked 2026-11-12
     variants: [
       {
         key: "orange",

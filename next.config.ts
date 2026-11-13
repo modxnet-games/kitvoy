@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   // given a page of its own later.
   async redirects() {
     return [
+      // Google Shopping listings fetched before the move still point at "/": send them to the inflator
+      { source: "/", has: [{ type: "query", key: "utm_campaign", value: "merchant_feed" }], destination: "/inflator", permanent: false },
       // The old template catalog
       { source: "/shop", destination: "/products", permanent: false },
       { source: "/shop/cordless-tire-inflator", destination: "/inflator", permanent: false },

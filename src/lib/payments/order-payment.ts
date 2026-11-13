@@ -31,11 +31,15 @@ export async function getPayableOrder(orderId: unknown) {
 /** Checks the order's items are still in stock before taking money. */
 export async function orderHasStock(orderId: string): Promise<boolean> {
   const items = await prisma.orderItem.findMany({ where: { orderId } });
-  const result = await validateStockForCheckout(
-    items
-      .filter((i) => i.productId)
-      .map((i) => ({ productId: i.productId!, productName: i.productName, quantity: i.quantity })),
-  );
+  // Stock is kept per product, so a product's colours are counted together
+  const perProduct = new Map<string, { productId: string; productName: string; quantity: number }>();
+  for (const item of items) {
+    if (!item.productId) continue;
+    const current = perProduct.get(item.productId);
+    if (current) current.quantity += item.quantity;
+    else perProduct.set(item.productId, { productId: item.productId, productName: item.productName, quantity: item.quantity });
+  }
+  const result = await validateStockForCheckout([...perProduct.values()]);
   return result.valid;
 }
 

@@ -2,7 +2,8 @@ import { formatSender } from "@/config/mail-senders";
 import { formatOrderReference } from "@/lib/data/admin-orders";
 import { prisma } from "@/lib/db";
 import { buildOrderConfirmationEmail, sendOrderConfirmation, type OrderConfirmationPayload } from "@/lib/email";
-import type { ShippingAddress } from "@/lib/us-address";
+import { countryName, countryOf, type ShippingAddress } from "@/lib/us-address";
+import { getCatalogProduct } from "@/config/catalog";
 
 export type ConfirmationResult = { sent: true } | { sent: false; reason: string };
 
@@ -59,8 +60,30 @@ export async function deliverOrderConfirmation(orderId: string, deps: Confirmati
 function shipToLines(order: { customerName: string; location: string; shippingAddress: unknown }) {
   const address = order.shippingAddress as ShippingAddress | null;
   return address
-    ? [order.customerName, [address.address1, address.address2].filter(Boolean).join(", "), `${address.city}, ${address.state} ${address.zip}`]
+    ? [
+        order.customerName,
+        [address.address1, address.address2].filter(Boolean).join(", "),
+        [address.city, [address.state, address.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+        // The country is named when it isn't the United States
+        ...(countryOf(address) === "US" ? [] : [countryName(countryOf(address))]),
+      ]
     : [order.customerName, order.location];
+}
+
+/**
+ * For an order going outside the United States: the country and the days in
+ * transit its items were sold with (the slowest item's, from the catalog), so
+ * the email repeats what the product page and checkout said.
+ */
+function deliveryFor(order: { shippingAddress: unknown; items: { productSlug: string }[] }): Pick<OrderConfirmationPayload, "delivery"> {
+  const country = countryOf(order.shippingAddress as { country?: unknown } | null);
+  if (country === "US") return {};
+  const quotes = order.items.flatMap((i) => {
+    const days = getCatalogProduct(i.productSlug)?.shipping[country]?.days;
+    return days ? [days] : [];
+  });
+  if (quotes.length === 0) return {};
+  return { delivery: { country: countryName(country), days: { min: Math.max(...quotes.map((q) => q.min)), max: Math.max(...quotes.map((q) => q.max)) } } };
 }
 
 export const prismaDeps: ConfirmationDeps = {
@@ -88,6 +111,7 @@ export const prismaDeps: ConfirmationDeps = {
       total: order.total,
       paymentMethod: order.paymentMethod,
       shipTo: shipToLines(order),
+      ...deliveryFor(order),
     };
   },
   send: sendOrderConfirmation,

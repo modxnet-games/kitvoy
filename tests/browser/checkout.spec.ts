@@ -206,12 +206,20 @@ test("on a phone the card form and Pay button sit high, and the page keeps its h
   await skeleton.route("**/*.js", (route) => route.abort());
   await skeleton.goto("/checkout");
   const skeletonHeight = await skeleton.locator(".checkout-page").evaluate((el) => el.getBoundingClientRect().height);
+  // The outline holds room for the express buttons: their placeholder and the gap under it
+  const expressRoom = await skeleton
+    .locator("[data-express-skeleton]")
+    .evaluate((el) => el.getBoundingClientRect().height + parseFloat(getComputedStyle(el).marginBottom));
   await skeleton.close();
 
   await addOneAndOpenCheckout(page);
   await expectNoSidewaysScroll(page);
+  // The express block keeps that room while its buttons load, then folds away in a browser with no express method to offer
+  const express = page.locator("[data-express]");
+  await expect(express).not.toHaveAttribute("data-express", "loading", { timeout: 20_000 });
+  const folded = (await express.getAttribute("data-express")) === "none" ? expressRoom : 0;
   const formHeight = await page.locator(".checkout-page").evaluate((el) => el.getBoundingClientRect().height);
-  expect(Math.abs(formHeight - skeletonHeight)).toBeLessThan(120);
+  expect(Math.abs(formHeight + folded - skeletonHeight)).toBeLessThan(120);
 
   await fillDetails(page);
   await continueToPayment(page);

@@ -16,7 +16,8 @@ const idOf = (ref: string | { id: string } | null | undefined) => (typeof ref ==
  * The only place a card payment completes an order. Verifies the signature on
  * the raw body first, then:
  *  - payment_intent.succeeded → completePaidOrder() → afterOrderPaid(); refunds a
- *    second payment for an order that's already paid or canceled
+ *    second payment for an order that's already paid or canceled, and alerts the
+ *    owner instead of marking the order paid when the amount isn't its total
  *  - payment_intent.payment_failed → logged (the customer can retry)
  *  - charge.updated → records the Stripe fee when it wasn't ready at success
  *  - charge.refunded → refundedAmount / paymentStatus "refunded"
@@ -118,17 +119,36 @@ async function handleSucceeded(stripe: Stripe, intent: Stripe.PaymentIntent) {
   }
 
   const fee = await chargeFee(stripe, idOf(intent.latest_charge));
-  if (await completePaidOrder(order.id, intent.id, fee, "card", !intent.livemode)) {
+  // The amount Stripe received goes with it: the order is only marked paid while it still costs exactly that.
+  // The check above read the order a moment ago, and an unpaid order can be edited in that moment
+  const paid = await completePaidOrder({
+    orderId: order.id,
+    paymentRef: intent.id,
+    paidTotal: intent.amount_received / 100,
+    paymentFee: fee,
+    paymentMethod: "card",
+    testPayment: !intent.livemode,
+  });
+  if (paid) {
     // Respond to Stripe now; email, push and CJ run after the response.
     // Test-mode payments never reach the supplier.
     after(() => afterOrderPaid(order.id, { testPayment: !intent.livemode }));
     return;
   }
 
+  const current = await prisma.order.findUnique({ where: { id: order.id }, select: { paymentStatus: true, paymentRef: true, total: true } });
+  if (current?.paymentStatus !== "paid") {
+    // Not paid: the order was changed while this payment settled, so the money matches nothing.
+    // The same alert as for any other amount that doesn't match; a person decides what happens to it
+    await sendOwnerAlert(`Card payment amount doesn't match ${reference}`, [
+      `PaymentIntent ${intent.id} received ${formatPrice(intent.amount_received / 100)} ${intent.currency.toUpperCase()}, but the order was changed while the payment settled${current ? `; its total is now ${formatPrice(current.total)}` : " and no longer exists"}.`,
+      "The order was NOT marked paid. Check it in the Stripe Dashboard.",
+    ]);
+    return;
+  }
   // Already paid: by this intent (a retried event) or by something else (paid twice)
-  const current = await prisma.order.findUnique({ where: { id: order.id }, select: { paymentRef: true } });
-  if (current?.paymentRef === intent.id) return;
-  await refundDuplicate(stripe, intent, reference, `the order was already paid (${current?.paymentRef ?? "unknown"})`);
+  if (current.paymentRef === intent.id) return;
+  await refundDuplicate(stripe, intent, reference, `the order was already paid (${current.paymentRef ?? "unknown"})`);
 }
 
 /** Refunds a second payment in full and tells the owner. Idempotent per intent. */

@@ -73,6 +73,10 @@ interface CheckoutFormProps {
   visitorCountry?: string | null;
   /** Days in transit per country for this cart, shown under the address heading */
   deliveryDays?: Partial<Record<CountryCode, { min: number; max: number }>>;
+  /** True while an express payment above the form is in flight: nothing here can be edited or submitted */
+  locked?: boolean;
+  /** The values came from a wallet and didn't pass: point out every problem straight away, not field by field */
+  showErrorsAtOnce?: boolean;
 }
 
 export function CheckoutForm({
@@ -84,6 +88,8 @@ export function CheckoutForm({
   countries = ["US"],
   visitorCountry = null,
   deliveryDays,
+  locked = false,
+  showErrorsAtOnce = false,
 }: CheckoutFormProps) {
   const { t } = useLanguage();
   const allowed = countries.length ? countries : (["US"] as CountryCode[]);
@@ -92,8 +98,8 @@ export function CheckoutForm({
     const wanted = [initialValues?.country, visitorCountry].find((c): c is CountryCode => isCountryCode(c) && allowed.includes(c));
     return { ...EMPTY_FORM, ...initialValues, country: wanted ?? allowed[0] };
   });
-  const [errors, setErrors] = useState<CheckoutErrors>({});
-  const [touched, setTouched] = useState<Partial<Record<keyof CheckoutFormData, boolean>>>({});
+  const [errors, setErrors] = useState<CheckoutErrors>(() => (showErrorsAtOnce ? validateCheckoutDetails(values) : {}));
+  const [touched, setTouched] = useState<Partial<Record<keyof CheckoutFormData, boolean>>>(() => (showErrorsAtOnce ? ALL_TOUCHED : {}));
   const summaryRef = useRef<HTMLDivElement>(null);
 
   const country = values.country ?? "US";
@@ -152,7 +158,7 @@ export function CheckoutForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || locked) return;
     const formErrors = validateCheckoutDetails(values);
     setErrors(formErrors);
     setTouched(ALL_TOUCHED);
@@ -182,7 +188,7 @@ export function CheckoutForm({
     onBlur: handleBlur(field),
     error: showError(field),
     valid: isValid(field),
-    disabled: isSubmitting,
+    disabled: isSubmitting || locked,
   });
 
   const stateError = showError("state");
@@ -257,7 +263,7 @@ export function CheckoutForm({
                 id="checkout-country"
                 name="country"
                 required
-                disabled={isSubmitting || allowed.length < 2}
+                disabled={isSubmitting || locked || allowed.length < 2}
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
                 autoComplete="shipping country"
@@ -313,7 +319,7 @@ export function CheckoutForm({
                 id="checkout-state"
                 name="state"
                 required
-                disabled={isSubmitting}
+                disabled={isSubmitting || locked}
                 value={values.state}
                 onChange={handleChange("state")}
                 onBlur={handleBlur("state")}
@@ -365,7 +371,7 @@ export function CheckoutForm({
       </fieldset>
 
       <div className="space-y-3 pt-1">
-        <CheckoutButton type="submit" loading={isSubmitting} loadingLabel={t("checkout.savingDetails")}>
+        <CheckoutButton type="submit" loading={isSubmitting} loadingLabel={t("checkout.savingDetails")} disabled={locked}>
           {submitLabel ?? t("checkout.placeOrder")}
           <ArrowRight className="size-[18px]" aria-hidden="true" />
         </CheckoutButton>

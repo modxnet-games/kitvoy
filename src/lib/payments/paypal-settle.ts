@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { sendOwnerAlert } from "@/lib/email";
 import { afterOrderPaid, completePaidOrder } from "@/lib/payments/order-payment";
 import { getPayPal, paypal } from "@/lib/payments/paypal";
+import { PAYPAL_EXPRESS_REFERENCE, PAYPAL_ID_RE, STORE_ID_RE } from "@/lib/payments/paypal-ids";
 import { cancelOpenPaymentIntent, getStripe } from "@/lib/payments/stripe";
 
 type PayPalMoney = { value?: string; currency_code?: string };
@@ -11,11 +12,34 @@ type PayPalCapture = {
   amount?: PayPalMoney;
   seller_receivable_breakdown?: { paypal_fee?: PayPalMoney };
 };
-/** The parts of a PayPal order this store reads. */
+type PayPalName = { given_name?: string; surname?: string };
+type PayPalPhone = { national_number?: string };
+type PayPalAddress = {
+  address_line_1?: string;
+  address_line_2?: string;
+  /** State, province or region */
+  admin_area_1?: string;
+  /** City */
+  admin_area_2?: string;
+  postal_code?: string;
+  country_code?: string;
+};
+/** One line of the cart as express checkout records it in the PayPal order (the `sku` says which product, colour and quantity). */
+export type PayPalItem = { name?: string; sku?: string; quantity?: string; unit_amount?: PayPalMoney };
+/** The parts of a PayPal order this store reads. The buyer, the shipping address and the items are only read by express checkout. */
 export type PayPalOrder = {
   id?: string;
   status?: string;
-  purchase_units?: { custom_id?: string; amount?: PayPalMoney; payments?: { captures?: PayPalCapture[] } }[];
+  payer?: { name?: PayPalName; email_address?: string; phone?: { phone_number?: PayPalPhone } };
+  payment_source?: { paypal?: { name?: PayPalName; email_address?: string; phone_number?: PayPalPhone } };
+  purchase_units?: {
+    reference_id?: string;
+    custom_id?: string;
+    amount?: PayPalMoney;
+    items?: PayPalItem[];
+    shipping?: { name?: { full_name?: string }; phone_number?: PayPalPhone; address?: PayPalAddress };
+    payments?: { captures?: PayPalCapture[] };
+  }[];
 };
 
 /** The parts of a store order settling needs. */
@@ -42,7 +66,15 @@ export type SettleResult =
         | "mismatch"
         /** A card payment for the same order is already settling */
         | "card_in_progress"
-        /** PayPal didn't complete the capture */
+        /** An express PayPal order whose address the store order doesn't hold yet */
+        | "awaiting_details"
+        /** PayPal accepted the payment but is holding it (a review, an eCheck): its notification settles the order when the money arrives */
+        | "capture_pending"
+        /** PayPal refused the capture: nothing was taken */
+        | "capture_declined"
+        /** PayPal took the money, but the order was changed meanwhile and no longer costs that amount: the capture is given back */
+        | "order_changed"
+        /** PayPal didn't complete the capture, and what became of it isn't known */
         | "not_completed";
     };
 
@@ -53,13 +85,19 @@ export interface SettleDeps {
   /** Captures an approved order; safe to repeat (PayPal answers a repeat with the first result) */
   capture(paypalOrderId: string): Promise<PayPalOrder>;
   cardPaymentInProgress(paymentIntentId: string | null): Promise<boolean>;
-  /** Marks the store order paid, atomically; false when it already was */
-  complete(orderId: string, captureRef: string, fee: number | undefined): Promise<boolean>;
-  /** What the order is recorded as paid by */
+  /** Marks the store order paid, atomically, if it still costs the `paidTotal` PayPal took; false when it was already paid or costs something else now */
+  complete(orderId: string, captureRef: string, fee: number | undefined, paidTotal: number): Promise<boolean>;
+  /** What the order is recorded as paid by; null when it isn't paid */
   paidRef(orderId: string): Promise<string | null>;
   /** Email, push, Meta Purchase, fulfillment: runs once, for whoever completed the order */
   afterPaid(orderId: string, stripePaymentIntentId: string | null): void;
   refundDuplicate(captureId: string, orderId: string, paidBy: string): Promise<void>;
+  /**
+   * A capture that pays for nothing: the order was changed while PayPal was
+   * taking the money and no longer costs `paid`. Gives it back and tells the
+   * owner either way, so the money never sits unseen.
+   */
+  refundUnmatched(input: { captureId: string | null; paypalOrderId: string; orderId: string; paid: string }): Promise<void>;
   /** Drops a PayPal order id that must never be captured for this order */
   forget(orderId: string, paypalOrderId: string): Promise<void>;
 }
@@ -78,6 +116,9 @@ const open = (reason: Extract<SettleResult, { status: "open" }>["reason"]): Sett
  * - The store order flips to paid in one atomic update, and only the caller
  *   that flipped it sends the confirmation, the Meta Purchase and the
  *   fulfillment request.
+ * - That update only goes through while the order still costs what PayPal
+ *   took. An order edited during the capture stays unpaid, and the capture
+ *   is refunded with a note to the owner.
  *
  * Nothing from a browser or a webhook is trusted: the PayPal order is read
  * from PayPal with the store's own credentials, and it is captured only if it
@@ -93,27 +134,57 @@ export async function settlePayPalOrder(
 
   const expected = order.total.toFixed(2);
   const matches = (money: PayPalMoney | undefined) => money?.value === expected && money?.currency_code === "USD";
+  /**
+   * PayPal holds a completed capture for this order, but the order doesn't
+   * cost that amount (any more): it was edited while the money was being
+   * taken. The order must not be paid by it, for the old cart or the new one,
+   * so the capture goes back to the buyer and the owner is told. The order
+   * stops naming the PayPal order: nothing is left to settle.
+   */
+  const unmatched = async (capture: PayPalCapture): Promise<SettleResult> => {
+    console.error(`[paypal] ${reference(order.id)}: capture ${capture.id ?? "?"} of PayPal order ${paypalOrderId} no longer matches the order's total; giving it back`);
+    await deps.refundUnmatched({ captureId: capture.id ?? null, paypalOrderId, orderId: order.id, paid: capture.amount?.value ?? "?" });
+    await deps.forget(order.id, paypalOrderId);
+    return open("order_changed");
+  };
 
   let paypalOrder = await deps.getOrder(paypalOrderId);
   if (!paypalOrder) return open("gone");
 
   const unit = paypalOrder.purchase_units?.[0];
   if (unit?.custom_id !== order.id || !matches(unit?.amount)) {
+    // Already captured for this order, for an amount the order no longer costs: the order was changed after
+    // the money was taken and whoever captured it didn't get to deal with it (see `unmatched` above)
+    const taken = unit?.custom_id === order.id ? unit.payments?.captures?.find((c) => c.status === "COMPLETED") : undefined;
+    if (taken) return unmatched(taken);
     console.warn(`[paypal] ${reference(order.id)}: PayPal order ${paypalOrderId} is for another order or amount; not capturing`);
     await deps.forget(order.id, paypalOrderId);
     return open("mismatch");
   }
+  // An express order ships to the address the buyer chose in PayPal. That address is saved on the store
+  // order together with this PayPal order's id, so until the order names it, it is not captured: a
+  // notification that arrives first must not pay an order that still holds an address typed earlier
+  if (unit.reference_id === PAYPAL_EXPRESS_REFERENCE && order.paymentRef !== paypalOrderId) return open("awaiting_details");
 
   if (paypalOrder.status === "APPROVED") {
     // A card payment for this order is already settling: don't take the money twice
     if (await deps.cardPaymentInProgress(order.stripePaymentIntentId)) return open("card_in_progress");
     paypalOrder = await deps.capture(paypalOrderId);
   }
+  const capture = paypalOrder.purchase_units?.[0]?.payments?.captures?.[0];
+  // PayPal accepted the payment and is holding it. The order keeps naming this PayPal order, so the
+  // notification PayPal sends when the money arrives finds it and marks it paid then
+  if (capture?.status === "PENDING") {
+    console.warn(`[paypal] ${reference(order.id)}: capture ${capture.id ?? "?"} is pending at PayPal`);
+    return open("capture_pending");
+  }
+  if (capture?.status === "DECLINED" || capture?.status === "FAILED") {
+    console.warn(`[paypal] ${reference(order.id)}: PayPal refused the capture (${capture.status})`);
+    return open("capture_declined");
+  }
   if (paypalOrder.status !== "COMPLETED") {
     return open(paypalOrder.status === "CREATED" || paypalOrder.status === "PAYER_ACTION_REQUIRED" || paypalOrder.status === "SAVED" ? "not_approved" : "not_completed");
   }
-
-  const capture = paypalOrder.purchase_units?.[0]?.payments?.captures?.[0];
   if (capture?.status !== "COMPLETED" || !matches(capture.amount)) {
     console.error(`[paypal] ${reference(order.id)}: capture not completed:`, paypalOrder.status, capture?.status, capture?.amount);
     return open("not_completed");
@@ -122,14 +193,17 @@ export async function settlePayPalOrder(
   // Store the capture id: it's what a refund in PayPal needs. The fee feeds the profit figures.
   const fee = Number(capture.seller_receivable_breakdown?.paypal_fee?.value);
   const captureRef = capture.id ?? paypalOrderId;
-  if (await deps.complete(order.id, captureRef, Number.isFinite(fee) ? fee : undefined)) {
+  // The amount PayPal took goes with it: the order is only marked paid while it still costs exactly that
+  if (await deps.complete(order.id, captureRef, Number.isFinite(fee) ? fee : undefined, Number(capture.amount?.value))) {
     deps.afterPaid(order.id, order.stripePaymentIntentId);
     return { status: "paid" };
   }
 
-  // Already paid: by this capture (the webhook and the browser arriving together) or by a card payment that won the race
   const paidBy = await deps.paidRef(order.id);
-  if (paidBy !== captureRef && capture.id) await deps.refundDuplicate(capture.id, order.id, paidBy ?? "unknown");
+  // Not paid: the order was changed while PayPal was capturing, so this money matches nothing
+  if (paidBy === null) return unmatched(capture);
+  // Already paid: by this capture (the webhook and the browser arriving together) or by a card payment that won the race
+  if (paidBy !== captureRef && capture.id) await deps.refundDuplicate(capture.id, order.id, paidBy);
   return { status: "paid" };
 }
 
@@ -147,15 +221,45 @@ async function cardPaymentInProgress(paymentIntentId: string | null): Promise<bo
   }
 }
 
+/** Refunds a PayPal capture in full. The request carries the same id every time, so a repeat is answered with the first refund. */
+async function refundCapture(captureId: string): Promise<void> {
+  const client = getPayPal();
+  if (!client) throw new Error("PayPal isn't configured");
+  const req = new paypal.payments.CapturesRefundRequest(captureId);
+  req.payPalRequestId(`refund-duplicate-${captureId}`);
+  req.requestBody({} as never);
+  await client.execute(req);
+}
+
+/**
+ * Refunds a capture that pays for nothing because the order was changed while
+ * PayPal was taking the money, and tells the owner: what happened when the
+ * refund went through, what to do by hand when it didn't.
+ */
+async function refundUnmatchedCapture(input: { captureId: string | null; paypalOrderId: string; orderId: string; paid: string }): Promise<void> {
+  const what = `PayPal ${input.captureId ? `capture ${input.captureId}` : `order ${input.paypalOrderId}`} took $${input.paid} for ${reference(input.orderId)}, but the order was changed while the payment was being taken and no longer costs that amount.`;
+  try {
+    if (!input.captureId) throw new Error("PayPal reported no capture id");
+    await refundCapture(input.captureId);
+    await sendOwnerAlert(`PayPal payment refunded for ${reference(input.orderId)}: the order changed during payment`, [
+      what,
+      "The order was NOT marked paid and the payment was refunded automatically.",
+      "Nothing else to do unless the customer asks about it.",
+    ]);
+  } catch (err) {
+    await sendOwnerAlert(`PayPal payment NOT refunded for ${reference(input.orderId)}: the order changed during payment`, [
+      what,
+      "The order was NOT marked paid, and the automatic refund failed:",
+      err instanceof Error ? err.message : String(err),
+      "Refund it from the PayPal dashboard.",
+    ]);
+  }
+}
+
 /** Refunds a PayPal capture in full when the order was already paid another way, and tells the owner. */
 async function refundDuplicateCapture(captureId: string, orderId: string, paidBy: string): Promise<void> {
-  const client = getPayPal();
   try {
-    if (!client) throw new Error("PayPal isn't configured");
-    const req = new paypal.payments.CapturesRefundRequest(captureId);
-    req.payPalRequestId(`refund-duplicate-${captureId}`);
-    req.requestBody({} as never);
-    await client.execute(req);
+    await refundCapture(captureId);
     await sendOwnerAlert(`Duplicate PayPal payment refunded for ${reference(orderId)}`, [
       `PayPal capture ${captureId} was refunded automatically because the order was already paid (${paidBy}).`,
     ]);
@@ -203,14 +307,18 @@ export function defaultSettleDeps(): SettleDeps {
       }
     },
     cardPaymentInProgress,
-    complete: (orderId, captureRef, fee) => completePaidOrder(orderId, captureRef, fee, "paypal"),
-    paidRef: async (orderId) => (await prisma.order.findUnique({ where: { id: orderId }, select: { paymentRef: true } }))?.paymentRef ?? null,
+    complete: (orderId, captureRef, fee, paidTotal) => completePaidOrder({ orderId, paymentRef: captureRef, paidTotal, paymentFee: fee, paymentMethod: "paypal" }),
+    paidRef: async (orderId) => {
+      const paid = await prisma.order.findUnique({ where: { id: orderId }, select: { paymentStatus: true, paymentRef: true } });
+      return paid?.paymentStatus === "paid" ? paid.paymentRef ?? "unknown" : null;
+    },
     afterPaid: (orderId, stripePaymentIntentId) => {
       // Don't make the customer (or PayPal's webhook) wait on email and push; the server keeps running
       void afterOrderPaid(orderId);
       void cancelOpenPaymentIntent(stripePaymentIntentId);
     },
     refundDuplicate: refundDuplicateCapture,
+    refundUnmatched: refundUnmatchedCapture,
     forget: async (orderId, paypalOrderId) => {
       await prisma.order.updateMany({ where: { id: orderId, paymentStatus: "unpaid", paymentRef: paypalOrderId }, data: { paymentRef: null } });
     },
@@ -226,9 +334,6 @@ type PayPalWebhookEvent = {
     supplementary_data?: { related_ids?: { order_id?: unknown } };
   };
 };
-
-const PAYPAL_ID_RE = /^[A-Z0-9]{8,40}$/;
-const STORE_ID_RE = /^[a-z0-9]{20,36}$/;
 
 /**
  * Which PayPal order (and which store order) a webhook notification is about.

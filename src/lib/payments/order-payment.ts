@@ -5,10 +5,11 @@ import { isCjConfigured } from "@/config/fulfillment";
 import { sendOrderToCj } from "@/lib/fulfillment/cj";
 import { recordFulfillment, sendOrderToZendrop } from "@/lib/fulfillment/zendrop";
 import { deliverOrderConfirmation } from "@/lib/order-confirmation";
+import { toCents } from "@/lib/payments/money";
 import { notifyAdminDevices } from "@/lib/push/admin-devices";
 import { validateStockForCheckout } from "@/lib/stock";
 
-export { toCents } from "@/lib/payments/money";
+export { toCents };
 
 const orderReference = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
 
@@ -43,42 +44,102 @@ export async function orderHasStock(orderId: string): Promise<boolean> {
   return result.valid;
 }
 
+/** A payment a provider has taken, as marking the order paid needs it. */
+export interface PaidOrderInput {
+  orderId: string;
+  /** What paid it: the Stripe PaymentIntent id or the PayPal capture id */
+  paymentRef: string;
+  /** What the provider actually took, in dollars */
+  paidTotal: number;
+  paymentFee?: number;
+  paymentMethod?: "card" | "paypal";
+  testPayment?: boolean;
+}
+
+/**
+ * Which order row a payment may mark paid: the order, while it is still unpaid
+ * and still costs what was taken. The total is part of the condition because
+ * an unpaid order can be edited at any moment, also while a provider is taking
+ * the money for what it cost a second ago: an order that has grown since then
+ * must not come out paid. Amounts are stored in dollars, so "the same total"
+ * is the same number of cents. Null for an amount that isn't a payment.
+ */
+export function paidOrderWhere(orderId: string, paidTotal: number) {
+  if (!Number.isFinite(paidTotal) || paidTotal <= 0) return null;
+  const cents = toCents(paidTotal);
+  return {
+    id: orderId,
+    paymentStatus: { not: "paid" },
+    total: { gte: (cents - 0.5) / 100, lt: (cents + 0.5) / 100 },
+  };
+}
+
+type PaidOrderWhere = NonNullable<ReturnType<typeof paidOrderWhere>>;
+
+/** What marking an order paid writes on it. */
+export interface PaidOrderData {
+  paymentStatus: "paid";
+  paymentRef: string;
+  status: "CONFIRMED";
+  testPayment: boolean;
+  paymentMethod?: "card" | "paypal";
+  paymentFee?: number;
+}
+
+/** The order tables as marking an order paid uses them, inside one transaction. Replaceable in tests. */
+export interface PaidOrderStore {
+  /** Writes `data` on the orders matching `where`, in one statement; the number of orders changed */
+  markPaid(where: PaidOrderWhere, data: PaidOrderData): Promise<number>;
+  items(orderId: string): Promise<{ productId: string | null; quantity: number }[]>;
+  takeFromStock(productId: string, quantity: number): Promise<void>;
+}
+
+/**
+ * The rule of completePaidOrder, apart from the database: one conditional
+ * write decides whether this payment pays the order, and only its winner
+ * takes the items out of stock.
+ */
+export async function markOrderPaid(store: PaidOrderStore, input: PaidOrderInput): Promise<boolean> {
+  const where = paidOrderWhere(input.orderId, input.paidTotal);
+  if (!where) return false;
+  const changed = await store.markPaid(where, {
+    paymentStatus: "paid",
+    paymentRef: input.paymentRef,
+    status: "CONFIRMED",
+    testPayment: input.testPayment ?? false,
+    ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
+    ...(input.paymentFee !== undefined ? { paymentFee: input.paymentFee } : {}),
+  });
+  if (changed === 0) return false;
+
+  for (const item of await store.items(input.orderId)) {
+    if (!item.productId) continue;
+    await store.takeFromStock(item.productId, item.quantity);
+  }
+  return true;
+}
+
 /**
  * Marks an order paid and takes its items out of stock, atomically. Returns
- * false when it was already paid (duplicate capture or webhook), so callers
- * only notify and fulfill once.
+ * false when nothing was marked, so callers only notify and fulfill once:
+ * the order was already paid (a duplicate capture or webhook), or it no
+ * longer costs `paidTotal` (it was edited while the payment was being taken).
+ * The caller tells the two apart by reading the order, and must not let the
+ * money of the second case go unnoticed.
  */
-export async function completePaidOrder(
-  orderId: string,
-  paymentRef: string,
-  paymentFee?: number,
-  paymentMethod?: "card" | "paypal",
-  testPayment = false,
-): Promise<boolean> {
-  return prisma.$transaction(async (tx) => {
-    const { count } = await tx.order.updateMany({
-      where: { id: orderId, paymentStatus: { not: "paid" } },
-      data: {
-        paymentStatus: "paid",
-        paymentRef,
-        status: "CONFIRMED",
-        testPayment,
-        ...(paymentMethod ? { paymentMethod } : {}),
-        ...(paymentFee !== undefined ? { paymentFee } : {}),
+export async function completePaidOrder(input: PaidOrderInput): Promise<boolean> {
+  return prisma.$transaction((tx) =>
+    markOrderPaid(
+      {
+        markPaid: async (where, data) => (await tx.order.updateMany({ where, data })).count,
+        items: (orderId) => tx.orderItem.findMany({ where: { orderId } }),
+        takeFromStock: async (productId, quantity) => {
+          await tx.product.update({ where: { id: productId }, data: { stock: { decrement: quantity } } });
+        },
       },
-    });
-    if (count === 0) return false;
-
-    const items = await tx.orderItem.findMany({ where: { orderId } });
-    for (const item of items) {
-      if (!item.productId) continue;
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
-      });
-    }
-    return true;
-  });
+      input,
+    ),
+  );
 }
 
 /**

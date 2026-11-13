@@ -13,13 +13,24 @@ import { Breadcrumbs, EmptyState } from "@/components/storefront";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { CheckoutForm, OrderSummary } from "@/components/checkout";
 import type { CheckoutFormData } from "@/components/checkout";
+import { ExpressCheckout, type ExpressHost, type ExpressMethod, type ExpressStatus, type PaidOrder } from "@/components/checkout/express-checkout";
+import { PayPalExpress } from "@/components/checkout/paypal-express";
+import { PayPalExpressRedirect } from "@/components/checkout/paypal-express-redirect";
 import { OpenInBrowser } from "@/components/checkout/open-in-browser";
 import { PayPalPayment } from "@/components/checkout/paypal-payment";
 import { PayPalRedirect } from "@/components/checkout/paypal-redirect";
 import { StripePayment, preloadStripe } from "@/components/checkout/stripe-payment";
-import type { OrderTotals } from "@/lib/payments/money";
-import { placeOrder } from "@/lib/client/place-order";
+import { toCents, type OrderTotals } from "@/lib/payments/money";
+import { placeOrder, type PlaceOrderResult } from "@/lib/client/place-order";
 import { logCheckoutEvent } from "@/lib/client/checkout-log";
+import {
+  expressArrival,
+  expressReturnFromUrl,
+  forgetExpressApproval,
+  readExpressApproval,
+  stripExpressReturnFromAddressBar,
+  type ExpressArrival,
+} from "@/lib/client/paypal-express";
 import { forgetCheckoutOnServer, resumeCheckout, type ResumeResponse } from "@/lib/client/resume-checkout";
 import {
   clearCheckoutRecord,
@@ -52,10 +63,15 @@ interface CheckoutClientProps {
   resumeHint?: boolean;
   /** Where the visitor is browsing from (Cloudflare's CF-IPCountry header), to pre-select the shipping country */
   visitorCountry?: string | null;
+  /** The PayPal express button at the top of the details step; off when PAYPAL_EXPRESS=off on the server */
+  paypalExpress?: boolean;
 }
 
 /** `cartKey` is the cart the order was created from; its total is stale once the cart changes. */
 type PendingOrder = { orderId: string; orderReference: string; cartKey: string; totals: OrderTotals };
+
+/** The server's answer once the details are saved as an order. */
+type SavedOrder = Extract<PlaceOrderResult, { ok: true }>;
 
 /** The cart as one comparable string, whatever order its lines are in. */
 const cartKeyOf = (items: { product: { id: string; variant?: { key: string } }; quantity: number }[]) =>
@@ -75,22 +91,28 @@ interface Boot {
   draft: CheckoutDraft | null;
   /** PayPal just sent the customer back: after approving, or after backing out */
   paypal: "return" | "cancel" | null;
+  /** PayPal sent an express buyer back (redirect mode), checked against the marker this browser kept when it left */
+  express: ExpressArrival | null;
   /** Worth asking the server before showing the form */
   restore: boolean;
 }
 
 function readBoot(): Boot {
-  if (typeof window === "undefined") return { link: null, token: null, orderReference: null, draft: null, paypal: null, restore: false };
+  if (typeof window === "undefined") return { link: null, token: null, orderReference: null, draft: null, paypal: null, express: null, restore: false };
   const record = readCheckoutRecord();
   const link = resumeLinkFromUrl(window.location.href);
   const token = record?.token ?? null;
+  const express = expressArrival(expressReturnFromUrl(window.location.href), readExpressApproval());
   return {
     link,
     token,
     orderReference: record?.orderReference ?? null,
     draft: record?.draft ?? null,
     paypal: paypalReturnFromUrl(window.location.href),
-    restore: !!(link || token || hasResumeCookieFlag()),
+    express,
+    // Back from approving an express payment: the details step stays, where that payment is completed.
+    // The checkout's own order, if it has one, is found by the server from its cookie
+    restore: express?.kind !== "return" && !!(link || token || hasResumeCookieFlag()),
   };
 }
 
@@ -140,14 +162,15 @@ function Steps({ current }: { current: 1 | 2 }) {
 /**
  * Two steps: shipping details save a pending (unpaid) order, then the inline
  * Payment Element (Stripe) or PayPal collects payment for that order's
- * server-side total.
+ * server-side total. Above the details form, the express buttons do both at
+ * once: the wallet or PayPal shares the address, and the buyer pays there.
  *
  * A started checkout survives a reload, an in-app browser discarding the
  * page, and a move to another browser: the order's session token (local
  * storage and an HttpOnly cookie) brings back the payment step, and saving
  * the details again updates that same order instead of creating another.
  */
-export function CheckoutClient({ paypalClientId, stripePublishableKey, customer, resumeHint = false, visitorCountry = null }: CheckoutClientProps) {
+export function CheckoutClient({ paypalClientId, stripePublishableKey, customer, resumeHint = false, visitorCountry = null, paypalExpress = false }: CheckoutClientProps) {
   const { t } = useLanguage();
   const router = useRouter();
   const mounted = useMounted();
@@ -155,6 +178,11 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
   const clearCart = useCartStore((s) => s.clearCart);
   const subtotal = useCartStore((s) => s.getSubtotal());
   const [boot] = useState(readBoot);
+  // The express approval the buyer has just come back from (redirect mode): completed once, by the redirect button
+  const arrival = useRef<string | null>(boot.express?.kind === "return" ? boot.express.id : null);
+  // Until that return has ended, a page with no cart still shows it being completed (the web view may have dropped the cart)
+  // So does a page reloaded while an approval was being confirmed (the return parameters are gone by then, the marker isn't)
+  const [returnPending, setReturnPending] = useState(() => boot.express?.kind === "return" || readExpressApproval() !== null);
   const [phase, setPhase] = useState<"restoring" | "ready">(() => (boot.restore ? "restoring" : "ready"));
   const [details, setDetails] = useState<CheckoutFormData | null>(null);
   const [created, setCreated] = useState<PendingOrder | null>(null);
@@ -162,14 +190,24 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
   const [restoredIntent, setRestoredIntent] = useState<{ orderId: string; clientSecret: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Which payment option is mid-flight, so the other one can't start a second payment
-  const [processing, setProcessing] = useState<"stripe" | "paypal" | null>(null);
+  // Which payment option is mid-flight, so the other one can't start a second payment.
+  // The two express ones run from the details step, and hold the form while they do
+  const [processing, setProcessing] = useState<"stripe" | "paypal" | "express_wallet" | "express_paypal" | null>(null);
+  // Who holds the details step right now: the form while it saves, or an express payment. The same lock as
+  // `isSubmitting` and `processing`, readable inside a click handler before React has drawn the page again
+  const step1Lock = useRef<"form" | ExpressMethod | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const paymentTopRef = useRef<HTMLElement>(null);
   // The checkout's session token: sent when the details are saved again, so the same order is updated
   const [sessionToken, setSessionToken] = useState<string | null>(boot.token);
   // Said once after coming back from PayPal without a payment
   const [notice, setNotice] = useState<string | null>(null);
+  // What became of the last express attempt, shown with the express buttons or, once on the payment step, above the ways to pay
+  // A buyer who backed out of PayPal (redirect mode) is told so as the page opens
+  const [expressNotice, setExpressNotice] = useState<string | null>(() => (boot.express?.kind === "cancel" ? t("checkout.expressPaypalNotCompleted") : null));
+  // Details a wallet shared that didn't pass the form's rules: the form starts over with them, problems marked
+  const [walletPrefill, setWalletPrefill] = useState(0);
+  const [markFormErrors, setMarkFormErrors] = useState(false);
   // Once the customer has typed or submitted, a late answer from the server no longer rearranges the page
   const userActed = useRef(false);
 
@@ -178,6 +216,10 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
   // PayPal's pop-up buttons lose their callback there, so PayPal becomes a full-page redirect instead
   const paypal = paypalMode({ paypalConfigured: !!paypalClientId, inAppBrowser: !!inApp });
   const canPay = Boolean(paypal || stripePublishableKey);
+  // PayPal express: PayPal's pop-up button where pop-ups work, and in Meta's in-app browsers a full-page trip to PayPal and back
+  const paypalExpressOn = paypalExpress && paypal !== null && !!paypalClientId;
+  // What that button says about itself while PayPal's script loads
+  const [paypalExpressStatus, setPaypalExpressStatus] = useState<ExpressStatus>("loading");
 
   // The card form's connections and script start as soon as the checkout opens, not at the payment step
   if (stripePublishableKey) {
@@ -216,6 +258,8 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
         setSessionToken(null);
         clearCheckoutRecord();
         if (!thisCheckout) return undefined;
+        // This checkout is finished: an express approval still waiting for its answer has it now
+        forgetExpressApproval();
         logCheckoutEvent(boot.paypal ? "paypal_approved" : "checkout_restored", { ref: res.orderReference, code: res.status });
         trackPurchase({ orderReference: res.orderReference, value: res.total, contents: res.contents });
         clearCart();
@@ -252,6 +296,24 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
     },
     [boot, clearCart, router],
   );
+
+  // PayPal sent an express buyer back: its parameters leave the address bar, and a buyer who backed out is told so
+  const expressReturnHandled = useRef(false);
+  useEffect(() => {
+    if (expressReturnHandled.current) return;
+    expressReturnHandled.current = true;
+    stripExpressReturnFromAddressBar();
+    const back = boot.express;
+    if (!back || back.kind === "return") return;
+    if (back.kind === "cancel") {
+      // Nothing was approved, so nothing can be taken: the marker of that PayPal order goes
+      forgetExpressApproval();
+      logCheckoutEvent("paypal_returned", { step: 1, code: "express_cancel" });
+      return;
+    }
+    // A return naming a PayPal order this browser didn't open (or no longer remembers): nothing is completed or claimed
+    logCheckoutEvent("paypal_returned", { step: 1, code: `express_${back.code}` });
+  }, [boot]);
 
   const restoreStarted = useRef(false);
   useEffect(() => {
@@ -338,20 +400,8 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [paymentReference]);
 
-  const handleDetails = async (data: CheckoutFormData) => {
-    if (isSubmitting) return;
-    if (!canPay) { setError(t("checkout.paymentUnavailable")); return; }
-    userActed.current = true;
-    setError(null);
-    setIsSubmitting(true);
-    // With this checkout's token the server updates its open order instead of creating a second one
-    const result = await placeOrder(data, items, { resumeToken: sessionToken });
-    setIsSubmitting(false);
-
-    if (!result.ok) {
-      setError(t(result.errorKey));
-      return;
-    }
+  /** The order now exists on the server: what the browser keeps, logs and tells Meta, whichever way the details arrived. */
+  const rememberOrder = (result: SavedOrder) => {
     // From here the browser keeps only the token and the order reference; the typed draft is dropped
     pendingDraft.current = null;
     clearTimeout(draftTimer.current);
@@ -364,20 +414,88 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
     // Meta's InitiateCheckout: once per order, with the order reference as its event_id (the server sends the same)
     trackInitiateCheckout(result.orderReference, items, result.totals.total);
     setRestoredIntent(null);
+  };
+
+  /** Opens the payment step for a saved order. */
+  const showPaymentStep = (data: CheckoutFormData, result: SavedOrder) => {
+    setMarkFormErrors(false);
     setDetails(data);
     setCreated({ orderId: result.orderId, orderReference: result.orderReference, cartKey, totals: result.totals });
   };
 
-  const handlePaid = () => {
-    if (!pending) return;
+  const handleDetails = async (data: CheckoutFormData) => {
+    if (isSubmitting || step1Lock.current) return;
+    if (!canPay) { setError(t("checkout.paymentUnavailable")); return; }
+    userActed.current = true;
+    setError(null);
+    step1Lock.current = "form";
+    setIsSubmitting(true);
+    // With this checkout's token the server updates its open order instead of creating a second one
+    const result = await placeOrder(data, items, { resumeToken: sessionToken });
+    step1Lock.current = null;
+    setIsSubmitting(false);
+
+    if (!result.ok) {
+      setError(t(result.errorKey));
+      return;
+    }
+    rememberOrder(result);
+    setExpressNotice(null);
+    showPaymentStep(data, result);
+  };
+
+  /** A payment went through, on either step: `order` carries the server's reference and total for it. */
+  const handlePaid = (order: PaidOrder) => {
     // The server's total for this order, which is the amount paid
-    trackPurchase({ orderReference: pending.orderReference, value: pending.totals.total, contents: toContents(items) });
-    // Paid: nothing about this checkout stays in the browser
+    trackPurchase({ orderReference: order.orderReference, value: order.total, contents: order.contents ?? toContents(items) });
+    // Paid: nothing about this checkout stays in the browser, an express approval still waiting for its answer included
     setSessionToken(null);
     clearCheckoutRecord();
+    forgetExpressApproval();
     forgetCheckoutOnServer();
     clearCart();
-    router.push(`/checkout/success?ref=${encodeURIComponent(pending.orderReference)}`);
+    router.push(`/checkout/success?ref=${encodeURIComponent(order.orderReference)}`);
+  };
+
+  /** Hands the express approval the buyer came back from to the redirect button, once. */
+  const takeArrival = () => {
+    const id = arrival.current;
+    arrival.current = null;
+    return id;
+  };
+
+  /** What every express button (wallets, PayPal) is given: the details step's lock, the notice and the way to finish. */
+  const expressHost: ExpressHost = {
+    isLocked: () => step1Lock.current !== null,
+    acquire: (method) => {
+      if (step1Lock.current) return false;
+      step1Lock.current = method;
+      userActed.current = true;
+      setProcessing(method === "wallet" ? "express_wallet" : "express_paypal");
+      setError(null);
+      setExpressNotice(null);
+      return true;
+    },
+    release: (method) => {
+      if (step1Lock.current !== method) return;
+      step1Lock.current = null;
+      setProcessing((now) => (now === "express_wallet" || now === "express_paypal" ? null : now));
+    },
+    notify: (message) => {
+      // Every express button clears the notice as it is pressed, so this is the buyer using the page:
+      // a late answer about an earlier checkout must not rearrange it under an open wallet sheet or PayPal window
+      userActed.current = true;
+      setExpressNotice(message);
+    },
+    paid: handlePaid,
+    log: (event, data) => logCheckoutEvent(event, { step: 1, ...data }),
+  };
+
+  /** Saves the order for details a wallet shared, exactly as the form does, without leaving the details step. */
+  const saveExpressOrder = async (data: CheckoutFormData) => {
+    const result = await placeOrder(data, items, { resumeToken: sessionToken });
+    if (result.ok) rememberOrder(result);
+    return result;
   };
 
   if (!mounted || phase !== "ready") {
@@ -385,9 +503,37 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
     return <CheckoutSkeleton variant={restoring ? "payment" : "details"} label={mounted && boot.restore ? t("checkout.restoring") : undefined} />;
   }
 
+  if (items.length === 0 && returnPending && paypalExpressOn && paypal === "redirect") {
+    return (
+      <div className="store-container checkout-page py-8 md:py-12">
+        <div className="mx-auto max-w-md space-y-4">
+          <PayPalExpressRedirect
+            items={items}
+            cartKey={cartKey}
+            sessionToken={sessionToken}
+            host={expressHost}
+            takeArrival={takeArrival}
+            onArrivalDone={() => setReturnPending(false)}
+            returnOnly
+          />
+          {expressNotice && (
+            <p role="alert" className="rounded-xl border border-[#f3dcb0] bg-[#fdf6e7] px-4 py-3 text-sm text-[#7a5a12]">
+              {expressNotice}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (items.length === 0) {
     return (
       <div className="container mx-auto px-4 py-12 md:py-16">
+        {expressNotice && (
+          <p role="alert" className="mx-auto mb-8 max-w-md rounded-xl border border-[#f3dcb0] bg-[#fdf6e7] px-4 py-3 text-sm text-[#7a5a12]">
+            {expressNotice}
+          </p>
+        )}
         <Breadcrumbs
           items={[{ label: t("cart.title"), href: "/cart" }, { label: t("checkout.title") }]}
           className="mb-8"
@@ -420,6 +566,10 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
   const draft = boot.draft ?? {};
   const formDefaults: Partial<CheckoutFormData> =
     details ?? { ...(customer ? { email: customer.email, fullName: customer.fullName } : {}), ...draft, country: isCountryCode(draft.country) ? draft.country : undefined };
+  // The cart's own figures: what an express sheet shows before the server has priced the order
+  const subtotalCents = toCents(subtotal);
+  const shippingCents = toCents(getShippingForItems(items));
+  const expressBusy = isSubmitting ? "form" : processing === "express_wallet" ? "wallet" : processing === "express_paypal" ? "paypal" : null;
 
   return (
     <div className="store-container checkout-page py-8 md:py-12">
@@ -494,7 +644,10 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                     </div>
                     <button
                       type="button"
-                      onClick={() => setCreated(null)}
+                      onClick={() => {
+                        setExpressNotice(null);
+                        setCreated(null);
+                      }}
                       disabled={!!processing}
                       className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-[#a83d10] transition-all duration-200 hover:bg-[#fae6db] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c94b16]/40 disabled:opacity-50"
                     >
@@ -512,6 +665,13 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       {t("checkout.paymentSubtitle")}
                     </p>
                   </div>
+                  {/* An express payment that didn't finish brought the buyer here: say why, above the ways to pay */}
+                  {expressNotice && (
+                    <p role="alert" className="flex items-start gap-3 rounded-xl border border-[#f3dcb0] bg-[#fdf6e7] px-4 py-3 text-sm text-[#7a5a12]">
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                      {expressNotice}
+                    </p>
+                  )}
                   {stripePublishableKey && (
                     <StripePayment
                       publishableKey={stripePublishableKey}
@@ -520,7 +680,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                       total={pending.totals.total}
                       billing={{ name: details.fullName, email: details.email, phone: details.phone, postalCode: details.zip, country: detailsCountry }}
                       initialClientSecret={restoredIntent?.orderId === pending.orderId ? restoredIntent.clientSecret : null}
-                      onPaid={handlePaid}
+                      onPaid={() => handlePaid({ orderReference: pending.orderReference, total: pending.totals.total })}
                       onProcessingChange={(busy) => setProcessing(busy ? "stripe" : null)}
                       onEvent={(event, data) => logCheckoutEvent(event, { ref: pending.orderReference, step: 2, ...data })}
                       disabled={processing === "paypal"}
@@ -551,7 +711,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                     <PayPalPayment
                       clientId={paypalClientId}
                       orderId={pending.orderId}
-                      onPaid={handlePaid}
+                      onPaid={() => handlePaid({ orderReference: pending.orderReference, total: pending.totals.total })}
                       onProcessingChange={(busy) => setProcessing(busy ? "paypal" : null)}
                       onEvent={(event) => logCheckoutEvent(event, { ref: pending.orderReference, step: 2 })}
                       disabled={processing === "stripe"}
@@ -570,6 +730,59 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
               </div>
             ) : (
               <>
+                {/* Express checkout: pay with a wallet or PayPal, which also supplies the address. Details step only */}
+                {canPay && (
+                  <ExpressCheckout
+                    publishableKey={stripePublishableKey}
+                    subtotalCents={subtotalCents}
+                    shippingCents={shippingCents}
+                    countries={shipCountries}
+                    deliveryDays={deliveryDays}
+                    host={expressHost}
+                    busy={expressBusy}
+                    notice={expressNotice}
+                    saveOrder={saveExpressOrder}
+                    onFixInForm={(data, message) => {
+                      // The form's own placeholder for "how to pay": that is chosen on the next step
+                      setDetails({ ...data, paymentMethod: "paypal" });
+                      setMarkFormErrors(true);
+                      setWalletPrefill((n) => n + 1);
+                      setExpressNotice(message);
+                    }}
+                    onReviewPayment={(data, order, message, clientSecret) => {
+                      // The card form opens on the intent the wallet just tried, without another round trip
+                      if (clientSecret) setRestoredIntent({ orderId: order.orderId, clientSecret });
+                      setExpressNotice(message);
+                      showPaymentStep(data, order);
+                    }}
+                    // PAYPAL EXPRESS SLOT: PayPal supplies the address. In Meta's in-app browsers, where a pop-up loses its
+                    // page, the whole page goes to PayPal and back; elsewhere PayPal's pop-up button. Not without PayPal,
+                    // and not when it is switched off
+                    paypal={
+                      paypalExpressOn && paypal === "redirect" ? (
+                        <PayPalExpressRedirect
+                          items={items}
+                          cartKey={cartKey}
+                          sessionToken={sessionToken}
+                          host={expressHost}
+                          takeArrival={takeArrival}
+                          onArrivalDone={() => setReturnPending(false)}
+                        />
+                      ) : paypalExpressOn && paypalClientId ? (
+                        <PayPalExpress
+                          clientId={paypalClientId}
+                          items={items}
+                          cartKey={cartKey}
+                          sessionToken={sessionToken}
+                          countries={shipCountries}
+                          host={expressHost}
+                          onStatus={setPaypalExpressStatus}
+                        />
+                      ) : null
+                    }
+                    paypalStatus={paypal === "redirect" ? "ready" : paypalExpressStatus}
+                  />
+                )}
                 {customer && (
                   <p className="mb-6 flex items-center gap-2 rounded-xl bg-[#faf9f6] px-4 py-3 text-sm text-[#666a67]">
                     <Check className="size-4 text-[#2f7d4f]" aria-hidden="true" />
@@ -577,9 +790,12 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                   </p>
                 )}
                 <CheckoutForm
+                  key={walletPrefill}
                   onSubmit={handleDetails}
                   onDraftChange={handleDraftChange}
                   isSubmitting={isSubmitting}
+                  locked={processing === "express_wallet" || processing === "express_paypal"}
+                  showErrorsAtOnce={markFormErrors}
                   initialValues={formDefaults}
                   submitLabel={t("checkout.continueToPayment")}
                   countries={shipCountries}

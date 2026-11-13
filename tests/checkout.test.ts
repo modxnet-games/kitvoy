@@ -18,6 +18,7 @@ import {
 } from "../src/lib/client/checkout-storage";
 import { detectInAppBrowser, externalBrowserUrl } from "../src/lib/in-app-browser";
 import { CHECKOUT_EVENTS, formatCheckoutEvent, sanitizeCheckoutEvent } from "../src/lib/checkout/events";
+import { markOrderPaid, paidOrderWhere, type PaidOrderInput, type PaidOrderStore } from "../src/lib/payments/order-payment";
 import { paypalEventTarget, settlePayPalOrder, type PayPalOrder, type SettleDeps, type SettleOrder } from "../src/lib/payments/paypal-settle";
 import { paypalMode } from "../src/lib/checkout/payment-options";
 import { orderLinesKey } from "../src/lib/orders";
@@ -346,7 +347,10 @@ test("the server Purchase and InitiateCheckout use the order reference as event_
 
 const unpaid: SettleOrder = { id: "cmw9wrjyz00044ku7za4og2cg", total: 59.99, paymentStatus: "unpaid", paymentRef: "5AB12345CD678901E", stripePaymentIntentId: "pi_1" };
 
-const paypalOrder = (status: string, overrides: { customId?: string; value?: string; captured?: boolean; captureId?: string } = {}): PayPalOrder => ({
+const paypalOrder = (
+  status: string,
+  overrides: { customId?: string; value?: string; captured?: boolean; captureId?: string; captureStatus?: string } = {},
+): PayPalOrder => ({
   id: "5AB12345CD678901E",
   status,
   purchase_units: [
@@ -354,15 +358,29 @@ const paypalOrder = (status: string, overrides: { customId?: string; value?: str
       custom_id: overrides.customId ?? unpaid.id,
       amount: { value: overrides.value ?? "59.99", currency_code: "USD" },
       payments: overrides.captured
-        ? { captures: [{ id: overrides.captureId ?? "CAP123", status: "COMPLETED", amount: { value: overrides.value ?? "59.99", currency_code: "USD" }, seller_receivable_breakdown: { paypal_fee: { value: "2.58", currency_code: "USD" } } }] }
+        ? {
+            captures: [
+              {
+                id: overrides.captureId ?? "CAP123",
+                status: overrides.captureStatus ?? "COMPLETED",
+                amount: { value: overrides.value ?? "59.99", currency_code: "USD" },
+                seller_receivable_breakdown: { paypal_fee: { value: "2.58", currency_code: "USD" } },
+              },
+            ],
+          }
         : undefined,
     },
   ],
 });
 
-/** The outside world of settling, recorded. `paidBy` is the store order's state, shared between concurrent callers. */
-function settleWorld(remote: PayPalOrder | null, options: { cardInProgress?: boolean; alreadyPaidBy?: string } = {}) {
-  const state: { remote: PayPalOrder | null; paidBy: string | null } = { remote, paidBy: options.alreadyPaidBy ?? null };
+/**
+ * The outside world of settling, recorded. `paidBy` and `total` are the store
+ * order's state, shared between concurrent callers. `editedTo` is a total the
+ * buyer's own edit gives the order while PayPal is capturing; `captureStatus`
+ * is how PayPal leaves the capture.
+ */
+function settleWorld(remote: PayPalOrder | null, options: { cardInProgress?: boolean; alreadyPaidBy?: string; editedTo?: number; captureStatus?: string } = {}) {
+  const state: { remote: PayPalOrder | null; paidBy: string | null; total: number } = { remote, paidBy: options.alreadyPaidBy ?? null, total: unpaid.total };
   const log: string[] = [];
   const deps: SettleDeps = {
     getOrder: async () => {
@@ -371,12 +389,14 @@ function settleWorld(remote: PayPalOrder | null, options: { cardInProgress?: boo
     },
     capture: async () => {
       log.push("capture");
-      state.remote = paypalOrder("COMPLETED", { captured: true });
+      state.remote = paypalOrder("COMPLETED", { captured: true, captureStatus: options.captureStatus });
+      if (options.editedTo !== undefined) state.total = options.editedTo;
       return state.remote;
     },
     cardPaymentInProgress: async () => options.cardInProgress ?? false,
-    complete: async (_orderId, captureRef, fee) => {
-      if (state.paidBy) return false;
+    // As completePaidOrder decides: only an unpaid order that still costs what was taken
+    complete: async (_orderId, captureRef, fee, paidTotal) => {
+      if (state.paidBy || Math.round(state.total * 100) !== Math.round(paidTotal * 100)) return false;
       state.paidBy = captureRef;
       log.push(`complete:${captureRef}:${fee}`);
       return true;
@@ -387,6 +407,9 @@ function settleWorld(remote: PayPalOrder | null, options: { cardInProgress?: boo
     },
     refundDuplicate: async (captureId, _orderId, paidBy) => {
       log.push(`refund:${captureId}:${paidBy}`);
+    },
+    refundUnmatched: async ({ captureId, paid }) => {
+      log.push(`unmatched:${captureId}:${paid}`);
     },
     forget: async () => {
       log.push("forget");
@@ -455,6 +478,159 @@ test("a PayPal capture for an order a card already paid is refunded, not kept", 
   const { deps, log } = settleWorld(paypalOrder("COMPLETED", { captured: true }), { alreadyPaidBy: "pi_card" });
   assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, deps), { status: "paid" });
   assert.deepEqual(log, ["get", "refund:CAP123:pi_card"]);
+});
+
+test("an order edited while PayPal was capturing is not paid by that capture: the money goes back and the owner is told", async () => {
+  // The buyer approved $59.99; while the capture ran, the same checkout was saved again with a bigger cart
+  const world = settleWorld(paypalOrder("APPROVED"), { editedTo: 134.98 });
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, world.deps), { status: "open", reason: "order_changed" });
+  assert.deepEqual(world.log, ["get", "capture", "unmatched:CAP123:59.99", "forget"]);
+  assert.equal(world.state.paidBy, null, "never marked paid: not for the cart that was paid for, and not for the new one");
+  assert.equal(world.log.includes("afterPaid"), false, "no confirmation, no Purchase event, nothing sent to the supplier");
+
+  // Whoever looks at it afterwards (PayPal's notification, a reload) finds a completed capture for an amount the
+  // order doesn't cost. Should the first caller have stopped before dealing with it, the money still goes back
+  const later = settleWorld(paypalOrder("COMPLETED", { captured: true }));
+  assert.deepEqual(await settlePayPalOrder({ ...unpaid, total: 134.98, paymentRef: null }, unpaid.paymentRef, later.deps), { status: "open", reason: "order_changed" });
+  assert.deepEqual(later.log, ["get", "unmatched:CAP123:59.99", "forget"]);
+
+  // Once PayPal shows the capture as refunded there is nothing left to give back, or to say
+  const refunded = settleWorld(paypalOrder("COMPLETED", { captured: true, captureStatus: "REFUNDED" }));
+  assert.deepEqual(await settlePayPalOrder({ ...unpaid, total: 134.98, paymentRef: null }, unpaid.paymentRef, refunded.deps), { status: "open", reason: "mismatch" });
+  assert.deepEqual(refunded.log, ["get", "forget"]);
+
+  // A completed PayPal order that belongs to another store order is never refunded from here
+  const foreign = settleWorld(paypalOrder("COMPLETED", { captured: true, customId: "cmw9wlz3700024ku7uyi1a53z" }));
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, foreign.deps), { status: "open", reason: "mismatch" });
+  assert.deepEqual(foreign.log, ["get", "forget"]);
+});
+
+test("PayPal's capture carries the amount it took to the one write that marks the order paid", async () => {
+  const seen: number[] = [];
+  const world = settleWorld(paypalOrder("APPROVED"));
+  const complete = world.deps.complete;
+  world.deps.complete = (orderId, captureRef, fee, paidTotal) => {
+    seen.push(paidTotal);
+    return complete(orderId, captureRef, fee, paidTotal);
+  };
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, world.deps), { status: "paid" });
+  assert.deepEqual(seen, [59.99]);
+});
+
+test("a capture PayPal is holding or has refused is told apart from one whose outcome isn't known", async () => {
+  // Held (a review, an eCheck): the order keeps naming the PayPal order, so the notification that follows completes it
+  const held = settleWorld(paypalOrder("APPROVED"), { captureStatus: "PENDING" });
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, held.deps), { status: "open", reason: "capture_pending" });
+  assert.deepEqual(held.log, ["get", "capture"], "not marked paid, and nothing dropped from the order");
+  // The notification, once the money is in
+  held.state.remote = paypalOrder("COMPLETED", { captured: true });
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, held.deps), { status: "paid" });
+  assert.equal(held.log.filter((l) => l === "afterPaid").length, 1);
+
+  for (const captureStatus of ["DECLINED", "FAILED"]) {
+    const refused = settleWorld(paypalOrder("APPROVED"), { captureStatus });
+    assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, refused.deps), { status: "open", reason: "capture_declined" }, captureStatus);
+    assert.equal(refused.state.paidBy, null);
+  }
+
+  // Anything else PayPal reports about a capture says nothing certain
+  const odd = settleWorld(paypalOrder("APPROVED"), { captureStatus: "PARTIALLY_REFUNDED" });
+  assert.deepEqual(await settlePayPalOrder(unpaid, unpaid.paymentRef, odd.deps), { status: "open", reason: "not_completed" });
+});
+
+/* ---------- marking an order paid ---------- */
+
+/** One order row and its stock, as the paid-order write sees them. */
+function paidOrderStore(row: { id: string; paymentStatus: string; total: number }) {
+  const log: string[] = [];
+  const store: PaidOrderStore = {
+    markPaid: async (where, data) => {
+      const matches = row.id === where.id && row.paymentStatus !== where.paymentStatus.not && row.total >= where.total.gte && row.total < where.total.lt;
+      if (!matches) return 0;
+      row.paymentStatus = data.paymentStatus;
+      log.push(`paid:${data.paymentRef}:${data.paymentMethod ?? ""}:${data.paymentFee ?? ""}:${data.testPayment}`);
+      return 1;
+    },
+    items: async () => [
+      { productId: "p1", quantity: 2 },
+      { productId: null, quantity: 1 },
+    ],
+    takeFromStock: async (productId, quantity) => {
+      log.push(`stock:${productId}:-${quantity}`);
+    },
+  };
+  return { store, log, row };
+}
+
+const payment = (changes: Partial<PaidOrderInput> = {}): PaidOrderInput => ({ orderId: unpaid.id, paymentRef: "CAP123", paidTotal: 59.99, paymentFee: 2.58, paymentMethod: "paypal", ...changes });
+
+test("an order is marked paid once, by a payment for exactly what it costs, and only then leaves stock", async () => {
+  const world = paidOrderStore({ id: unpaid.id, paymentStatus: "unpaid", total: 59.99 });
+  assert.equal(await markOrderPaid(world.store, payment()), true);
+  assert.deepEqual(world.log, ["paid:CAP123:paypal:2.58:false", "stock:p1:-2"]);
+
+  // A second capture, a retried webhook, a card payment arriving late: the order is already paid
+  assert.equal(await markOrderPaid(world.store, payment()), false);
+  assert.equal(await markOrderPaid(world.store, payment({ paymentRef: "pi_late", paymentMethod: "card" })), false);
+  assert.equal(world.log.length, 2, "nothing written and no stock taken twice");
+});
+
+test("an order that was edited while its payment was being taken is not marked paid for the amount that was settled", async () => {
+  // Paid $59.99 for one; the order now holds three for $134.98
+  const grown = paidOrderStore({ id: unpaid.id, paymentStatus: "unpaid", total: 134.98 });
+  assert.equal(await markOrderPaid(grown.store, payment({ paidTotal: 59.99 })), false);
+  assert.equal(grown.row.paymentStatus, "unpaid");
+  assert.deepEqual(grown.log, [], "nothing written, nothing taken from stock");
+
+  // The other way round, and a cent apart: still not this order's price
+  for (const [total, paidTotal] of [[59.99, 134.98], [59.99, 59.98], [59.99, 60], [0.3, 0.31]] as const) {
+    const world = paidOrderStore({ id: unpaid.id, paymentStatus: "unpaid", total });
+    assert.equal(await markOrderPaid(world.store, payment({ paidTotal })), false, `${total} vs ${paidTotal}`);
+  }
+  // The same amount is the same amount however the float came out
+  const float = paidOrderStore({ id: unpaid.id, paymentStatus: "unpaid", total: 0.1 + 0.2 });
+  assert.equal(await markOrderPaid(float.store, payment({ paidTotal: 0.3 })), true);
+  // A card payment says what it received in cents
+  const card = paidOrderStore({ id: unpaid.id, paymentStatus: "unpaid", total: 134.98 });
+  assert.equal(await markOrderPaid(card.store, payment({ paidTotal: 13498 / 100, paymentRef: "pi_1", paymentMethod: "card", paymentFee: undefined, testPayment: true })), true);
+  assert.deepEqual(card.log, ["paid:pi_1:card::true", "stock:p1:-2"]);
+
+  // Another order's id, or an amount that isn't a payment, marks nothing
+  const other = paidOrderStore({ id: "cmw9wlz3700024ku7uyi1a53z", paymentStatus: "unpaid", total: 59.99 });
+  assert.equal(await markOrderPaid(other.store, payment()), false);
+  for (const paidTotal of [0, -59.99, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const world = paidOrderStore({ id: unpaid.id, paymentStatus: "unpaid", total: 59.99 });
+    assert.equal(await markOrderPaid(world.store, payment({ paidTotal })), false, String(paidTotal));
+    assert.equal(paidOrderWhere(unpaid.id, paidTotal), null);
+  }
+});
+
+test("the paid-order condition is one statement: the order, still unpaid, at the settled total to the cent", async () => {
+  const where = paidOrderWhere(unpaid.id, 59.99);
+  assert.ok(where);
+  assert.equal(where.id, unpaid.id);
+  assert.deepEqual(where.paymentStatus, { not: "paid" });
+  assert.ok(where.total.gte <= 59.99 && 59.99 < where.total.lt);
+  assert.ok(where.total.lt - where.total.gte <= 0.01 + 1e-9, "no wider than one cent");
+  assert.ok(!(59.98 >= where.total.gte) && !(60 < where.total.lt));
+
+  const { readFile } = await import("node:fs/promises");
+  const lib = (await readFile("src/lib/payments/order-payment.ts", "utf8")).replace(/\r\n/g, "\n");
+  // The condition and the write are the same updateMany, inside the transaction that takes the stock
+  assert.match(lib, /prisma\.\$transaction\(\(tx\) =>\s+markOrderPaid\(/);
+  assert.match(lib, /markPaid: async \(where, data\) => \(await tx\.order\.updateMany\(\{ where, data \}\)\)\.count/);
+
+  // Both providers hand over what they actually took
+  const webhook = await readFile("src/app/api/webhooks/stripe/route.ts", "utf8");
+  assert.match(webhook, /paidTotal: intent\.amount_received \/ 100/);
+  // A card payment that no longer matches is flagged to the owner, not marked paid and not passed off as a duplicate
+  const afterFlip = webhook.slice(webhook.indexOf("const paid = await completePaidOrder("), webhook.indexOf("async function refundDuplicate"));
+  assert.match(afterFlip, /if \(current\?\.paymentStatus !== "paid"\) \{\s+[^]*?sendOwnerAlert\(`Card payment amount doesn't match[^]*?return;\s+\}\s+\/\/ Already paid/);
+  const settle = await readFile("src/lib/payments/paypal-settle.ts", "utf8");
+  assert.match(settle, /deps\.complete\(order\.id, captureRef, Number\.isFinite\(fee\) \? fee : undefined, Number\(capture\.amount\?\.value\)\)/);
+  assert.match(settle, /completePaidOrder\(\{ orderId, paymentRef: captureRef, paidTotal, paymentFee: fee, paymentMethod: "paypal" \}\)/);
+  // "Not paid" is told apart from "paid by something else" by the order's payment status, not by its reference
+  assert.match(settle, /paid\?\.paymentStatus === "paid" \? paid\.paymentRef \?\? "unknown" : null/);
 });
 
 test("a PayPal notification only names what to look up", () => {

@@ -29,6 +29,9 @@ export const CHECKOUT_EVENTS = [
   "open_in_browser",
   "payment_hidden",
   "payment_visible",
+  "express_shown",
+  "express_clicked",
+  "express_failed",
 ] as const;
 
 export type CheckoutEventName = (typeof CHECKOUT_EVENTS)[number];
@@ -43,7 +46,7 @@ export interface CheckoutEvent {
   step?: 1 | 2;
   /** A duration in milliseconds (how long the card form took, how long the page was hidden) */
   ms?: number;
-  /** A short machine code: Stripe's error code, "reused", "cancel"… */
+  /** A short machine code: Stripe's error code, "reused", "cancel", the express methods on offer ("apple_pay,paypal")… */
   code?: string;
   /** Screen width in CSS pixels */
   w?: number;
@@ -52,7 +55,7 @@ export interface CheckoutEvent {
 }
 
 const REFERENCE_RE = /^KTV-[A-Z0-9]{8}$/;
-const CODE_RE = /^[A-Za-z0-9_.:-]{1,48}$/;
+const CODE_RE = /^[A-Za-z0-9_.:,-]{1,48}$/;
 const SID_RE = /^[a-z0-9]{6,12}$/;
 const APPS = new Set(["facebook", "instagram", "threads"]);
 

@@ -148,6 +148,10 @@ export async function PUT(request: Request) {
     const settled = await settlePayPalOrder(order);
     if (settled.status === "paid") return NextResponse.json({ ok: true });
     console.error(`[checkout/paypal] capture not completed for ${order.id}: ${settled.reason}`);
+    // PayPal took the money and it is being given back (the order was changed meanwhile): the buyer gets the
+    // general message, not the one that says nothing was charged
+    // The same goes for a capture PayPal is holding: it may still go through
+    if (settled.reason === "order_changed" || settled.reason === "capture_pending") return NextResponse.json({ error: "order.errorGeneric" }, { status: 409 });
     return NextResponse.json({ error: "PAYMENT_NOT_COMPLETED" }, { status: 402 });
   } catch (err) {
     console.error("[checkout/paypal] capture error:", err);

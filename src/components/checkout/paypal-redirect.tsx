@@ -18,6 +18,28 @@ interface PayPalRedirectProps {
   disabled?: boolean;
 }
 
+/**
+ * The store's own PayPal button, for where PayPal's can't be used: PayPal's
+ * yellow, at the size of the checkout's other buttons. The express block's
+ * redirect button wears the same.
+ */
+export const paypalButtonClass =
+  "inline-flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#ffc439] px-6 text-[15px] font-semibold text-[#111111] transition-all duration-200 hover:bg-[#f2ba36] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#0070e0]/30 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none";
+
+/** "Pay with PayPal", with PayPal's name in its two blues. */
+export function PayWithPayPalLabel() {
+  const { t } = useLanguage();
+  return (
+    <>
+      {t("checkout.payWith")}
+      <span className="text-[17px] font-extrabold italic tracking-tight">
+        <span className="text-[#003087]">Pay</span>
+        <span className="text-[#0070e0]">Pal</span>
+      </span>
+    </>
+  );
+}
+
 /** Server error codes map to a generic message; message keys (with a dot) pass through. */
 const toMessageKey = (code: string) => (code.includes(".") ? code : "checkout.paymentFailed");
 
@@ -83,7 +105,7 @@ export function PayPalRedirect({ orderId, sessionToken, onProcessingChange, onRe
         disabled={leaving || disabled}
         aria-busy={leaving || undefined}
         data-paypal-redirect
-        className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#ffc439] px-6 text-[15px] font-semibold text-[#111111] transition-all duration-200 hover:bg-[#f2ba36] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#0070e0]/30 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+        className={paypalButtonClass}
       >
         {leaving ? (
           <span className="inline-flex items-center gap-2.5" role="status">
@@ -91,13 +113,7 @@ export function PayPalRedirect({ orderId, sessionToken, onProcessingChange, onRe
             {t("checkout.paypalOpening")}
           </span>
         ) : (
-          <>
-            {t("checkout.payWith")}
-            <span className="text-[17px] font-extrabold italic tracking-tight">
-              <span className="text-[#003087]">Pay</span>
-              <span className="text-[#0070e0]">Pal</span>
-            </span>
-          </>
+          <PayWithPayPalLabel />
         )}
       </button>
       <p className="text-center text-xs leading-relaxed text-[#666a67]">{t("checkout.paypalRedirectNote")}</p>

@@ -32,8 +32,9 @@ interface StripePaymentProps {
 }
 
 // Stripe.js loads once per key. A failed download is forgotten, so "Try again" really asks again.
+// The express buttons above the details form use the same instance.
 const stripePromises = new Map<string, Promise<StripeJs | null>>();
-function getStripeJs(key: string): Promise<StripeJs | null> {
+export function getStripeJs(key: string): Promise<StripeJs | null> {
   let promise = stripePromises.get(key);
   if (!promise) {
     promise = loadStripe(key);
@@ -56,8 +57,8 @@ export function preloadStripe(key: string): void {
 /** Server error codes map to a generic message; message keys (with a dot) pass through. */
 const toMessageKey = (code: unknown) => (typeof code === "string" && code.includes(".") ? code : "checkout.cardFormFailed");
 
-/** The Payment Element drawn like the rest of the checkout: same radius, borders, focus ring and brand color. */
-const appearance: Appearance = {
+/** Stripe's elements drawn like the rest of the checkout: same radius, borders, focus ring and brand color. */
+export const appearance: Appearance = {
   theme: "stripe",
   variables: {
     colorPrimary: "#C94B16",

@@ -11,10 +11,22 @@ function Field({ hint = false, className = "" }: { hint?: boolean; className?: s
   );
 }
 
-/** The details form's outline: contact, shipping address, the button and the sign-in shortcut. */
+/** The express block's outline: its label, one button and the "OR" before the form (the same heights as the real block). */
+function ExpressShape() {
+  return (
+    <div className="mb-6" data-express-skeleton>
+      <div className={`mx-auto h-4 w-28 ${bar}`} />
+      <div className={`mt-3 h-13 ${bar}`} />
+      <div className={`mx-auto mt-5 h-4 w-8 ${bar}`} />
+    </div>
+  );
+}
+
+/** The details form's outline: express checkout, contact, shipping address, the button and the sign-in shortcut. */
 function DetailsShape() {
   return (
     <div>
+      <ExpressShape />
       <div className="space-y-8">
         <div>
           <div className={`h-6 w-20 ${bar}`} />

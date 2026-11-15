@@ -4,8 +4,19 @@
  * Commerce facts (price tiers, colours, countries) live in config/catalog.ts.
  *
  * Copy rules: product specs come from the store owner's confirmed spec for
- * the product (recorded at the top of its file); no strike-through or "was"
- * prices, no invented reviews or ratings, no countdowns or stock warnings.
+ * the product (recorded at the top of its file); no invented "was" prices
+ * (the only struck figure the page draws is the real cost of the same units
+ * bought singly), no invented reviews or ratings, no countdowns or stock
+ * warnings.
+ *
+ * The template follows the owner's TreeAura product page (2026-11-15): gallery
+ * and buy box, a before/after comparison, three steps beside a diagram,
+ * specifications, the FAQ and a closing band. It reads `tagline`,
+ * `description`, `features`, `trust`, `gallery`, `transformation`,
+ * `howItWorks`, `diagram`, `included.items`, `seo.facts` and `closing`. The
+ * fields the earlier layout used (`headline`, `subheadline`, `benefits`,
+ * `demoLoops`, `bundle`, `comparison`, `story`) stay as approved copy for
+ * ads, emails and a later section, and are still held to the copy rules.
  */
 
 export type IconName =
@@ -21,13 +32,27 @@ export type IconName =
   | "play"
   | "hand";
 
+/** A feature callout drawn over a gallery photo as a crisp vector pill (never baked into the pixels). */
+export interface GalleryBadge {
+  icon: "ring" | "reverse" | "shield" | "bolt";
+  title: string;
+  sub: string;
+}
+
 export interface GalleryImage {
   src: string;
   /** Full alt text */
   alt: string;
-  /** Short label under the thumbnail */
+  /** Short name of the photo */
   label: string;
+  /** Callout shown on this photo, on the photos that have one */
+  badge?: GalleryBadge;
+  /** A dark photo: the watermark and position dots are drawn light on it */
+  dark?: boolean;
 }
+
+/** The schematics a product page can show beside its three steps (components/product/product-diagram.tsx). */
+export type DiagramId = "pouncepop-motion";
 
 /**
  * A short looping demo clip. `src` stays null until a real clip of the product
@@ -52,8 +77,16 @@ export interface ProductContent {
   slug: string;
   /** Full product name, used in the <h1> eyebrow, image alts and structured data */
   name: string;
-  /** Small label above the headline */
+  /** Small label above the product name, drawn as a pill */
   eyebrow: string;
+  /** One line beside the pill, in the display italic */
+  tagline: string;
+  /** A sentence or two under the product name */
+  description: string;
+  /** Bullet points that close the buy box */
+  features: string[];
+  /** The product's own item in the trust row (the guarantee, shipping and checkout items are store-wide) */
+  trust: { icon: "shield" | "paw" | "battery"; label: string };
   /** The hook */
   headline: string;
   subheadline: string;
@@ -65,6 +98,18 @@ export interface ProductContent {
   /** Heading above the bundle cards */
   bundle: { heading: string; intro: string; tierNotes: Record<number, string> };
   howItWorks: { heading: string; steps: { icon: IconName; title: string; text: string }[]; tip?: string };
+  /** Two photos of one scene, compared with a slider; the section is left out without it */
+  transformation?: {
+    eyebrow: string;
+    heading: string;
+    lede: string;
+    before: { src: string; alt: string };
+    after: { src: string; alt: string };
+  };
+  /** The schematic beside the three steps, and the line under it; the steps run three across without it */
+  diagram?: { id: DiagramId; caption: string };
+  /** The closing band: one line and the button that leads back up to the buy box */
+  closing: { heading: string; cta: string };
   comparison: {
     heading: string;
     ours: string;

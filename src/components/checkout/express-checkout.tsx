@@ -354,7 +354,7 @@ function WalletButtons({ amountCents, subtotalCents, shippingCents, countries, d
         onConfirm={handleConfirm}
       />
       {confirming && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-white/90 text-sm font-medium text-[#666a67]" role="status">
+        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-white/90 text-sm font-medium text-[#5b6b64]" role="status">
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           {t("checkout.processingPayment")}
         </div>
@@ -451,7 +451,7 @@ export function ExpressCheckout({
   return (
     <div data-express={state} className={visible || notice ? "mb-6" : undefined}>
       {visible && (
-        <p id="express-checkout-label" className="text-center text-xs font-medium leading-4 text-[#666a67]">
+        <p id="express-checkout-label" className="text-center text-xs font-medium leading-4 text-[#5b6b64]">
           {t("checkout.expressTitle")}
         </p>
       )}
@@ -463,7 +463,7 @@ export function ExpressCheckout({
             inert={!walletRow || walletInert}
           >
             {walletRow && walletStatus === "loading" && (
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-13 rounded-xl border border-[#eeece6] bg-[#f6f5f1] motion-safe:animate-pulse" role="status" aria-label={t("checkout.expressLoading")} />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-13 rounded-xl border border-[#f3eee2] bg-[#f7f3ea] motion-safe:animate-pulse" role="status" aria-label={t("checkout.expressLoading")} />
             )}
             {stripeJs.stripe && (
               <Elements stripe={stripeJs.stripe} options={elementsOptions}>
@@ -502,8 +502,8 @@ export function ExpressCheckout({
       )}
       {visible && (
         <div className="relative mt-5" aria-hidden="true">
-          <div className="absolute inset-x-0 top-1/2 border-t border-[#e7e5df]" />
-          <p className="relative mx-auto w-fit bg-white px-3 text-xs font-medium uppercase leading-4 tracking-wider text-[#7d817d]">{t("checkout.expressOr")}</p>
+          <div className="absolute inset-x-0 top-1/2 border-t border-[#e6e0d2]" />
+          <p className="relative mx-auto w-fit bg-white px-3 text-xs font-medium uppercase leading-4 tracking-wider text-[#7b877f]">{t("checkout.expressOr")}</p>
         </div>
       )}
     </div>

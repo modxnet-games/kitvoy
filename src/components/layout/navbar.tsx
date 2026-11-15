@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowRight, Menu, ShoppingBag, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
 import { cartDrawerControl, useCartStore } from "@/store/cart-store";
 import { useStorefrontUI } from "@/store/storefront-ui";
 import { useMounted } from "@/hooks/use-mounted";
@@ -12,7 +12,7 @@ import { BrandLogo } from "./brand-logo";
 import { CartDrawer } from "./cart-drawer";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 
-/** On a product page the links jump to its sections; elsewhere they lead to the catalog. */
+/** On the inflator's page the links jump to its sections; elsewhere they lead to the catalog. */
 function navLinks(pathname: string | null) {
   const product = catalog.find((p) => p.path === pathname);
   if (product) {
@@ -43,8 +43,13 @@ export function Navbar({ announcementText, announcementVisible = true }: { annou
   const setOverlay = useStorefrontUI(s => s.setOverlay);
   const close = useCallback(() => setOverlay(null), [setOverlay]);
   const { links: LINKS, cta } = navLinks(pathname);
+  // A product page on the shared template keeps its header to the logo and the bag, so nothing leads away from the buy box
+  const minimal = catalog.some((p) => p.path === pathname && p.path.startsWith("/products/"));
+  const count = mounted ? itemCount : 0;
   // The inflator ships to the US only, so its page keeps the US wording (or the admin's own text)
-  const announcement = pathname === "/inflator" ? announcementText || "Free U.S. Shipping on Every Order" : "Free Tracked Shipping on Every Order";
+  const announcement = pathname === "/inflator"
+    ? (announcementText || <><strong>Free U.S. Shipping</strong> on Every Order</>)
+    : <><strong>Free Tracked Shipping</strong> Included on Every Order</>;
 
   useEffect(() => useCartStore.subscribe((state, prev) => {
     if (state.items.length > prev.items.length) {
@@ -57,21 +62,27 @@ export function Navbar({ announcementText, announcementVisible = true }: { annou
 
   return <>
     <a className="skip-link" href="#main-content">Skip to content</a>
-    <header className="store-header">
-      {announcementVisible && <div className="announcement">{announcement}</div>}
-      <nav className="store-container header-nav" aria-label="Main navigation">
-        <Link href="/" aria-label="Kitvoy home"><BrandLogo /></Link>
-        <ul className="desktop-nav">{LINKS.map(link => <li key={link.href}><Link href={link.href}>{link.label}</Link></li>)}</ul>
-        <div className="nav-actions">
-          <button className="icon-button cart-trigger" aria-label={"Open cart" + (mounted && itemCount ? ", " + itemCount + " items" : "")} onClick={() => setOverlay("cart")}><ShoppingBag size={23} />{mounted && itemCount > 0 && <span className="cart-count">{itemCount}</span>}</button>
-          <Link href={cta.href} className="primary-button nav-purchase">{cta.label} <ArrowRight size={16} /></Link>
-          <button className="icon-button mobile-menu-trigger" aria-label="Open menu" onClick={() => setOverlay("menu")}><Menu size={25} /></button>
+    {announcementVisible && <div className="kv-topbar">{announcement}</div>}
+    <header className="kv-header">
+      <div className="kv-wrap">
+        <Link href="/" className="kv-logo" aria-label="Kitvoy home"><BrandLogo /></Link>
+        {!minimal && <nav aria-label="Main navigation"><ul className="kv-header-nav">{LINKS.map(link => <li key={link.href}><Link href={link.href}>{link.label}</Link></li>)}</ul></nav>}
+        <div className="kv-header-actions">
+          {!minimal && <Link href={cta.href} className="kv-btn kv-btn-primary kv-header-cta">{cta.label} <ArrowRight size={16} aria-hidden="true" /></Link>}
+          <button className="kv-bag-btn cart-trigger" onClick={() => setOverlay("cart")} aria-label={"Open cart" + (count ? ", " + count + (count === 1 ? " item" : " items") : "")}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 8h14l-1.2 12H6.2L5 8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+              <path d="M9 8V6.5a3 3 0 016 0V8" stroke="currentColor" strokeWidth="1.6" />
+            </svg>
+            {count > 0 && <span className="kv-bag-count">{count}</span>}
+          </button>
+          {!minimal && <button className="kv-menu-btn" aria-label="Open menu" onClick={() => setOverlay("menu")}><Menu size={24} aria-hidden="true" /></button>}
         </div>
-      </nav>
+      </div>
     </header>
     <Sheet open={overlay === "menu"} onOpenChange={open => setOverlay(open ? "menu" : null)}>
       <SheetContent side="right" className="store-menu" showCloseButton={false}>
-        <SheetHeader className="menu-header"><SheetTitle><BrandLogo /></SheetTitle><SheetClose render={<button className="icon-button" aria-label="Close menu" />}><X /></SheetClose></SheetHeader>
+        <SheetHeader className="menu-header"><SheetTitle className="kv-logo" aria-label="Kitvoy"><BrandLogo /></SheetTitle><SheetClose render={<button className="icon-button" aria-label="Close menu" />}><X /></SheetClose></SheetHeader>
         <nav aria-label="Mobile navigation">{LINKS.map(link => <Link key={link.href} href={link.href} onClick={close}>{link.label}<ArrowRight size={19} /></Link>)}<Link href="/support" onClick={close}>Help & information<ArrowRight size={19} /></Link><Link href="/account" onClick={close}>My account<ArrowRight size={19} /></Link></nav>
         <Link href={cta.href} className="primary-button" onClick={close}>{cta.label}</Link>
       </SheetContent>

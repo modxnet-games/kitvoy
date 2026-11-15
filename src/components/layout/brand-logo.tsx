@@ -1,17 +1,12 @@
 import { siteConfig } from "@/config/site";
-import { cn } from "@/lib/utils";
 
-/** Text wordmark used in the header and footer. */
-export function BrandLogo({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-2 text-2xl font-black tracking-tight",
-        className,
-      )}
-    >
-      <img src={siteConfig.icon} alt="" aria-hidden className="size-8" />
-      {siteConfig.name}
-    </span>
-  );
+/**
+ * The Kitvoy logo: the dog, the cat and the leaf over the wordmark, from
+ * /public/brand. `light` is the cream version for dark backgrounds. The link or
+ * heading around it carries the name, so the image itself is decorative.
+ * `lazy` is for a logo far down the page (the footer's).
+ */
+export function BrandLogo({ light = false, lazy = false }: { light?: boolean; lazy?: boolean }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={light ? siteConfig.logoLight : siteConfig.logo} alt="" width={955} height={650} decoding="async" loading={lazy ? "lazy" : undefined} />;
 }

@@ -50,7 +50,7 @@ function Buttons({ orderId, onPaid, onError, onProcessingChange, onEvent, disabl
   return (
     <div className={disabled ? "relative min-h-13 opacity-50" : "relative min-h-13"} aria-disabled={disabled || undefined}>
       {(isPending || capturing) && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-white/85 text-sm font-medium text-[#666a67]" role="status">
+        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-white/85 text-sm font-medium text-[#5b6b64]" role="status">
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           {capturing ? "Confirming your payment…" : "Loading PayPal…"}
         </div>

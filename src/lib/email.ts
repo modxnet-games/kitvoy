@@ -412,6 +412,17 @@ export async function sendOrderConfirmation(
   }
 }
 
+/**
+ * The green band that opens every customer email: the logo, on the logo's own
+ * green. Mail apps that hold images back show the store's name in its place
+ * (the image's alt text, styled like the heading it stands in for).
+ */
+function brandHeader(storeName: string): string {
+  const origin = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+  const type = "color:#FBF8F1;font-size:20px;font-weight:800;";
+  return `<tr><td style="background:#1C5244;padding:18px 28px;${type}"><img src="${origin}/brand/kitvoy-logo-email.png" alt="${escapeHtml(storeName)}" height="48" style="display:block;border:0;outline:none;height:48px;width:auto;${type}"></td></tr>`;
+}
+
 /** Subject, plain text and HTML for the order confirmation (no sending). */
 export function buildOrderConfirmationEmail(p: OrderConfirmationPayload): { subject: string; text: string; html: string } {
   const storeName = "Kitvoy";
@@ -450,22 +461,22 @@ export function buildOrderConfirmationEmail(p: OrderConfirmationPayload): { subj
     `— ${storeName}`,
   ].join("\n");
 
-  const ink = "#0B0B0F";
-  const muted = "#5A5A66";
-  const line = "#E7E7EC";
+  const ink = "#0F2A23";
+  const muted = "#5B6B64";
+  const line = "#E6E0D2";
   const cell = `padding:10px 0;border-bottom:1px solid ${line};font-size:14px;`;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:0;background:#F4F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#F3EEE2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EEE2;padding:24px 12px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
-        <tr><td style="background:${ink};padding:20px 28px;color:#FFFFFF;font-size:20px;font-weight:800;">${storeName}</td></tr>
+        ${brandHeader(storeName)}
         <tr><td style="padding:28px;">
           <p style="margin:0 0 8px;font-size:22px;font-weight:800;">Thanks for your order</p>
           <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:${muted};">Hi ${escapeHtml(firstName)}, your payment went through and your order is confirmed.</p>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;border-radius:10px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EEE2;border-radius:10px;">
             <tr><td style="padding:16px 18px;">
               <p style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${muted};">Order</p>
               <p style="margin:4px 0 0;font-size:18px;font-weight:700;font-family:Consolas,Monaco,monospace;">${escapeHtml(p.orderReference)}</p>
@@ -542,8 +553,8 @@ export function buildCustomerMessageEmail(p: Pick<CustomerMessagePayload, "from"
   const body = p.body.replace(/\r\n?/g, "\n").trim();
   const text = `${body}\n\n— ${p.from.name}\n${p.from.email}`;
 
-  const ink = "#0B0B0F";
-  const muted = "#5A5A66";
+  const ink = "#0F2A23";
+  const muted = "#5B6B64";
   const paragraphs = body
     .split(/\n{2,}/)
     .map((para) => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;">${escapeHtml(para).replace(/\n/g, "<br>")}</p>`)
@@ -551,14 +562,14 @@ export function buildCustomerMessageEmail(p: Pick<CustomerMessagePayload, "from"
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(p.subject)}</title></head>
-<body style="margin:0;padding:0;background:#F4F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#F3EEE2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EEE2;padding:24px 12px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
-        <tr><td style="background:${ink};padding:20px 28px;color:#FFFFFF;font-size:20px;font-weight:800;">${storeName}</td></tr>
+        ${brandHeader(storeName)}
         <tr><td style="padding:28px;">
           ${paragraphs}
-          <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #E7E7EC;font-size:14px;line-height:1.5;color:${muted};"><strong style="color:${ink};">${escapeHtml(p.from.name)}</strong><br>${escapeHtml(p.from.email)}</p>
+          <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #E6E0D2;font-size:14px;line-height:1.5;color:${muted};"><strong style="color:${ink};">${escapeHtml(p.from.name)}</strong><br>${escapeHtml(p.from.email)}</p>
         </td></tr>
       </table>
       <p style="margin:14px 0 0;font-size:12px;color:${muted};">Reply to this email to reach ${storeName}.</p>
@@ -601,29 +612,29 @@ export function buildShippingEmail(p: ShippingConfirmationPayload): { subject: s
     `— ${storeName}`,
   ].join("\n");
 
-  const ink = "#0B0B0F";
-  const orange = "#FF7A1A";
-  const muted = "#5A5A66";
+  const ink = "#0F2A23";
+  const brand = "#1C5244";
+  const muted = "#5B6B64";
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:0;background:#F4F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#F3EEE2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EEE2;padding:24px 12px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
-        <tr><td style="background:${ink};padding:20px 28px;color:#FFFFFF;font-size:20px;font-weight:800;">${storeName}</td></tr>
+        ${brandHeader(storeName)}
         <tr><td style="padding:28px;">
           <p style="margin:0 0 8px;font-size:22px;font-weight:800;">${escapeHtml(headline)}</p>
           <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:${muted};">Hi ${escapeHtml(firstName)}, ${
             p.isUpdate ? "here’s the new tracking number for" : "your package is with the carrier. Here’s how to follow"
           } order <strong style="color:${ink};">${escapeHtml(p.orderReference)}</strong>.</p>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;border-radius:10px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EEE2;border-radius:10px;">
             <tr><td style="padding:16px 18px;">
               <p style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${muted};">Tracking number</p>
               <p style="margin:4px 0 0;font-size:18px;font-weight:700;font-family:Consolas,Monaco,monospace;">${escapeHtml(p.trackingNumber)}</p>
             </td></tr>
           </table>
-          <p style="margin:20px 0;"><a href="${escapeHtml(p.trackingUrl)}" style="display:inline-block;background:${orange};color:${ink};text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:10px;">Track your package</a></p>
+          <p style="margin:20px 0;"><a href="${escapeHtml(p.trackingUrl)}" style="display:inline-block;background:${brand};color:#FBF8F1;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:10px;">Track your package</a></p>
           <p style="margin:0 0 6px;font-size:13px;font-weight:700;">Shipping to</p>
           <p style="margin:0 0 18px;font-size:14px;line-height:1.5;color:${muted};">${p.shipTo.map(escapeHtml).join("<br>")}</p>
           <p style="margin:0 0 6px;font-size:13px;font-weight:700;">In this shipment</p>
@@ -711,31 +722,31 @@ export function buildReviewRequestEmail(p: ReviewRequestPayload): { subject: str
     footer,
   ].join("\n");
 
-  const ink = "#0B0B0F";
-  const orange = "#FF7A1A";
-  const muted = "#5A5A66";
+  const ink = "#0F2A23";
+  const brand = "#1C5244";
+  const muted = "#5B6B64";
   const starUrl = (n: number) => `${p.reviewUrl}?rating=${n}`;
   const stars = [1, 2, 3, 4, 5]
-    .map((n) => `<a href="${escapeHtml(starUrl(n))}" title="${n} star${n === 1 ? "" : "s"}" style="color:#C94B16;text-decoration:none;font-size:34px;line-height:1;padding:0 3px;">&#9733;</a>`)
+    .map((n) => `<a href="${escapeHtml(starUrl(n))}" title="${n} star${n === 1 ? "" : "s"}" style="color:#1C5244;text-decoration:none;font-size:34px;line-height:1;padding:0 3px;">&#9733;</a>`)
     .join("");
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:0;background:#F4F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#F3EEE2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EEE2;padding:24px 12px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
-        <tr><td style="background:${ink};padding:20px 28px;color:#FFFFFF;font-size:20px;font-weight:800;">${storeName}</td></tr>
+        ${brandHeader(storeName)}
         <tr><td style="padding:28px;">
           <p style="margin:0 0 8px;font-size:22px;font-weight:800;">How's it going, ${escapeHtml(firstName)}?</p>
           <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:${muted};">${escapeHtml(intro)}</p>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F6;border-radius:10px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3EEE2;border-radius:10px;">
             <tr><td align="center" style="padding:18px;">
               <p style="margin:0 0 8px;font-size:13px;color:${muted};">Tap a star to start your review</p>
               <p style="margin:0;">${stars}</p>
             </td></tr>
           </table>
-          <p style="margin:20px 0;"><a href="${escapeHtml(p.reviewUrl)}" style="display:inline-block;background:${orange};color:${ink};text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:10px;">Write a review</a></p>
+          <p style="margin:20px 0;"><a href="${escapeHtml(p.reviewUrl)}" style="display:inline-block;background:${brand};color:#FBF8F1;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:10px;">Write a review</a></p>
           <p style="margin:0 0 14px;font-size:13px;line-height:1.5;color:${muted};">${escapeHtml(fairness)}</p>
           <p style="margin:0;font-size:13px;line-height:1.5;color:${muted};">${escapeHtml(help)}</p>
         </td></tr>

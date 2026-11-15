@@ -210,7 +210,7 @@ export function CheckoutForm({
       )}
 
       <fieldset>
-        <legend className="text-base font-semibold text-[#171918]">{t("checkout.contactTitle")}</legend>
+        <legend className="text-base font-semibold text-[#0f2a23]">{t("checkout.contactTitle")}</legend>
         <div className="mt-4 space-y-5">
         <CheckoutField
           {...fieldProps("email")}
@@ -244,8 +244,8 @@ export function CheckoutForm({
       </fieldset>
 
       <fieldset>
-        <legend className="text-base font-semibold text-[#171918]">{t("checkout.shippingTitle")}</legend>
-        <p className="mt-1 text-sm text-[#666a67]">
+        <legend className="text-base font-semibold text-[#0f2a23]">{t("checkout.shippingTitle")}</legend>
+        <p className="mt-1 text-sm text-[#5b6b64]">
           {us
             ? t("checkout.shippingNote")
             : days
@@ -255,7 +255,7 @@ export function CheckoutForm({
         <div className="mt-4 space-y-5">
         {(allowed.length > 1 || !us) && (
           <div className="min-w-0">
-            <label htmlFor="checkout-country" className="mb-1.5 block text-sm font-medium text-[#171918]">
+            <label htmlFor="checkout-country" className="mb-1.5 block text-sm font-medium text-[#0f2a23]">
               {t("checkout.country")}
             </label>
             <div className="relative">
@@ -275,10 +275,10 @@ export function CheckoutForm({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-[#666a67]" aria-hidden="true" />
+              <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-[#5b6b64]" aria-hidden="true" />
             </div>
             {unservedVisitorCountry && (
-              <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-[#666a67]">
+              <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-[#5b6b64]">
                 <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                 {t("checkout.countryNotServed", { country: unservedVisitorCountry })}
               </p>
@@ -311,7 +311,7 @@ export function CheckoutForm({
           />
           {rules.region === "select" ? (
           <div className="min-w-0 sm:col-span-4">
-            <label htmlFor="checkout-state" className="mb-1.5 block text-sm font-medium text-[#171918]">
+            <label htmlFor="checkout-state" className="mb-1.5 block text-sm font-medium text-[#0f2a23]">
               {t("checkout.state")}
             </label>
             <div className="relative">
@@ -335,7 +335,7 @@ export function CheckoutForm({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-[#666a67]" aria-hidden="true" />
+              <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-[#5b6b64]" aria-hidden="true" />
             </div>
             {stateError && (
               <p id="checkout-state-message" role="alert" className="mt-1.5 text-[13px] font-medium leading-snug text-[#b3261e]">
@@ -375,7 +375,7 @@ export function CheckoutForm({
           {submitLabel ?? t("checkout.placeOrder")}
           <ArrowRight className="size-[18px]" aria-hidden="true" />
         </CheckoutButton>
-        <p className="text-center text-xs leading-relaxed text-[#666a67]">{t("checkout.paymentIntro")}</p>
+        <p className="text-center text-xs leading-relaxed text-[#5b6b64]">{t("checkout.paymentIntro")}</p>
       </div>
     </form>
   );

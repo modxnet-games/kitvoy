@@ -54,7 +54,7 @@ export function AccountOrderDetailClient({ order, review }: AccountOrderDetailCl
         </Link>
 
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="font-serif text-3xl font-medium">
             {t("account.orders.orderDetails")} {order.reference}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -175,7 +175,7 @@ export function AccountOrderDetailClient({ order, review }: AccountOrderDetailCl
                   href={trackingUrl(order.trackingNumber)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-ink transition hover:bg-brand/90"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-brand-foreground transition hover:bg-brand/90"
                 >
                   {t("account.orders.trackPackage")}
                   <ExternalLink className="size-4" />
@@ -212,7 +212,7 @@ export function AccountOrderDetailClient({ order, review }: AccountOrderDetailCl
                 <p className="mt-2 text-sm text-muted-foreground">{t("account.orders.reviewText")}</p>
                 <Link
                   href={review.href}
-                  className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-ink transition hover:bg-brand/90"
+                  className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-brand-foreground transition hover:bg-brand/90"
                 >
                   {t("account.orders.writeReview")}
                 </Link>

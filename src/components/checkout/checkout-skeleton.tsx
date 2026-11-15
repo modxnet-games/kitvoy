@@ -1,4 +1,4 @@
-const bar = "rounded-xl bg-[#ebe8e1] motion-safe:animate-pulse";
+const bar = "rounded-xl bg-[#ece6d8] motion-safe:animate-pulse";
 
 /** A label, its input and (for some fields) the hint under it: the same heights as a real checkout field. */
 function Field({ hint = false, className = "" }: { hint?: boolean; className?: string }) {
@@ -52,7 +52,7 @@ function DetailsShape() {
           </div>
         </div>
         <div className="space-y-3 pt-1">
-          <div className="h-13 rounded-xl bg-[#c94b16]/25 motion-safe:animate-pulse" />
+          <div className="h-13 rounded-xl bg-[#1c5244]/25 motion-safe:animate-pulse" />
           <div className={`mx-auto h-4 w-64 max-w-full ${bar}`} />
         </div>
       </div>
@@ -80,14 +80,14 @@ function PaymentShape() {
           ))}
           <div className="h-[200px] sm:h-[340px]" />
         </div>
-        <div className="h-13 rounded-xl bg-[#c94b16]/25 motion-safe:animate-pulse" />
+        <div className="h-13 rounded-xl bg-[#1c5244]/25 motion-safe:animate-pulse" />
       </div>
     </div>
   );
 }
 
 /**
- * The checkout's shape, shown the instant "Continue to checkout" is clicked
+ * The checkout's shape, shown the instant "Check out" is clicked
  * (route loading state), while the saved cart loads in the browser and while
  * a started checkout is being restored. It mirrors the real page section by
  * section, so the page keeps its height and nothing below it jumps when the
@@ -96,11 +96,11 @@ function PaymentShape() {
 export function CheckoutSkeleton({ variant = "details", label = "Loading checkout" }: { variant?: "details" | "payment"; label?: string }) {
   return (
     <div className="store-container checkout-page py-8 md:py-12" role="status" aria-label={label}>
-      <div className="h-9 w-40 rounded-lg bg-[#ebe8e1] motion-safe:animate-pulse sm:h-10" />
+      <div className="h-9 w-40 rounded-lg bg-[#ece6d8] motion-safe:animate-pulse sm:h-10" />
       <div className={`mt-4 h-6 w-64 max-w-full ${bar}`} />
-      <div className={`mt-6 h-[58px] rounded-2xl bg-[#ebe8e1] motion-safe:animate-pulse lg:hidden`} />
+      <div className={`mt-6 h-[58px] rounded-2xl bg-[#ece6d8] motion-safe:animate-pulse lg:hidden`} />
       <div className="mt-6 grid gap-8 lg:mt-8 lg:grid-cols-12 lg:items-start lg:gap-10">
-        <div className="min-w-0 rounded-2xl border border-[#e7e5df] bg-white p-5 sm:p-8 lg:col-span-7">
+        <div className="min-w-0 rounded-2xl border border-[#e6e0d2] bg-white p-5 sm:p-8 lg:col-span-7">
           {variant === "payment" ? <PaymentShape /> : <DetailsShape />}
         </div>
         <div className={`hidden h-96 lg:col-span-5 lg:block ${bar}`} />

@@ -19,12 +19,12 @@ interface CheckoutFieldProps extends Omit<React.ComponentProps<"input">, "classN
 
 /** The input style every checkout field shares, also used by the state select. */
 export const checkoutInputClass = cn(
-  "block h-12 w-full min-w-0 rounded-xl border border-[#dcd9d0] bg-white px-4 text-base text-[#171918]",
+  "block h-12 w-full min-w-0 rounded-xl border border-[#d8d1c0] bg-white px-4 text-base text-[#0f2a23]",
   "placeholder:text-[#9a9d99] transition-all duration-200",
-  "hover:border-[#bdb9ae]",
-  "focus:border-[#c94b16] focus:outline-none focus:ring-4 focus:ring-[#c94b16]/15",
+  "hover:border-[#bdb8a8]",
+  "focus:border-[#1c5244] focus:outline-none focus:ring-4 focus:ring-[#1c5244]/15",
   "aria-invalid:border-[#d13b2b] aria-invalid:focus:ring-[#d13b2b]/15",
-  "disabled:cursor-not-allowed disabled:bg-[#f4f3ef] disabled:text-[#8a8d89]",
+  "disabled:cursor-not-allowed disabled:bg-[#f7f3ea] disabled:text-[#8a8d89]",
   "motion-reduce:transition-none",
 );
 
@@ -35,9 +35,9 @@ export function CheckoutField({ label, error, hint, optional, valid, id, classNa
 
   return (
     <div className={cn("min-w-0", className)}>
-      <label htmlFor={inputId} className="mb-1.5 flex items-baseline justify-between gap-3 text-sm font-medium text-[#171918]">
+      <label htmlFor={inputId} className="mb-1.5 flex items-baseline justify-between gap-3 text-sm font-medium text-[#0f2a23]">
         <span>{label}</span>
-        {optional && <span className="text-xs font-normal text-[#666a67]">Optional</span>}
+        {optional && <span className="text-xs font-normal text-[#5b6b64]">Optional</span>}
       </label>
       <div className="relative">
         <input
@@ -59,7 +59,7 @@ export function CheckoutField({ label, error, hint, optional, valid, id, classNa
           {error}
         </p>
       ) : hint ? (
-        <p id={messageId} className="mt-1.5 text-xs leading-snug text-[#666a67]">
+        <p id={messageId} className="mt-1.5 text-xs leading-snug text-[#5b6b64]">
           {hint}
         </p>
       ) : null}

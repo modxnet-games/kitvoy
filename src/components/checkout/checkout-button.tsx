@@ -23,13 +23,13 @@ export function CheckoutButton({ children, loading = false, loadingLabel, disabl
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex h-13 w-full items-center justify-center gap-2.5 rounded-xl bg-[#c94b16] px-6 text-[15px] font-semibold text-white",
-        "shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_10px_20px_-14px_rgba(201,75,22,0.8)] transition-all duration-200",
-        "hover:-translate-y-0.5 hover:bg-[#ae3d0e] hover:shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_16px_26px_-14px_rgba(201,75,22,0.9)]",
+        "inline-flex h-13 w-full items-center justify-center gap-2.5 rounded-xl bg-[#1c5244] px-6 text-[15px] font-semibold text-white",
+        "shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_10px_20px_-14px_rgba(28, 82, 68,0.8)] transition-all duration-200",
+        "hover:-translate-y-0.5 hover:bg-[#246554] hover:shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_16px_26px_-14px_rgba(28, 82, 68,0.9)]",
         "active:translate-y-0 active:scale-[0.99] active:shadow-none",
-        "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c94b16]/25",
+        "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1c5244]/25",
         "disabled:translate-y-0 disabled:cursor-not-allowed disabled:shadow-none",
-        loading ? "disabled:bg-[#c94b16]/80 disabled:text-white" : "disabled:bg-[#e7e5df] disabled:text-[#666a67]",
+        loading ? "disabled:bg-[#1c5244]/80 disabled:text-white" : "disabled:bg-[#e6e0d2] disabled:text-[#5b6b64]",
         "motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         className,
       )}

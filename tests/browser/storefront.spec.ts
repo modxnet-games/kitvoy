@@ -16,7 +16,7 @@ async function add(page: Page, quantity: number) {
   await choose(page, quantity);
   await page.getByRole("button", { name: new RegExp("^Add " + quantity + " to cart") }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Continue to checkout" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Check out" })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -48,18 +48,18 @@ for (const width of [360, 390, 768, 1440]) {
     await expect(page.getByRole("button", { name: "Add 2 to cart · $99.99" })).toBeEnabled();
     await page.locator("#bundles").screenshot({ path: screenshotDir + "/bundles-" + width + ".png" });
     await add(page, 2);
-    await expect(page.locator(".cart-total dd")).toHaveText("$99.99");
+    await expect(page.locator(".kv-cart-total")).toHaveText("$99.99 USD");
     await page.getByRole("button", { name: "Increase quantity" }).click();
-    await expect(page.locator(".cart-total dd")).toHaveText("$134.98");
+    await expect(page.locator(".kv-cart-total")).toHaveText("$134.98 USD");
     await page.getByRole("button", { name: "Decrease quantity" }).click();
-    await expect(page.locator(".cart-total dd")).toHaveText("$99.99");
+    await expect(page.locator(".kv-cart-total")).toHaveText("$99.99 USD");
     await page.screenshot({ path: screenshotDir + "/cart-" + width + ".png" });
     await noOverflow(page);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.locator(".mobile-buy-bar")).toBeHidden();
     await page.getByRole("button", { name: /^Open cart/ }).click();
-    await page.getByRole("link", { name: "Continue to checkout" }).click();
+    await page.getByRole("link", { name: "Check out" }).click();
     await expect(page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
     await expect(page.locator(".mobile-buy-bar")).toHaveCount(0);
     await page.getByRole("button", { name: "Continue to payment" }).click();
@@ -71,7 +71,7 @@ for (const width of [360, 390, 768, 1440]) {
     // On phones the order summary is folded, so use the step line that every width shows
     await page.locator(".checkout-progress").getByRole("link", { name: "Cart" }).click();
     await page.getByRole("button", { name: /^Remove/ }).click();
-    await expect(page.getByText("Your next trip starts here.")).toBeVisible();
+    await expect(page.getByText("Your cart is empty.")).toBeVisible();
   });
 }
 
@@ -122,23 +122,57 @@ test("failed quote blocks checkout and can be retried", async ({ page }) => {
   await choose(page, 1);
   await page.getByRole("button", { name: "Add 1 to cart · $59.99" }).click();
   await expect(page.getByText(/We couldn't check availability/)).toBeVisible();
-  await expect(page.getByRole("link", { name: "Continue to checkout" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Check out" })).toHaveCount(0);
   fail = false;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("link", { name: "Continue to checkout" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Check out" })).toBeVisible();
 });
 
 test("sign-in and checkout offer Continue with Google", async ({ page }) => {
   await page.goto("/login?error=google_denied&redirect=//evil.com");
-  await expect(page.getByRole("alert").filter({ hasText: "Google sign-in was cancelled" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Google sign-in was canceled" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Continue with Google" })).toHaveAttribute("href", "/api/auth/google?redirect=%2Faccount");
   const login = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(login.violations).toEqual([]);
 
   await page.goto("/inflator");
   await add(page, 1);
-  await page.getByRole("link", { name: "Continue to checkout" }).click();
+  await page.getByRole("link", { name: "Check out" }).click();
   await expect(page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Continue with Google" })).toHaveAttribute("href", "/api/auth/google?redirect=%2Fcheckout");
+  await noOverflow(page);
+});
+
+test("the product page: one heading, gallery, bundles, a color for each ball, the cart and accessibility", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/products/pouncepop");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 1, name: "PouncePop Smart Interactive Dog & Cat Ball" })).toBeVisible();
+  await noOverflow(page);
+  // The 2-pack is the lead offer; a thumbnail changes the photo
+  await expect(page.getByRole("radio", { name: /2 Balls/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("button", { name: "Add to cart · $49.99" })).toBeEnabled();
+  await page.getByRole("button", { name: /^Show image 2/ }).click();
+  await expect(page.getByRole("button", { name: /^Show image 2/ })).toHaveAttribute("aria-current", "true");
+  // Three balls: the chips under the price set one color for the whole pack, then the third ball gets its own
+  await page.getByRole("radio", { name: /3 Balls/ }).click();
+  await page.getByRole("radiogroup", { name: "Color for all 3 balls" }).getByRole("radio", { name: "Blue" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Color of ball 1" }).getByRole("radio", { name: "Blue" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("radiogroup", { name: "Color of ball 3" }).getByRole("radio", { name: "Purple" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Color of ball 3" }).getByRole("radio", { name: "Purple" })).toHaveAttribute("aria-checked", "true");
+  // Mixed again, so no single color stands for the pack
+  await expect(page.getByRole("radiogroup", { name: "Color for all 3 balls" }).getByRole("radio", { name: "Blue" })).toHaveAttribute("aria-checked", "false");
+  const product = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(product.violations).toEqual([]);
+  await page.getByRole("button", { name: "Add to cart · $64.99" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  // The dot between the two is decoration, hidden from the heading's name
+  await expect(page.getByRole("heading", { name: /^Cart +3 items$/ })).toBeVisible();
+  // Two blue and one purple: one pack, two lines
+  await expect(page.locator(".kv-cart-line")).toHaveCount(2);
+  await expect(page.locator(".kv-cart-total")).toHaveText("$64.99 USD");
+  await expect(page.getByRole("link", { name: "Check out" })).toBeVisible();
+  const cart = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(cart.violations).toEqual([]);
   await noOverflow(page);
 });

@@ -1,41 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import {
-  ArrowRight,
-  BatteryCharging,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  CircleHelp,
-  Hand,
-  Info,
-  LockKeyhole,
-  Package,
-  PawPrint,
-  Play,
-  Plus,
-  Power,
-  RotateCcw,
-  Ruler,
-  ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-  Truck,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
-
-import "@/app/product-page.css";
-import { useMounted } from "@/hooks/use-mounted";
 
 import { SHIPPING_COUNTRY_CODES, type CatalogProduct, type CatalogVariant, type CountryCode } from "@/config/catalog";
-import { processingText, storePolicies } from "@/config/policies";
-import type { DemoLoop, GalleryImage, IconName, ProductContent } from "@/config/products/types";
+import { storePolicies } from "@/config/policies";
+import type { GalleryBadge, GalleryImage, ProductContent } from "@/config/products/types";
+import { siteConfig } from "@/config/site";
 import { trackAddToCart } from "@/lib/analytics/meta-pixel";
 import { getBundleSavings, getLineTotal } from "@/lib/bundles";
+import { arrivalRange } from "@/lib/delivery-estimate";
 import { formatPrice } from "@/lib/formatters";
 import type { ReviewSummary } from "@/lib/reviews";
 import { COUNTRY_RULES, isCountryCode } from "@/lib/us-address";
@@ -44,7 +18,16 @@ import { useStorefrontUI } from "@/store/storefront-ui";
 import { withVariant, type ProductDisplay } from "@/types/product";
 import { TrackViewContent } from "@/components/analytics/track-view-content";
 import { CustomerReviews } from "@/components/landing/customer-reviews";
-import { usePrefersReducedMotion } from "@/components/landing/use-reduced-motion";
+import { PayBadges, TrustIcon } from "@/components/payments/pay-badges";
+import { BeforeAfter } from "./before-after";
+import { ProductDiagram } from "./product-diagram";
+
+/*
+ * The product page template. Its layout is the owner's TreeAura product page,
+ * section for section (styles in app/brand.css): gallery and buy box, a
+ * before/after comparison, three steps beside a diagram, specifications, the
+ * FAQ and a closing band, with a buy bar that slides in on phones.
+ */
 
 export interface ProductPageProps {
   /** The database product (live price, stock, shippingTax, images); null if it isn't in the database yet */
@@ -59,23 +42,14 @@ export interface ProductPageProps {
   reviews?: ReviewSummary | null;
   /** Cloudflare's CF-IPCountry for this visitor, e.g. "US", "DE", or null */
   visitorCountry?: string | null;
+  /** Today in the store's time zone (YYYY-MM-DD), from the server, for the delivery estimate */
+  today?: string | null;
 }
 
-const ICONS: Record<IconName, LucideIcon> = {
-  sparkles: Sparkles,
-  zap: Zap,
-  shield: ShieldCheck,
-  battery: BatteryCharging,
-  paw: PawPrint,
-  ruler: Ruler,
-  truck: Truck,
-  package: Package,
-  power: Power,
-  play: Play,
-  hand: Hand,
-};
-
 const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** The gallery never shows more than this many photos, whatever the content file lists. */
+const MAX_GALLERY_SLIDES = 5;
 
 /**
  * A photo that fills its (position: relative, fixed aspect ratio) parent. If
@@ -86,134 +60,100 @@ const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1
  */
 function Photo({ src, alt, sizes, preload = false }: { src: string; alt: string; sizes: string; preload?: boolean }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  if (failedSrc === src) return <span className="pp-image-fallback" role={alt ? "img" : undefined} aria-label={alt || undefined} aria-hidden={alt ? undefined : true} />;
-  return <Image fill className="pp-cover" src={src} alt={alt} sizes={sizes} preload={preload} onError={() => setFailedSrc(src)} />;
+  if (failedSrc === src) return <span className="kv-image-fallback" role={alt ? "img" : undefined} aria-label={alt || undefined} aria-hidden={alt ? undefined : true} />;
+  return <Image fill src={src} alt={alt} sizes={sizes} preload={preload} fetchPriority={preload ? "high" : "auto"} onError={() => setFailedSrc(src)} />;
 }
 
-/** Swipeable photo strip (native scroll-snap), with arrows and thumbnails on larger screens and dots on phones. */
-function Gallery({ slides }: { slides: GalleryImage[] }) {
-  const track = useRef<HTMLUListElement>(null);
-  const frame = useRef(0);
-  const [active, setActive] = useState(0);
-  const reducedMotion = usePrefersReducedMotion();
-  const count = slides.length;
-
-  const goTo = useCallback(
-    (index: number) => {
-      const el = track.current;
-      if (!el) return;
-      const target = Math.max(0, Math.min(index, count - 1));
-      el.scrollTo({ left: target * el.clientWidth, behavior: reducedMotion ? "auto" : "smooth" });
-    },
-    [count, reducedMotion],
+function BadgeIcon({ icon }: { icon: GalleryBadge["icon"] }) {
+  const p = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      {icon === "ring" && (<><circle {...p} cx="12" cy="12" r="8.5" strokeDasharray="5.2 2.6" /><circle {...p} cx="12" cy="12" r="3.6" /></>)}
+      {icon === "reverse" && (<><path {...p} d="M20 4v16" /><path {...p} d="M4 9h8.500a3.500 3.500 0 010 7H7" /><path {...p} d="M9.500 13.500L7 16l2.500 2.500" /></>)}
+      {icon === "shield" && (<><path {...p} d="M12 3l7 3v5c0 4.500-3 8.300-7 10-4-1.700-7-5.500-7-10V6z" /><path {...p} d="M9 12l2.200 2.200L15.200 10" /></>)}
+      {icon === "bolt" && (<path {...p} d="M13 3L5 13.500h6L10 21l8-10.500h-6z" />)}
+    </svg>
   );
+}
 
-  // The slide in view follows the scroll position, whatever moved it: a swipe, the keyboard, an arrow or a thumbnail
-  const onScroll = () => {
-    cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(() => {
-      const el = track.current;
-      if (el && el.clientWidth > 0) setActive(Math.round(el.scrollLeft / el.clientWidth));
-    });
+/** What the main picture is showing: a gallery photo, or the photo of a colour the customer has just picked. */
+type Shown = Pick<GalleryImage, "src" | "alt" | "badge" | "dark">;
+
+/**
+ * The gallery: one large photo, changed by a swipe or by its thumbnails, with
+ * the brand mark, a feature callout on the photos that have one, and position
+ * dots. While a picked colour's photo is on show no thumbnail is current;
+ * choosing a thumbnail or swiping goes back to the gallery.
+ */
+function Gallery({ slides, preview, onLeavePreview }: { slides: GalleryImage[]; preview: Shown | null; onLeavePreview: () => void }) {
+  const [active, setActive] = useState(0);
+  const touchX = useRef<number | null>(null);
+  if (slides.length === 0) return null;
+
+  const shown: Shown = preview ?? slides[Math.min(active, slides.length - 1)];
+  const go = (dir: 1 | -1) => {
+    onLeavePreview();
+    setActive((i) => (i + dir + slides.length) % slides.length);
   };
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
-
-  // A newly picked colour becomes the first photo: bring it into view
-  const firstSrc = slides[0]?.src;
-  const shownFirst = useRef(firstSrc);
-  useEffect(() => {
-    if (shownFirst.current === firstSrc) return;
-    shownFirst.current = firstSrc;
-    goTo(0);
-  }, [firstSrc, goTo]);
-
-  if (count === 0) return null;
 
   return (
-    <div className="pp-gallery" role="region" aria-label="Product gallery">
-      <div className="pp-gallery-stage">
-        <ul ref={track} className="pp-gallery-track" tabIndex={0} onScroll={onScroll}>
-          {slides.map((slide, i) => (
-            <li key={i} className="pp-gallery-slide">
-              <Photo key={slide.src} src={slide.src} alt={slide.alt} sizes="(max-width: 850px) 100vw, 52vw" preload={i === 0} />
-            </li>
-          ))}
-        </ul>
-        {count > 1 && (
-          <>
-            <button type="button" className="pp-gallery-arrow is-prev" aria-label="Previous product image" disabled={active === 0} onClick={() => goTo(active - 1)}>
-              <ChevronLeft aria-hidden="true" />
-            </button>
-            <button type="button" className="pp-gallery-arrow is-next" aria-label="Next product image" disabled={active >= count - 1} onClick={() => goTo(active + 1)}>
-              <ChevronRight aria-hidden="true" />
-            </button>
-            <div className="pp-gallery-dots" aria-hidden="true">
-              {slides.map((_, i) => (
-                <span key={i} className={i === active ? "is-active" : undefined} />
-              ))}
-            </div>
-          </>
+    <div className="kv-gallery">
+      <div
+        className="kv-gallery-main"
+        onTouchStart={(e) => {
+          touchX.current = e.touches[0].clientX;
+        }}
+        onTouchEnd={(e) => {
+          if (touchX.current == null) return;
+          const dx = e.changedTouches[0].clientX - touchX.current;
+          touchX.current = null;
+          if (Math.abs(dx) > 40 && slides.length > 1) go(dx < 0 ? 1 : -1);
+        }}
+      >
+        <Photo src={shown.src} alt={shown.alt} sizes="(min-width: 960px) 640px, 100vw" preload={!preview && active === 0} />
+        <span className={`kv-gallery-mark${shown.dark ? " on-img-dark" : ""}`} aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={shown.dark ? siteConfig.wordmarkLight : siteConfig.wordmark} alt="" width={951} height={334} />
+        </span>
+        {shown.badge && (
+          <div className="kv-gallery-badge">
+            <span className="kv-gallery-badge-ic">
+              <BadgeIcon icon={shown.badge.icon} />
+            </span>
+            <span>
+              <strong>{shown.badge.title}</strong>
+              <small>{shown.badge.sub}</small>
+            </span>
+          </div>
+        )}
+        {slides.length > 1 && (
+          <div className={`kv-gallery-dots${shown.dark ? "" : " on-img-light"}`} aria-hidden="true">
+            {slides.map((_, i) => (
+              <i key={i} className={!preview && i === active ? "on" : ""} />
+            ))}
+          </div>
         )}
       </div>
-      {count > 1 && (
-        <div className="pp-thumbs">
+      {slides.length > 1 && (
+        <div className="kv-thumbs">
           {slides.map((slide, i) => (
-            <button key={i} type="button" className="pp-thumb" aria-current={i === active ? "true" : undefined} onClick={() => goTo(i)}>
-              <span className="pp-thumb-image">
-                <Photo key={slide.src} src={slide.src} alt="" sizes="120px" />
-              </span>
-              <span className="pp-thumb-label">{slide.label}</span>
+            <button
+              key={slide.src}
+              type="button"
+              className="kv-thumb"
+              aria-current={!preview && i === active}
+              aria-label={`Show image ${i + 1}: ${slide.alt}`}
+              onClick={() => {
+                onLeavePreview();
+                setActive(i);
+              }}
+            >
+              <Image src={slide.src} alt="" width={64} height={64} />
             </button>
           ))}
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * A looping clip. It starts muted when it scrolls into view and pauses when it
- * leaves, rather than through the autoplay attribute: that way nothing plays
- * for a visitor who asked for reduced motion, who gets the poster and the
- * player's own controls instead.
- */
-function DemoVideo({ loop, src }: { loop: DemoLoop; src: string }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const reducedMotion = usePrefersReducedMotion();
-
-  useEffect(() => {
-    const video = ref.current;
-    if (!video) return;
-    if (reducedMotion) {
-      video.pause();
-      return;
-    }
-    video.muted = true;
-    const play = () => {
-      video.play().catch(() => {
-        // The browser refused to start it (data saver, autoplay blocked): the poster stays
-      });
-    };
-    if (!("IntersectionObserver" in window)) {
-      play();
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) play();
-        else video.pause();
-      },
-      { threshold: 0.25 },
-    );
-    observer.observe(video);
-    return () => observer.disconnect();
-  }, [reducedMotion]);
-
-  return (
-    <video ref={ref} muted loop playsInline preload="metadata" poster={loop.poster} controls={reducedMotion} aria-label={loop.posterAlt}>
-      {loop.webm && <source src={loop.webm} type="video/webm" />}
-      <source src={src} type="video/mp4" />
-    </video>
   );
 }
 
@@ -253,56 +193,6 @@ function shippingNotice(entry: CatalogProduct, visitorCountry: string | null | u
   return ships(entry.shipping.US ? "US" : destinations[0]);
 }
 
-const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
-
-/** `days` business days after `from` (Saturdays and Sundays don't count). */
-function addBusinessDays(from: Date, days: number): Date {
-  const date = new Date(from);
-  let left = days;
-  while (left > 0) {
-    date.setDate(date.getDate() + 1);
-    if (date.getDay() !== 0 && date.getDay() !== 6) left -= 1;
-  }
-  return date;
-}
-
-const dateRange = (a: Date, b: Date) => (shortDate.format(a) === shortDate.format(b) ? shortDate.format(a) : `${shortDate.format(a)} – ${shortDate.format(b)}`);
-
-/**
- * Order today, ships, arrives: real dates worked out from the store's
- * processing time and this country's transit time (the same figures the
- * shipping answer gives), counted in business days, as estimates. Drawn after the page loads, since the
- * dates depend on the visitor's own clock.
- */
-function DeliveryTimeline({ transit }: { transit: { min: number; max: number } }) {
-  const mounted = useMounted();
-  const today = useMemo(() => (mounted ? new Date() : null), [mounted]);
-
-  const { processingDays } = storePolicies.shipping;
-  const shipsFrom = today ? addBusinessDays(today, processingDays.min) : null;
-  const shipsBy = today ? addBusinessDays(today, processingDays.max) : null;
-  const steps = [
-    { icon: ShoppingBag, label: "Order today", date: today ? shortDate.format(today) : "" },
-    { icon: Package, label: "Ships", date: shipsFrom && shipsBy ? dateRange(shipsFrom, shipsBy) : "" },
-    { icon: Truck, label: "Arrives", date: shipsFrom && shipsBy ? dateRange(addBusinessDays(shipsFrom, transit.min), addBusinessDays(shipsBy, transit.max)) : "" },
-  ];
-
-  return (
-    <ol className="pp-timeline" aria-label="Estimated delivery timeline">
-      {steps.map(({ icon: Icon, label, date }) => (
-        <li key={label}>
-          <span className="pp-timeline-icon">
-            <Icon aria-hidden="true" />
-          </span>
-          <strong>{label}</strong>
-          <span className="pp-timeline-date">{date || " "}</span>
-        </li>
-      ))}
-      <li className="pp-timeline-note">Estimated dates</li>
-    </ol>
-  );
-}
-
 /**
  * The pack as cart lines. With a colour choice there is one line per colour
  * (`chosen` holds the colour of each unit); without one, a single line.
@@ -318,10 +208,10 @@ function buildLines(product: ProductDisplay, quantity: number, chosen: CatalogVa
   return lines;
 }
 
-/** The gallery never shows more than this many slides, whatever the content file lists. */
-const MAX_GALLERY_SLIDES = 5;
+/** What one unit costs inside a pack, never rounded up: $49.99 for two reads $24.99 each. */
+const perUnit = (total: number, quantity: number) => Math.floor(Math.round(total * 100) / quantity) / 100;
 
-export function ProductPage({ product, entry, content, faqs, reviews, visitorCountry = null }: ProductPageProps) {
+export function ProductPage({ product, entry, content, faqs, reviews, visitorCountry = null, today = null }: ProductPageProps) {
   const { tiers, variants } = entry;
   const largestPack = Math.max(1, ...tiers.map((tier) => tier.quantity));
   const hasColours = entry.hasColourChoice && variants.length > 0;
@@ -330,10 +220,10 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
   const [quantity, setQuantity] = useState(() => (product && product.stock >= 2 && tiers.some((tier) => tier.quantity === 2) ? 2 : (tiers[0]?.quantity ?? 1)));
   // One colour per unit of the largest pack; unit i starts on colour i, so three units start as one of each
   const [colours, setColours] = useState<string[]>(() => Array.from({ length: largestPack }, (_, i) => variants[i % Math.max(variants.length, 1)]?.key ?? ""));
-  // The colour the customer picked last; its photo leads the gallery
-  const [leadColour, setLeadColour] = useState<string | null>(null);
+  // The colour the customer picked last: its photo takes the gallery until they go back to the photos
+  const [previewColour, setPreviewColour] = useState<string | null>(null);
   const [pastBuyButton, setPastBuyButton] = useState(false);
-  const buyButton = useRef<HTMLButtonElement>(null);
+  const buyActions = useRef<HTMLDivElement>(null);
 
   const overlay = useStorefrontUI((s) => s.overlay);
   const openCart = useStorefrontUI((s) => s.openCart);
@@ -341,30 +231,31 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
 
   const price = product?.price ?? null;
   const total = price == null ? null : getLineTotal(price, quantity, entry.slug);
+  const unit = total == null ? null : perUnit(total, quantity);
   const canBuy = !!product && product.stock >= quantity;
-  const selectedTier = tiers.find((tier) => tier.quantity === quantity);
   const variantFor = (index: number): CatalogVariant | undefined => variants.find((v) => v.key === colours[index]) ?? variants[index % Math.max(variants.length, 1)];
   const chosen = Array.from({ length: quantity }, (_, i) => variantFor(i)).filter((v): v is CatalogVariant => !!v);
   const unitName = capitalise(entry.unit.one);
+  const unitsLabel = (n: number) => `${n} ${capitalise(n === 1 ? entry.unit.one : entry.unit.many)}`;
+  const shippingTax = product?.shippingTax ?? 0;
 
-  const leadVariant = leadColour ? variants.find((v) => v.key === leadColour) : undefined;
-  // Five slides at most. A picked colour's photo takes the first slide's place rather than adding one
   const gallery = content.gallery.slice(0, MAX_GALLERY_SLIDES);
-  const slides: GalleryImage[] =
-    leadVariant?.image && gallery.length > 0
-      ? [{ src: leadVariant.image, alt: `${content.name}, ${leadVariant.label}`, label: leadVariant.label }, ...gallery.slice(1)]
-      : gallery;
+  const previewVariant = previewColour ? variants.find((v) => v.key === previewColour) : undefined;
+  const preview: Shown | null = previewVariant?.image ? { src: previewVariant.image, alt: `${content.name}, ${previewVariant.label}` } : null;
 
   const notice = shippingNotice(entry, visitorCountry);
+  const arrival = notice?.kind === "ships" && today ? arrivalRange(today, notice.days) : null;
   const viewed = product ? { id: product.id, sku: variants[0]?.sku ?? product.sku, name: content.name, price: product.price, slug: entry.slug } : null;
+  // The box contents have their own column, so the specification list leaves that row out
+  const specs = content.seo.facts.filter((fact) => fact.name !== "In the box");
 
   useEffect(() => {
-    const button = buyButton.current;
-    if (!button || !("IntersectionObserver" in window)) return;
-    // The tall bottom margin counts "still below the fold" as intersecting, so the bar
-    // shows only after the button has left through the top, also after an anchor jump
-    const observer = new IntersectionObserver(([seen]) => setPastBuyButton(!seen.isIntersecting && seen.boundingClientRect.bottom < 0), { rootMargin: "0px 0px 100000px 0px" });
-    observer.observe(button);
+    // The buy bar is hidden while the Add to cart button is in view or still below, slides in
+    // once it has been scrolled past, and hides again on the way back up to it
+    const el = buyActions.current;
+    if (!el || !("IntersectionObserver" in window)) return;
+    const observer = new IntersectionObserver(([seen]) => setPastBuyButton(!seen.isIntersecting && seen.boundingClientRect.top < 0), { threshold: 0 });
+    observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
@@ -373,15 +264,23 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
     const wanted = new URLSearchParams(window.location.search).get("color");
     if (!wanted || !hasColours || !variants.some((v) => v.key === wanted)) return;
     setColours((current) => current.map((colour, i) => (i === 0 ? wanted : colour)));
-    setLeadColour(wanted);
+    setPreviewColour(wanted);
     // Only on arrival: later picks are the customer's
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function pickColour(index: number, key: string) {
     setColours((current) => current.map((colour, i) => (i === index ? key : colour)));
-    setLeadColour(key);
+    setPreviewColour(key);
   }
+
+  /** The chips under the price: one tap shows a colour and sets it for every unit of the pack. */
+  function pickColourForAll(key: string) {
+    setColours((current) => current.map(() => key));
+    setPreviewColour(key);
+  }
+  // The colour every unit of the chosen pack has, when they all share one
+  const sharedColour = chosen.length > 0 && chosen.every((v) => v.key === chosen[0].key) ? chosen[0].key : null;
 
   function addToCart() {
     if (!product || !canBuy || total == null) return;
@@ -391,344 +290,298 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
     openCart();
   }
 
-  const buyLabel = canBuy && total != null ? `Add ${quantity} to cart · ${formatPrice(total)}` : product ? "Unavailable in this quantity" : "Coming soon";
+  const showBar = pastBuyButton && !overlay;
+  const transformation = content.transformation;
 
   return (
-    <div className="kitvoy-home pp-page">
+    <div className="kv-page">
       <TrackViewContent product={viewed} />
 
-      <section className="store-container pp-hero" aria-labelledby="pp-heading">
-        <div className="pp-hero-copy">
-          {/* One h1: the product name line (drawn as the eyebrow) and the headline */}
-          <h1 id="pp-heading">
-            <span className="eyebrow">{content.eyebrow}</span> <span className="pp-title">{content.headline}</span>
-          </h1>
-          <p className="pp-subhead">{content.subheadline}</p>
-        </div>
+      {/* 1. Screen one: the gallery and the buy box */}
+      <section id="shop" className="kv-shop-top" aria-label={content.name}>
+        <div className="kv-wrap">
+          <div className="kv-product-grid">
+            <Gallery slides={gallery} preview={preview} onLeavePreview={() => setPreviewColour(null)} />
 
-        <Gallery slides={slides} />
-
-        <ul className="pp-benefits">
-          {content.benefits.map((benefit) => {
-            const Icon = ICONS[benefit.icon];
-            return (
-              <li key={benefit.title}>
-                <span className="pp-benefit-icon">
-                  <Icon aria-hidden="true" />
-                </span>
-                <div>
-                  <strong>{benefit.title}</strong>
-                  <span>{benefit.text}</span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-
-        <div id="bundles" className="pp-buybox" role="region" aria-labelledby="pp-bundle-heading">
-          <p className="pp-price">
-            {price == null ? (
-              <span className="pp-price-unavailable">Coming soon</span>
-            ) : (
-              <>
-                <strong>{formatPrice(price)}</strong>
-                <span>1 {entry.unit.one} · USD</span>
-              </>
-            )}
-          </p>
-          <h2 id="pp-bundle-heading">{content.bundle.heading}</h2>
-          <p className="pp-bundle-intro">{content.bundle.intro}</p>
-
-          <div className="pp-tiers" role="radiogroup" aria-labelledby="pp-bundle-heading">
-            {tiers.map((tier) => {
-              const selected = quantity === tier.quantity;
-              const unavailable = !product || product.stock < tier.quantity;
-              const lineTotal = price == null ? null : getLineTotal(price, tier.quantity, entry.slug);
-              // Real savings against buying the same number one at a time
-              const savings = price == null ? 0 : getBundleSavings(price, tier.quantity, entry.slug);
-              const note = content.bundle.tierNotes[tier.quantity];
-              return (
-                <label key={tier.quantity} className={`bundle-option pp-tier${selected ? " is-selected" : ""}${unavailable ? " is-unavailable" : ""}`}>
-                  <input type="radio" name="pp-bundle" value={tier.quantity} checked={selected} disabled={unavailable} onChange={() => setQuantity(tier.quantity)} />
-                  <span className="radio-indicator" aria-hidden="true">
-                    {selected && <Check size={14} />}
-                  </span>
-                  <span className="bundle-option-copy pp-tier-copy">
-                    {tier.badge && <em className="bundle-badge">{tier.badge}</em>}
-                    <strong>{tier.label}</strong>
-                    {note && <span>{note}</span>}
-                  </span>
-                  {lineTotal != null && (
-                    <span className="pp-tier-price">
-                      <b>{formatPrice(lineTotal)}</b>
-                      {tier.quantity > 1 && <small>{formatPrice(Math.floor(Math.round(lineTotal * 100) / tier.quantity) / 100)} each</small>}
-                      {savings > 0 && <em className="pp-save">Save {formatPrice(savings)}</em>}
-                    </span>
-                  )}
-                </label>
-              );
-            })}
-          </div>
-
-          {hasColours && (
-            <div className="pp-colours" role="group" aria-labelledby="pp-colours-title">
-              <p id="pp-colours-title" className="pp-colours-title">
-                {quantity === 1 ? "Color" : "Colors"}
+            <div className="kv-buy-box" id="buy">
+              <p className="kv-buy-eyebrow">
+                <span>{content.eyebrow}</span>
+                <em>{content.tagline}</em>
               </p>
-              {Array.from({ length: quantity }, (_, i) => {
-                const current = variantFor(i);
-                return (
-                  <div key={i} className="pp-colour-row" role="radiogroup" aria-labelledby={`pp-colour-${i}`}>
-                    <span id={`pp-colour-${i}`} className="pp-colour-label">
-                      {unitName} {i + 1}
+              <h1 className="kv-buy-title">{content.name}</h1>
+              <p className="kv-buy-desc">{content.description}</p>
+              <div className="kv-price-row">
+                {unit == null || price == null ? (
+                  <span className="kv-price-soon">Coming soon</span>
+                ) : (
+                  <>
+                    <span className="kv-price">{formatPrice(unit)}</span>
+                    {/* The struck figure is the real price of one unit bought singly */}
+                    {unit < price && <s className="kv-price-was">{formatPrice(price)}</s>}
+                    <span className="kv-price-note">
+                      per {entry.unit.one} &middot; Shipping: {shippingTax === 0 ? <b className="kv-free-tag">FREE</b> : <b>{formatPrice(shippingTax)}</b>}
                     </span>
-                    <div className="pp-swatches">
-                      {variants.map((variant) => {
-                        const selected = current?.key === variant.key;
-                        return (
-                          <label key={variant.key} className={`pp-swatch${selected ? " is-selected" : ""}`}>
-                            <input type="radio" name={`pp-colour-${i}`} value={variant.key} checked={selected} onChange={() => pickColour(i, variant.key)} />
-                            <span className="pp-swatch-dot" style={{ background: variant.swatch }} aria-hidden="true">
-                              {selected && <Check size={12} strokeWidth={3} />}
-                            </span>
-                            <span>{variant.label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  </>
+                )}
+              </div>
 
-          <button ref={buyButton} type="button" className="primary-button pp-add" disabled={!canBuy} onClick={addToCart}>
-            {buyLabel}
-            {canBuy && <ArrowRight size={18} aria-hidden="true" />}
-          </button>
-
-          {notice && (
-            <p className="pp-shipping">
-              <Truck aria-hidden="true" />
-              {notice.kind === "ships" ? (
-                <span>
-                  <strong>Free tracked shipping to {notice.country}</strong> · arrives about {notice.days.min}–{notice.days.max} days after it ships
-                </span>
-              ) : (
-                <span>
-                  {/* The server and the browser may spell a country's name differently; either is fine */}
-                  <strong>
-                    We don&apos;t deliver to <span suppressHydrationWarning>{notice.country}</span> yet.
-                  </strong>
-                  {notice.shipsTo.length > 0 && <span className="pp-ships-to">We ship to {notice.shipsTo.join(", ")}.</span>}
-                </span>
+              {/* Where TreeAura previews a lighting mood: tap a color to see it, and to set it for the whole pack */}
+              {hasColours && (
+                <div className="kv-moods" role="radiogroup" aria-label={quantity > 1 ? `Color for all ${quantity} ${entry.unit.many}` : "Color"}>
+                  {variants.map((variant) => {
+                    const on = sharedColour === variant.key;
+                    return (
+                      <button key={variant.key} type="button" role="radio" aria-checked={on} className="kv-mood" onClick={() => pickColourForAll(variant.key)}>
+                        <i style={{ background: variant.swatch, boxShadow: `0 0 8px ${variant.swatch}` }} />
+                        {variant.label}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
-            </p>
-          )}
-          {notice?.kind === "ships" && <DeliveryTimeline transit={notice.days} />}
 
-          <ul className="pp-trust">
-            <li>
-              <Truck aria-hidden="true" />
-              Free shipping
-            </li>
-            <li>
-              <RotateCcw aria-hidden="true" />
-              {storePolicies.returns.windowDays}-Day Money-Back Guarantee
-            </li>
-            <li>
-              <LockKeyhole aria-hidden="true" />
-              Secure checkout
-            </li>
-          </ul>
+              <div className="kv-option-label" id="bundles">
+                Choose your bundle
+              </div>
+              <div className="kv-bundles" role="radiogroup" aria-label="Bundle">
+                {tiers.map((tier) => {
+                  const on = quantity === tier.quantity;
+                  const unavailable = !product || product.stock < tier.quantity;
+                  const lineTotal = price == null ? null : getLineTotal(price, tier.quantity, entry.slug);
+                  // Real savings against buying the same number one at a time
+                  const savings = price == null ? 0 : getBundleSavings(price, tier.quantity, entry.slug);
+                  return (
+                    <button key={tier.quantity} type="button" role="radio" aria-checked={on} disabled={unavailable} className={`kv-bundle${on ? " on" : ""}`} onClick={() => setQuantity(tier.quantity)}>
+                      {tier.badge && <span className="kv-bundle-flag">{tier.badge}</span>}
+                      <span className="kv-bundle-radio" aria-hidden="true" />
+                      <span className="kv-bundle-main">
+                        <span className="kv-bundle-title">
+                          {unitsLabel(tier.quantity)}
+                          {savings > 0 && <em className="kv-save-pill">You save {formatPrice(savings)}</em>}
+                        </span>
+                        <span className="kv-bundle-sub">
+                          {tier.quantity === 1 ? "Single" : `${tier.quantity}-Pack`}
+                          {lineTotal != null && (
+                            <>
+                              {" "}
+                              &middot; {formatPrice(perUnit(lineTotal, tier.quantity))} / {entry.unit.one}
+                            </>
+                          )}
+                        </span>
+                      </span>
+                      {lineTotal != null && price != null && (
+                        <span className="kv-bundle-price">
+                          <strong>{formatPrice(lineTotal)}</strong>
+                          {savings > 0 && <s>{formatPrice(price * tier.quantity)}</s>}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
 
+              {/* A pack of two or three can mix colors: one row per unit. A single unit is covered by the chips above */}
+              {hasColours && quantity > 1 && (
+                <>
+                  <div className="kv-option-label">Mix your colors</div>
+                  <div className="kv-colour-rows">
+                    {Array.from({ length: quantity }, (_, i) => {
+                      const current = variantFor(i);
+                      const name = `${unitName} ${i + 1}`;
+                      return (
+                        <div key={i} className="kv-colour-row">
+                          <span className="kv-colour-name">{name}</span>
+                          <div className="kv-moods" role="radiogroup" aria-label={`Color of ${entry.unit.one} ${i + 1}`}>
+                            {variants.map((variant) => {
+                              const on = current?.key === variant.key;
+                              return (
+                                <button key={variant.key} type="button" role="radio" aria-checked={on} className="kv-mood" onClick={() => pickColour(i, variant.key)}>
+                                  <i style={{ background: variant.swatch, boxShadow: `0 0 8px ${variant.swatch}` }} />
+                                  {variant.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              <div className="kv-buy-actions" id="buy-cta" ref={buyActions}>
+                <button id="buy-add" type="button" className="kv-btn kv-btn-primary kv-btn-block" disabled={!canBuy} onClick={addToCart}>
+                  {canBuy && total != null ? <>Add to cart &middot; {formatPrice(total)}</> : product ? "Unavailable in this quantity" : "Coming soon"}
+                </button>
+              </div>
+
+              <PayBadges className="kv-paybadges-pdp" />
+              <ul className="kv-trust-row">
+                <li><TrustIcon name="guarantee" /><span>{storePolicies.returns.windowDays}-Day Money-Back Guarantee</span></li>
+                <li><TrustIcon name="truck" /><span>Free Tracked Shipping</span></li>
+                <li><TrustIcon name={content.trust.icon} /><span>{content.trust.label}</span></li>
+                <li><TrustIcon name="lock" /><span>Encrypted SSL Checkout</span></li>
+              </ul>
+
+              {notice && (
+                <div className="kv-ship-note">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s-7-6.200-7-11.500A7 7 0 0112 2.500a7 7 0 017 7C19 14.800 12 21 12 21z" stroke="currentColor" strokeWidth="1.500" /><circle cx="12" cy="9.500" r="2.400" stroke="currentColor" strokeWidth="1.500" /></svg>
+                  <span>
+                    <strong>Shipping: FREE.</strong>{" "}
+                    {notice.kind === "ships" ? (
+                      <>
+                        Tracked delivery to {notice.country} is included in the price.{" "}
+                        {arrival ? <>Order today, estimated arrival {arrival}.</> : <>Arrives about {notice.days.min}&ndash;{notice.days.max} days after it ships.</>}
+                      </>
+                    ) : (
+                      <>
+                        {/* The server and the browser may spell a country's name differently; either is fine */}
+                        Tracked delivery is included in every order. We&rsquo;re not delivering to <span suppressHydrationWarning>{notice.country}</span> yet
+                        {notice.shipsTo.length > 0 && <>; we currently ship to {notice.shipsTo.join(", ")}</>}.
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              <ul className="kv-feature-list">
+                {content.features.map((feature) => (
+                  <li key={feature}>{feature}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="store-container pp-service">
-        <div className="service-strip">
-          <div>
-            <Truck aria-hidden="true" />
-            <span>
-              <strong>Ships in {processingText}</strong>
-              <small>{notice?.kind === "ships" ? `Tracked delivery to ${notice.country}` : "Tracked delivery"}</small>
-            </span>
-          </div>
-          <div>
-            <Package aria-hidden="true" />
-            <span>
-              <strong>{storePolicies.returns.windowDays}-Day Money-Back Guarantee</strong>
-              <small>Love it, or send it back for a refund</small>
-            </span>
-          </div>
-          <Link href="/support">
-            <CircleHelp aria-hidden="true" />
-            <span>
-              <strong>A question before you buy?</strong>
-              <small>Get answers on our support page</small>
-            </span>
-            <ArrowRight className="service-arrow" aria-hidden="true" />
-          </Link>
-        </div>
-      </div>
-
-      {content.demoLoops.length > 0 && (
-        <section className="store-container pp-demos" aria-label={`${entry.shortName} in motion`}>
-          <div className="pp-demo-row">
-            {content.demoLoops.map((loop) => (
-              <figure key={loop.id} className="pp-demo-card">
-                <div className="pp-demo-media">
-                  {loop.src ? <DemoVideo loop={loop} src={loop.src} /> : <Photo src={loop.poster} alt={loop.posterAlt} sizes="(max-width: 639px) 74vw, 33vw" />}
-                </div>
-                <figcaption>
-                  <h3>{loop.title}</h3>
-                  <p>{loop.caption}</p>
-                </figcaption>
-              </figure>
-            ))}
+      {/* 2. Before and after */}
+      {transformation && (
+        <section id="before-after" className="kv-section kv-section-ink kv-on-dark">
+          <div className="kv-wrap">
+            <div className="kv-section-head">
+              <p className="kv-eyebrow">{transformation.eyebrow}</p>
+              <h2 className="kv-display">{transformation.heading}</h2>
+              <p className="kv-lede">{transformation.lede}</p>
+            </div>
+            <BeforeAfter before={transformation.before} after={transformation.after} />
           </div>
         </section>
       )}
 
-      <section id="how" className="store-container pp-how" aria-labelledby="pp-how-heading">
-        <h2 id="pp-how-heading">{content.howItWorks.heading}</h2>
-        <ol className="pp-steps">
-          {content.howItWorks.steps.map((step, i) => {
-            const Icon = ICONS[step.icon];
-            return (
-              <li key={step.title}>
-                <span className="pp-step-number" aria-hidden="true">
-                  {i + 1}
-                </span>
-                <div className="pp-step-copy">
+      {/* 3. How it works */}
+      <section id="how" className="kv-section">
+        <div className="kv-wrap">
+          <div className="kv-section-head">
+            <p className="kv-eyebrow">How it works</p>
+            <h2 className="kv-display">{content.howItWorks.heading}</h2>
+          </div>
+          {content.diagram ? (
+            <div className="kv-two-col kv-how-grid">
+              <div className="kv-steps" style={{ gridTemplateColumns: "1fr" }}>
+                {content.howItWorks.steps.map((step, i) => (
+                  <div className="kv-step" key={step.title}>
+                    <div className="kv-step-n">{String(i + 1).padStart(2, "0")}</div>
+                    <h3>{step.title}</h3>
+                    <p>{step.text}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="kv-diagram kv-how-diagram">
+                <ProductDiagram id={content.diagram.id} />
+                <p className="kv-caption" style={{ textAlign: "center", marginTop: 6 }}>
+                  {content.diagram.caption}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="kv-steps">
+              {content.howItWorks.steps.map((step, i) => (
+                <div className="kv-step" key={step.title}>
+                  <div className="kv-step-n">{String(i + 1).padStart(2, "0")}</div>
                   <h3>{step.title}</h3>
                   <p>{step.text}</p>
                 </div>
-                <Icon className="pp-step-icon" aria-hidden="true" />
-              </li>
-            );
-          })}
-        </ol>
-        {content.howItWorks.tip && (
-          <p className="pp-tip" role="note">
-            <Info aria-hidden="true" />
-            <span>{content.howItWorks.tip}</span>
-          </p>
-        )}
-      </section>
-
-      {content.story.length > 0 && (
-        <div className="store-container pp-story">
-          {content.story.map((block, i) => (
-            <section key={block.heading} className={`pp-story-row${i % 2 === 1 ? " is-flipped" : ""}`} aria-labelledby={`pp-story-${i}`}>
-              <div className="pp-story-media">
-                <Photo src={block.image} alt={block.imageAlt} sizes="(max-width: 639px) 100vw, 50vw" />
-              </div>
-              <div className="pp-story-copy">
-                <h2 id={`pp-story-${i}`}>{block.heading}</h2>
-                <p>{block.text}</p>
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
-
-      {content.comparison.rows.length > 0 && (
-        <section className="store-container pp-compare" aria-labelledby="pp-compare-heading">
-          <h2 id="pp-compare-heading">{content.comparison.heading}</h2>
-          <div className="pp-compare-wrap">
-            <table className="pp-compare-table" aria-labelledby="pp-compare-heading">
-              <thead>
-                <tr>
-                  <th scope="col">
-                    <span className="sr-only">Feature</span>
-                  </th>
-                  <th scope="col" className="is-ours">
-                    {content.comparison.ours}
-                  </th>
-                  <th scope="col">{content.comparison.theirs}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {content.comparison.rows.map((row) => (
-                  <tr key={row.feature}>
-                    <th scope="row">{row.feature}</th>
-                    <td className="is-ours">
-                      <span className="pp-compare-ours">
-                        <Check size={16} aria-hidden="true" />
-                        {row.ours}
-                      </span>
-                    </td>
-                    <td>{row.theirs}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      <section className="store-container pp-included" aria-labelledby="pp-included-heading">
-        <div className="pp-included-media">
-          <Photo src={content.included.image} alt={content.included.imageAlt} sizes="(max-width: 639px) 100vw, 42vw" />
-        </div>
-        <div className="pp-included-copy">
-          <h2 id="pp-included-heading">{content.included.heading}</h2>
-          <h3 className="eyebrow">In the box</h3>
-          <ul className="pp-box-list">
-            {content.included.items.map((item) => (
-              <li key={item}>
-                <Check size={18} aria-hidden="true" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      <div className="pp-closing">
-        {reviews && reviews.count > 0 && <CustomerReviews summary={reviews} />}
-
-        <section id="faq" className="store-container faq-section" aria-labelledby="faq-heading">
+      {/* 4. Specifications and what is in the box */}
+      <section className="kv-section-tight" style={{ background: "var(--kv-ivory-2)" }}>
+        <div className="kv-wrap kv-two-col" style={{ alignItems: "start" }}>
           <div>
-            <p className="eyebrow">Good to know</p>
-            <h2 id="faq-heading">
-              Questions?
-              <br />
-              We&apos;ve got answers.
-            </h2>
-            <p>
-              More questions?{" "}
-              <Link className="text-link" href="/support#contact">
-                Visit support <ArrowRight size={15} aria-hidden="true" />
-              </Link>
-            </p>
+            <p className="kv-eyebrow">Details</p>
+            <h2 className="kv-display" style={{ fontSize: "clamp(30px,6vw,44px)", margin: "10px 0 20px" }}>Specifications</h2>
+            <dl className="kv-specs">
+              {specs.map((fact) => (
+                <div className="kv-spec" key={fact.name}>
+                  <dt>{fact.name}</dt>
+                  <dd>{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <div className="faq-list">
+          <div style={{ marginTop: 28 }}>
+            <p className="kv-eyebrow">In the box</p>
+            <h2 className="kv-display" style={{ fontSize: "clamp(30px,6vw,44px)", margin: "10px 0 20px" }}>What you receive</h2>
+            <ul className="kv-feature-list">
+              {content.included.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Customer reviews: approved ones only, and no section at all until there is one */}
+      {reviews && reviews.count > 0 && <CustomerReviews summary={reviews} />}
+
+      {/* FAQ */}
+      <section id="faq" className="kv-section">
+        <div className="kv-wrap" style={{ maxWidth: 860 }}>
+          <div className="kv-section-head">
+            <p className="kv-eyebrow">Questions</p>
+            <h2 className="kv-display">Good to know.</h2>
+          </div>
+          <div className="kv-faq">
             {faqs.map((faq) => (
               <details key={faq.q}>
-                <summary>
-                  {faq.q}
-                  <Plus size={19} aria-hidden="true" />
-                </summary>
+                <summary>{faq.q}</summary>
                 <p>{faq.a}</p>
               </details>
             ))}
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
-      {product && pastBuyButton && !overlay && (
-        <aside className="mobile-buy-bar pp-buy-bar" aria-label="Quick purchase">
-          <div>
-            <strong>{total != null && formatPrice(total)}</strong>
-            <span>{[selectedTier?.label ?? `${quantity} ${quantity === 1 ? entry.unit.one : entry.unit.many}`, hasColours ? chosen.map((v) => v.label).join(", ") : ""].filter(Boolean).join(" · ")}</span>
+      {/* Closing: back up to the buy box */}
+      <section className="kv-section kv-section-dark kv-on-dark" style={{ textAlign: "center" }}>
+        <div className="kv-wrap" style={{ maxWidth: 760 }}>
+          <p className="kv-eyebrow">{siteConfig.name}</p>
+          <h2 className="kv-display" style={{ margin: "12px 0 18px" }}>{content.closing.heading}</h2>
+          <a href="#buy" className="kv-btn kv-btn-gold" id="order-up">
+            {content.closing.cta}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </a>
+        </div>
+      </section>
+
+      {/* The buy bar, on phones: fully inert until it is shown */}
+      {product && (
+        <div className={`kv-sticky-bar${showBar ? " show" : ""}`} aria-hidden={!showBar} inert={!showBar}>
+          <div className="kv-sb-info">
+            <strong>
+              {total != null && formatPrice(total)} {total != null && price != null && price * quantity > total && <s>{formatPrice(price * quantity)}</s>}
+            </strong>
+            <span>
+              {unitsLabel(quantity)} &middot; {shippingTax === 0 ? "Free shipping included" : `${formatPrice(shippingTax)} shipping`}
+            </span>
           </div>
-          <button type="button" className="primary-button" disabled={!canBuy} onClick={addToCart}>
+          <button type="button" className="kv-btn kv-btn-primary" tabIndex={showBar ? 0 : -1} disabled={!canBuy} onClick={addToCart}>
             {canBuy ? "Add to cart" : "Unavailable"}
-            {canBuy && <ArrowRight size={17} aria-hidden="true" />}
           </button>
-        </aside>
+        </div>
       )}
     </div>
   );

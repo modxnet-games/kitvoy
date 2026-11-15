@@ -16,6 +16,8 @@ export const dynamic = "force-dynamic";
 
 /** /inflator: the cordless tire inflator's landing page, which was the homepage until the store took on more products. */
 const path = productPath(INFLATOR_SLUG);
+/** The inflator has its own share card (the product, its price, the logo); the rest of the site shares the logo card */
+const shareImage = "/og-inflator.png";
 
 // A page's openGraph/twitter replace the layout's rather than merging, so the share image is repeated here
 export const metadata: Metadata = {
@@ -28,9 +30,9 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     title: productSeo.pageTitle,
     description: productSeo.description,
-    images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: "Kitvoy cordless tire inflator" }],
+    images: [{ url: shareImage, width: 1200, height: 630, alt: "Kitvoy cordless tire inflator" }],
   },
-  twitter: { card: "summary_large_image", title: productSeo.pageTitle, description: productSeo.description, images: [siteConfig.ogImage] },
+  twitter: { card: "summary_large_image", title: productSeo.pageTitle, description: productSeo.description, images: [shareImage] },
 };
 
 /** November through February in the store's time zone, when the cold-morning tire tip is shown. */

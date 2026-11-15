@@ -168,7 +168,7 @@ export function PayPalExpressRedirect({ items, cartKey, sessionToken, host, take
 
   if (confirming) {
     return (
-      <div className="flex h-13 items-center justify-center gap-2 rounded-xl bg-white text-sm font-medium text-[#666a67]" role="status" data-paypal-express-confirming>
+      <div className="flex h-13 items-center justify-center gap-2 rounded-xl bg-white text-sm font-medium text-[#5b6b64]" role="status" data-paypal-express-confirming>
         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         {t("checkout.expressPaypalConfirming")}
       </div>

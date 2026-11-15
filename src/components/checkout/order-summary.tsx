@@ -35,17 +35,17 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
   const usOnly = items.every((i) => { const entry = getCatalogProduct(i.product.slug); return !entry || Object.keys(entry.shipping).length === 1; });
 
   return (
-    <div className={cn(!embedded && "rounded-2xl border border-[#e7e5df] bg-white p-6 shadow-[0_1px_2px_rgba(23,25,24,0.04)] sm:p-7", className)}>
+    <div className={cn(!embedded && "rounded-2xl border border-[#e6e0d2] bg-white p-6 shadow-[0_1px_2px_rgba(15, 42, 35,0.04)] sm:p-7", className)}>
       {!embedded && (
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-lg font-semibold tracking-tight text-[#171918]">{t("cart.orderSummary")}</h2>
-          <Link href="/cart" className="text-sm font-medium text-[#a83d10] underline-offset-4 transition-colors duration-200 hover:text-[#8a2f0a] hover:underline">
+          <h2 className="text-lg font-semibold tracking-tight text-[#0f2a23]">{t("cart.orderSummary")}</h2>
+          <Link href="/cart" className="text-sm font-medium text-[#467253] underline-offset-4 transition-colors duration-200 hover:text-[#8a2f0a] hover:underline">
             {t("checkout.editCart")}
           </Link>
         </div>
       )}
 
-      <ul className={cn("divide-y divide-[#eeece6]", !embedded && "mt-5")}>
+      <ul className={cn("divide-y divide-[#f3eee2]", !embedded && "mt-5")}>
         {items.map((item: CartItem, index) => {
           const saved = lineSavings[index];
           const unit = getCatalogProduct(item.product.slug)?.unit;
@@ -53,19 +53,19 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
             <li key={lineKey(item.product)} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
               <div className="relative shrink-0">
                 <ProductLineImage
-                  className="size-[72px] rounded-xl bg-[#f0ede7]"
+                  className="size-[72px] rounded-xl bg-[#f3eee2]"
                   imgClassName="!object-contain mix-blend-multiply"
                   imageUrl={item.product.images?.[0]}
                   alt={item.product.name}
                   fallbackLetter={item.product.category.name}
                 />
-                <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-[#171918] px-1.5 text-xs font-semibold text-white" aria-label={`${t("cart.qty")} ${item.quantity}`}>
+                <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-[#0f2a23] px-1.5 text-xs font-semibold text-white" aria-label={`${t("cart.qty")} ${item.quantity}`}>
                   {item.quantity}
                 </span>
               </div>
               <div className="min-w-0 flex-1 pt-0.5">
-                <p className="text-sm font-semibold leading-snug text-[#171918]">{item.product.name}</p>
-                <p className="mt-0.5 text-sm text-[#666a67]">
+                <p className="text-sm font-semibold leading-snug text-[#0f2a23]">{item.product.name}</p>
+                <p className="mt-0.5 text-sm text-[#5b6b64]">
                   {unit
                     ? `${item.quantity} ${item.quantity === 1 ? unit.one : unit.many}`
                     : item.quantity === 1 ? t("checkout.oneItem") : t("checkout.manyItems", { count: item.quantity })}
@@ -75,7 +75,7 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
                   <p className="mt-1 text-xs font-medium text-[#2f7d4f]">{t("checkout.bundleSavingsLabel")} <Price value={saved} /></p>
                 )}
               </div>
-              <span className="shrink-0 pt-0.5 text-sm font-semibold text-[#171918]">
+              <span className="shrink-0 pt-0.5 text-sm font-semibold text-[#0f2a23]">
                 <Price value={lineTotals[index]} />
               </span>
             </li>
@@ -83,25 +83,25 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
         })}
       </ul>
 
-      <dl className="mt-5 space-y-2.5 border-t border-[#eeece6] pt-5 text-sm">
+      <dl className="mt-5 space-y-2.5 border-t border-[#f3eee2] pt-5 text-sm">
         <div className="flex justify-between gap-4">
-          <dt className="text-[#666a67]">{t("cart.subtotal")}{savings > 0 && <span className="text-[#7d817d]"> · {t("checkout.savingsIncluded")}</span>}</dt>
-          <dd className="font-medium text-[#171918]"><Price value={subtotal} /></dd>
+          <dt className="text-[#5b6b64]">{t("cart.subtotal")}{savings > 0 && <span className="text-[#7b877f]"> · {t("checkout.savingsIncluded")}</span>}</dt>
+          <dd className="font-medium text-[#0f2a23]"><Price value={subtotal} /></dd>
         </div>
         <div className="flex justify-between gap-4">
-          <dt className="text-[#666a67]">{t("cart.shipping")}</dt>
-          <dd className="font-medium text-[#171918]">{shipping === 0 ? t("cart.free") : <Price value={shipping} />}</dd>
+          <dt className="text-[#5b6b64]">{t("cart.shipping")}</dt>
+          <dd className="font-medium text-[#0f2a23]">{shipping === 0 ? t("cart.free") : <Price value={shipping} />}</dd>
         </div>
-        <div className="flex items-baseline justify-between gap-4 border-t border-[#eeece6] pt-4">
-          <dt className="text-base font-semibold text-[#171918]">{t("cart.total")} <span className="text-xs font-normal text-[#7d817d]">USD</span></dt>
-          <dd className="text-2xl font-bold tracking-tight text-[#171918]" aria-live="polite"><Price value={total} /></dd>
+        <div className="flex items-baseline justify-between gap-4 border-t border-[#f3eee2] pt-4">
+          <dt className="text-base font-semibold text-[#0f2a23]">{t("cart.total")} <span className="text-xs font-normal text-[#7b877f]">USD</span></dt>
+          <dd className="text-2xl font-bold tracking-tight text-[#0f2a23]" aria-live="polite"><Price value={total} /></dd>
         </div>
       </dl>
 
-      <ul className="mt-6 grid gap-3 border-t border-[#eeece6] pt-5 text-xs text-[#666a67]">
-        <li className="flex items-center gap-3"><Truck className="size-4 shrink-0 text-[#a83d10]" aria-hidden="true" />{shipping === 0 ? t(usOnly ? "checkout.trustShipping" : "checkout.trustShippingIntl") : t("checkout.trustTracked")}</li>
-        <li className="flex items-center gap-3"><Package className="size-4 shrink-0 text-[#a83d10]" aria-hidden="true" />{t("checkout.trustReturns", { days: storePolicies.returns.windowDays })}</li>
-        <li className="flex items-center gap-3"><ShieldCheck className="size-4 shrink-0 text-[#a83d10]" aria-hidden="true" />{t("checkout.trustSecure")}</li>
+      <ul className="mt-6 grid gap-3 border-t border-[#f3eee2] pt-5 text-xs text-[#5b6b64]">
+        <li className="flex items-center gap-3"><Truck className="size-4 shrink-0 text-[#467253]" aria-hidden="true" />{shipping === 0 ? t(usOnly ? "checkout.trustShipping" : "checkout.trustShippingIntl") : t("checkout.trustTracked")}</li>
+        <li className="flex items-center gap-3"><Package className="size-4 shrink-0 text-[#467253]" aria-hidden="true" />{t("checkout.trustReturns", { days: storePolicies.returns.windowDays })}</li>
+        <li className="flex items-center gap-3"><ShieldCheck className="size-4 shrink-0 text-[#467253]" aria-hidden="true" />{t("checkout.trustSecure")}</li>
       </ul>
       <p className="sr-only">{count} {count === 1 ? "item" : "items"}</p>
     </div>

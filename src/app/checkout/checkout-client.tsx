@@ -133,16 +133,16 @@ function Steps({ current }: { current: 1 | 2 }) {
           const circle = cn(
             "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors duration-200",
             done && "bg-[#2f7d4f] text-white",
-            active && "bg-[#c94b16] text-white",
-            !done && !active && "border border-[#dcd9d0] bg-white text-[#666a67]",
+            active && "bg-[#1c5244] text-white",
+            !done && !active && "border border-[#d8d1c0] bg-white text-[#5b6b64]",
           );
-          const text = cn("font-medium", active ? "text-[#171918]" : "text-[#666a67]");
+          const text = cn("font-medium", active ? "text-[#0f2a23]" : "text-[#5b6b64]");
           return (
             <li key={label} className="flex items-center gap-2 sm:gap-3" aria-current={active ? "step" : undefined}>
               {i === 0 ? (
-                <Link href="/cart" className="group flex items-center gap-2 rounded-md transition-colors duration-200 hover:text-[#171918] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c94b16]/40">
+                <Link href="/cart" className="group flex items-center gap-2 rounded-md transition-colors duration-200 hover:text-[#0f2a23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1c5244]/40">
                   <span className={circle}>{done ? <Check className="size-3.5" aria-hidden="true" /> : i + 1}</span>
-                  <span className={cn(text, "group-hover:text-[#171918]")}>{label}</span>
+                  <span className={cn(text, "group-hover:text-[#0f2a23]")}>{label}</span>
                 </Link>
               ) : (
                 <>
@@ -150,7 +150,7 @@ function Steps({ current }: { current: 1 | 2 }) {
                   <span className={text}>{label}</span>
                 </>
               )}
-              {i < steps.length - 1 && <span className="h-px w-6 bg-[#dcd9d0] sm:w-10" aria-hidden="true" />}
+              {i < steps.length - 1 && <span className="h-px w-6 bg-[#d8d1c0] sm:w-10" aria-hidden="true" />}
             </li>
           );
         })}
@@ -574,12 +574,12 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
   return (
     <div className="store-container checkout-page py-8 md:py-12">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-[#171918] sm:text-4xl">{t("checkout.title")}</h1>
+        <h1 className="font-serif text-4xl font-medium text-[#0f2a23] sm:text-5xl">{t("checkout.title")}</h1>
         <Steps current={step} />
       </header>
 
       {!canPay && (
-        <p className="mt-6 rounded-xl border border-[#e7e5df] bg-white p-4 text-sm text-[#666a67]" role="status">
+        <p className="mt-6 rounded-xl border border-[#e6e0d2] bg-white p-4 text-sm text-[#5b6b64]" role="status">
           Online payment is temporarily unavailable. You can review your details, but no order will be created.
         </p>
       )}
@@ -599,28 +599,28 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
       )}
 
       {/* Phones: the order folds into one line with the total; tap to see the items */}
-      <details className="group mt-6 rounded-2xl border border-[#e7e5df] bg-white shadow-[0_1px_2px_rgba(23,25,24,0.04)] lg:hidden">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 text-sm transition-colors duration-200 hover:bg-[#faf9f6] [&::-webkit-details-marker]:hidden">
-          <span className="flex items-center gap-2 font-medium text-[#171918]">
-            <ShoppingBag className="size-4 text-[#a83d10]" aria-hidden="true" />
+      <details className="group mt-6 rounded-2xl border border-[#e6e0d2] bg-white shadow-[0_1px_2px_rgba(15, 42, 35,0.04)] lg:hidden">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 text-sm transition-colors duration-200 hover:bg-[#fbf8f1] [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2 font-medium text-[#0f2a23]">
+            <ShoppingBag className="size-4 text-[#467253]" aria-hidden="true" />
             {t("cart.orderSummary")}
-            <span className="text-[#666a67]">· {itemCount} {itemCount === 1 ? "item" : "items"}</span>
-            <ChevronDown className="size-4 text-[#666a67] transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+            <span className="text-[#5b6b64]">· {itemCount} {itemCount === 1 ? "item" : "items"}</span>
+            <ChevronDown className="size-4 text-[#5b6b64] transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
           </span>
-          <strong className="text-base font-semibold text-[#171918]">{formatPrice(displayTotal)}</strong>
+          <strong className="text-base font-semibold text-[#0f2a23]">{formatPrice(displayTotal)}</strong>
         </summary>
-        <div className="border-t border-[#eeece6] px-5 py-5">
+        <div className="border-t border-[#f3eee2] px-5 py-5">
           <OrderSummary totals={pending?.totals} embedded />
         </div>
       </details>
 
       <div className="mt-6 grid gap-8 lg:mt-8 lg:grid-cols-12 lg:items-start lg:gap-10">
         <div className="min-w-0 lg:col-span-7">
-          <div className="rounded-2xl border border-[#e7e5df] bg-white p-5 shadow-[0_1px_2px_rgba(23,25,24,0.04)] sm:p-8">
+          <div className="rounded-2xl border border-[#e6e0d2] bg-white p-5 shadow-[0_1px_2px_rgba(15, 42, 35,0.04)] sm:p-8">
             {pending && details ? (
               <div className="space-y-6 sm:space-y-8">
                 {/* Phones get one compact row, so the card form and the Pay button sit high on the screen */}
-                <section ref={paymentTopRef} className="scroll-mt-3 rounded-xl border border-[#e7e5df] bg-[#faf9f6] px-4 py-3 sm:p-5" aria-labelledby="ship-to-heading">
+                <section ref={paymentTopRef} className="scroll-mt-3 rounded-xl border border-[#e6e0d2] bg-[#fbf8f1] px-4 py-3 sm:p-5" aria-labelledby="ship-to-heading">
                   <div className="flex items-center justify-between gap-3 sm:items-start sm:gap-4">
                     <div className="min-w-0">
                       <p className="flex items-center gap-2 text-sm font-semibold text-[#2f7d4f]">
@@ -628,11 +628,11 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                         <span className="sm:hidden">{t("checkout.detailsSavedShort")}</span>
                         <span className="hidden sm:inline">{t("checkout.detailsSaved")}</span>
                       </p>
-                      <h2 id="ship-to-heading" className="sr-only sm:not-sr-only sm:mt-3 sm:text-sm sm:font-semibold sm:text-[#171918]">{t("checkout.shipTo")}</h2>
-                      <p className="mt-1 truncate text-sm text-[#666a67] sm:hidden">
+                      <h2 id="ship-to-heading" className="sr-only sm:not-sr-only sm:mt-3 sm:text-sm sm:font-semibold sm:text-[#0f2a23]">{t("checkout.shipTo")}</h2>
+                      <p className="mt-1 truncate text-sm text-[#5b6b64] sm:hidden">
                         {details.fullName} · {details.address1}, {details.city}, {[details.state, details.zip].filter(Boolean).join(" ")}{countrySuffix}
                       </p>
-                      <address className="mt-1 hidden text-sm not-italic leading-relaxed text-[#666a67] sm:block">
+                      <address className="mt-1 hidden text-sm not-italic leading-relaxed text-[#5b6b64] sm:block">
                         {details.fullName}
                         <br />
                         {[details.address1, details.address2].filter(Boolean).join(", ")}
@@ -649,7 +649,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                         setCreated(null);
                       }}
                       disabled={!!processing}
-                      className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-[#a83d10] transition-all duration-200 hover:bg-[#fae6db] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c94b16]/40 disabled:opacity-50"
+                      className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-[#467253] transition-all duration-200 hover:bg-[#e7f0e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1c5244]/40 disabled:opacity-50"
                     >
                       <PencilLine className="size-4" aria-hidden="true" />
                       {t("checkout.editDetails")}
@@ -659,8 +659,8 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
 
                 <section className="space-y-4 sm:space-y-5" aria-labelledby="payment-heading">
                   <div>
-                    <h2 id="payment-heading" className="text-lg font-semibold tracking-tight text-[#171918]">{t("checkout.paymentTitle")}</h2>
-                    <p className="mt-1 flex items-center gap-1.5 text-xs text-[#666a67] sm:text-sm">
+                    <h2 id="payment-heading" className="text-lg font-semibold tracking-tight text-[#0f2a23]">{t("checkout.paymentTitle")}</h2>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-[#5b6b64] sm:text-sm">
                       <Lock className="size-3.5 shrink-0" aria-hidden="true" />
                       {t("checkout.paymentSubtitle")}
                     </p>
@@ -694,8 +694,8 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                   )}
                   {stripePublishableKey && paypal && (
                     <div className="relative py-2" aria-hidden="true">
-                      <div className="absolute inset-x-0 top-1/2 border-t border-[#e7e5df]" />
-                      <p className="relative mx-auto w-fit bg-white px-3 text-xs font-medium uppercase tracking-wider text-[#7d817d]">{t("checkout.payOr")}</p>
+                      <div className="absolute inset-x-0 top-1/2 border-t border-[#e6e0d2]" />
+                      <p className="relative mx-auto w-fit bg-white px-3 text-xs font-medium uppercase tracking-wider text-[#7b877f]">{t("checkout.payOr")}</p>
                     </div>
                   )}
                   {paypal === "redirect" && (
@@ -784,7 +784,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                   />
                 )}
                 {customer && (
-                  <p className="mb-6 flex items-center gap-2 rounded-xl bg-[#faf9f6] px-4 py-3 text-sm text-[#666a67]">
+                  <p className="mb-6 flex items-center gap-2 rounded-xl bg-[#fbf8f1] px-4 py-3 text-sm text-[#5b6b64]">
                     <Check className="size-4 text-[#2f7d4f]" aria-hidden="true" />
                     {t("checkout.signedInAs", { email: customer.email })}
                   </p>
@@ -806,8 +806,8 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
                 {!customer && (
                   <div className="mt-8 space-y-4">
                     <div className="relative">
-                      <div className="absolute inset-x-0 top-1/2 border-t border-[#e7e5df]" />
-                      <p className="relative mx-auto w-fit bg-white px-3 text-xs font-medium uppercase tracking-wider text-[#7d817d]">{t("checkout.googleShortcut")}</p>
+                      <div className="absolute inset-x-0 top-1/2 border-t border-[#e6e0d2]" />
+                      <p className="relative mx-auto w-fit bg-white px-3 text-xs font-medium uppercase tracking-wider text-[#7b877f]">{t("checkout.googleShortcut")}</p>
                     </div>
                     <GoogleSignInButton redirectUrl="/checkout" />
                   </div>
@@ -825,7 +825,7 @@ export function CheckoutClient({ paypalClientId, stripePublishableKey, customer,
       </div>
 
       <p className="mt-8 text-center text-sm">
-        <Link href="/cart" className="inline-flex min-h-11 items-center text-[#666a67] underline-offset-4 transition-colors duration-200 hover:text-[#171918] hover:underline">
+        <Link href="/cart" className="inline-flex min-h-11 items-center text-[#5b6b64] underline-offset-4 transition-colors duration-200 hover:text-[#0f2a23] hover:underline">
           {t("checkout.backToCart")}
         </Link>
       </p>

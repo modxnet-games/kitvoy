@@ -1,0 +1,100 @@
+/*
+ * The catalog pages (components/catalog/catalog-hub.tsx): /products, the page
+ * behind the Instagram and TikTok bio link, and the homepage. They wrap
+ * themselves in .kitvoy-home, so headings and easing come from storefront.css;
+ * colours are the logo palette (the --kv-* variables in globals.css).
+ */
+
+/* ── Catalog pages: /products (hub) and the homepage (home) ───────────── */
+.hub-page { padding-bottom: 88px; }
+.hub-header { padding-block: 36px 4px; }
+.hub-header h1 { font-size: clamp(40px, 4.2vw, 56px); }
+.hub-header p { margin-top: 12px; color: #5b6b64; font-size: 16px; line-height: 1.5; }
+.hub-hero { padding-block: 76px 28px; }
+.hub-hero h1 { max-width: 13ch; font-size: clamp(48px, 6.2vw, 84px); line-height: 1.02; text-wrap: balance; }
+.hub-hero p { max-width: 520px; margin-top: 22px; color: var(--kv-muted); font-size: 18px; line-height: 1.6; }
+.hub-hero .primary-button { margin-top: 28px; min-width: 220px; }
+.hub-niche { margin-top: 44px; }
+.hub-niche-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 20px; padding-bottom: 12px; border-bottom: 1px solid #e6e0d2; }
+.hub-page .hub-niche h2 { font-size: 28px; letter-spacing: -.01em; line-height: 1.15; }
+.hub-niche-head p { color: #5b6b64; font-size: 13px; line-height: 1.5; }
+.hub-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.hub-grid > li { display: flex; min-width: 0; }
+.hub-card { position: relative; display: flex; flex: 1; flex-direction: column; overflow: hidden; min-width: 0; border: 1px solid #e6e0d2; border-radius: var(--kv-radius); background: #fff; transition: transform .45s var(--ease-spring), box-shadow .45s var(--ease-out), border-color .2s; }
+.hub-card:active { transform: scale(.985); transition-duration: .1s; }
+/* The tile keeps its tint while the photo loads, and if it never does */
+.hub-card-media { position: relative; display: block; flex-shrink: 0; aspect-ratio: 4 / 3; background: #f3eee2; }
+.hub-card-media img { object-fit: cover; mix-blend-mode: multiply; }
+.hub-card-body { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; padding: 18px 20px 20px; }
+.hub-card-number { color: var(--kv-sage-deep); font-family: var(--kv-serif); font-size: 32px; font-weight: 500; line-height: 1; }
+.hub-card h3 { font-family: var(--kv-serif); font-size: 24px; font-weight: 600; line-height: 1.15; }
+.hub-card-tagline { color: #5b6b64; font-size: 13px; line-height: 1.55; }
+.hub-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: auto; padding-top: 10px; }
+.hub-card-price { color: var(--kv-forest); font-size: 16px; font-weight: 700; }
+.hub-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; background: #e7f0e8; color: #467253; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.hub-chip svg { width: 14px; height: 14px; }
+.hub-card-arrow { position: absolute; right: 18px; bottom: 21px; width: 18px; height: 18px; color: #467253; transition: translate .4s var(--ease-spring); }
+.hub-soon { margin-top: 16px; padding: 18px 20px; border: 1px dashed #d8d1c0; border-radius: 12px; color: #5b6b64; font-size: 13px; }
+/* The homepage: fewer, larger cards */
+.hub-page--home .hub-niche { margin-top: 56px; }
+.hub-page--home .hub-niche h2 { font-size: 34px; }
+.hub-page--home .hub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 20px; }
+.hub-page--home .hub-card-media { aspect-ratio: 16 / 10; }
+.hub-page--home .hub-card-body { gap: 8px; padding: 24px 26px 26px; }
+.hub-page--home .hub-card-number { font-size: 28px; }
+.hub-page--home .hub-card h3 { font-size: 32px; }
+.hub-page--home .hub-card-tagline { font-size: 15px; }
+.hub-page--home .hub-card-meta { padding-top: 14px; }
+.hub-page--home .hub-card-price { font-size: 18px; }
+.hub-page--home .hub-card-arrow { right: 26px; bottom: 28px; }
+/* A niche with a single product on the homepage: one wide card, photo beside the text, instead of half an empty row */
+@media (min-width: 640px) {
+  .hub-page--home .hub-grid > li:only-child { grid-column: 1 / -1; }
+  .hub-page--home .hub-grid > li:only-child .hub-card { flex-direction: row; }
+  .hub-page--home .hub-grid > li:only-child .hub-card-media { flex: 0 0 46%; }
+  .hub-page--home .hub-grid > li:only-child .hub-card-body { justify-content: center; padding: 36px 44px; }
+  .hub-page--home .hub-grid > li:only-child .hub-card-meta { margin-top: 0; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hub-card:hover { transform: translateY(-3px); border-color: #d8d1c0; box-shadow: 0 22px 34px -26px #0f2a2380; }
+  .hub-card:hover .hub-card-arrow { translate: 4px 0; }
+}
+
+@media (max-width: 1100px) {
+  .hub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 639px) {
+  .hub-page { padding-bottom: 48px; }
+  .hub-header { padding-block: 24px 0; }
+  .hub-header h1 { font-size: 38px; }
+  .hub-header p { margin-top: 8px; font-size: 15px; }
+  .hub-hero { padding-block: 36px 8px; }
+  .hub-hero h1 { font-size: clamp(42px, 12vw, 56px); }
+  .hub-hero p { margin-top: 16px; font-size: 16px; line-height: 1.45; }
+  .hub-hero .primary-button { width: 100%; margin-top: 22px; }
+  .hub-niche { margin-top: 30px; }
+  .hub-niche-head { flex-direction: column; align-items: flex-start; }
+  .hub-page .hub-niche h2 { font-size: 24px; }
+  .hub-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+  /* The bio-link page on a phone: a row per product, photo on the left, the whole row one tap target */
+  .hub-page--hub .hub-card { flex-direction: row; align-items: stretch; min-height: 136px; }
+  .hub-page--hub .hub-card-media { flex: 0 0 116px; aspect-ratio: auto; }
+  .hub-page--hub .hub-card-body { gap: 4px; padding: 14px 40px 14px 14px; }
+  .hub-page--hub .hub-card-number { font-size: 26px; }
+  .hub-page--hub .hub-card h3 { font-size: 21px; }
+  .hub-page--hub .hub-card-tagline { font-size: 12px; line-height: 1.45; }
+  .hub-page--hub .hub-card-meta { gap: 6px 10px; padding-top: 8px; }
+  .hub-page--hub .hub-card-price { font-size: 15px; }
+  .hub-page--hub .hub-card-arrow { top: 50%; right: 14px; bottom: auto; margin-top: -9px; }
+  .hub-soon { margin-top: 12px; padding: 16px; }
+  .hub-page--home .hub-niche { margin-top: 36px; }
+  .hub-page--home .hub-niche h2 { font-size: 28px; }
+  .hub-page--home .hub-grid { grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
+  .hub-page--home .hub-card-media { aspect-ratio: 4 / 3; }
+  .hub-page--home .hub-card-body { padding: 18px 18px 20px; }
+  .hub-page--home .hub-card h3 { font-size: 26px; }
+  .hub-page--home .hub-card-tagline { font-size: 14px; }
+  .hub-page--home .hub-card-arrow { right: 18px; bottom: 22px; }
+}

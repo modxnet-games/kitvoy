@@ -42,7 +42,7 @@ async function addOneAndOpenCheckout(page: Page) {
   await page.goto("/inflator");
   await page.locator("label.bundle-option").filter({ has: page.locator('input[value="1"]') }).click();
   await page.getByRole("button", { name: /^Add 1 to cart/ }).click();
-  await page.getByRole("link", { name: "Continue to checkout" }).click();
+  await page.getByRole("link", { name: "Check out" }).click();
   await expect(page).toHaveURL(/\/checkout$/);
   await expect(page.locator("#checkout-email")).toBeVisible();
 }

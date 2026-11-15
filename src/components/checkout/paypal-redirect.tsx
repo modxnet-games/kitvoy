@@ -116,7 +116,7 @@ export function PayPalRedirect({ orderId, sessionToken, onProcessingChange, onRe
           <PayWithPayPalLabel />
         )}
       </button>
-      <p className="text-center text-xs leading-relaxed text-[#666a67]">{t("checkout.paypalRedirectNote")}</p>
+      <p className="text-center text-xs leading-relaxed text-[#5b6b64]">{t("checkout.paypalRedirectNote")}</p>
     </div>
   );
 }

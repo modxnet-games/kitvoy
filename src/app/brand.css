@@ -1,0 +1,1653 @@
+/*
+ * Kitvoy brand layer: the top bar, header, footer, cart drawer and product page.
+ *
+ * The layout is the owner's TreeAura store (treeaura.shop), brought over rule
+ * for rule: same spacing, sizes and type, so the two stores share one design.
+ * What changes is the palette, which is the Kitvoy logo's: every colour reads a
+ * --kv-* variable from globals.css. Class names carry a kv- prefix so nothing
+ * here meets the older storefront.css.
+ *
+ * Order matters and follows TreeAura's own files (base rules, then its three
+ * rounds of refinements): later blocks deliberately restate earlier ones.
+ * Kitvoy's additions come last.
+ *
+ * Deliberate departures from TreeAura's values (the store's accessibility
+ * checks hold text to WCAG AA, and the logo needs its room):
+ *  - Accent text on cream (eyebrows, the step numerals, the italic tagline)
+ *    uses --kv-sage-deep. The logo sage itself is kept for icons, bullets and
+ *    other marks that are not text.
+ *  - Struck prices in the cart use the muted text colour, not a paler grey.
+ *  - The header is 62px, not 58px: the stacked Kitvoy logo needs the room.
+ */
+
+/* TreeAura sets these on <body>. Here they belong to the parts built from its stylesheet */
+.kv-topbar,
+.kv-header,
+.kv-page,
+.kv-footer,
+.kv-cart,
+.kv-sticky-bar {
+  font-family: var(--kv-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+}
+.kv-header,
+.kv-page,
+.kv-cart,
+.kv-sticky-bar {
+  color: var(--kv-ink);
+}
+
+/*
+ * TreeAura has no CSS reset and its spacing counts on the browser's own
+ * paragraph and list margins. Tailwind's reset removes them, so they are put
+ * back here for exactly the elements that relied on them, at zero specificity
+ * (:where) so any kv- rule still overrides them as it does there.
+ */
+:where(p.kv-eyebrow, p.kv-lede, p.kv-caption, dl.kv-specs) {
+  margin-block: 1em;
+}
+:where(.kv-footer) p {
+  margin-block: 1em;
+}
+
+/* =====================================================================
+   From TreeAura: base rules
+   ===================================================================== */
+.kv-wrap {
+  width: 100%;
+  max-width: var(--kv-maxw);
+  margin: 0 auto;
+  padding: 0 var(--kv-gutter);
+}
+/* ---------- Type ---------- */
+.kv-eyebrow {
+  font-family: var(--kv-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--kv-sage-deep);
+}
+.kv-on-dark .kv-eyebrow {
+  color: var(--kv-accent);
+}
+.kv-display {
+  font-family: var(--kv-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+  margin: 0;
+}
+h1.kv-display {
+  font-size: clamp(44px, 12vw, 96px);
+}
+h2.kv-display {
+  font-size: clamp(34px, 8vw, 62px);
+}
+h3.kv-display {
+  font-size: clamp(26px, 5vw, 36px);
+}
+.kv-lede {
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--kv-muted);
+  max-width: 34em;
+}
+.kv-on-dark .kv-lede {
+  color: rgba(251, 248, 241, 0.78);
+}
+.kv-caption {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--kv-muted);
+}
+/* ---------- Buttons ---------- */
+.kv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 0 28px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.kv-btn:active {
+  transform: scale(0.985);
+}
+.kv-btn-primary {
+  background: var(--kv-forest);
+  color: var(--kv-ivory);
+  box-shadow: 0 10px 24px -14px rgba(28, 82, 68, 0.9);
+}
+.kv-btn-primary:hover {
+  background: var(--kv-forest-2);
+}
+.kv-btn-gold {
+  background: var(--kv-accent);
+  color: var(--kv-ink);
+}
+.kv-btn-gold:hover {
+  background: #ddebdf;
+}
+.kv-btn-ghost {
+  background: transparent;
+  border-color: currentColor;
+  color: inherit;
+}
+.kv-btn-block {
+  width: 100%;
+}
+.kv-btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* ---------- Top bar & header ---------- */
+.kv-topbar {
+  background: var(--kv-forest);
+  color: var(--kv-ivory);
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  padding: 9px 14px;
+}
+.kv-topbar strong {
+  color: var(--kv-accent);
+  font-weight: 600;
+}
+.kv-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(251, 248, 241, 0.88);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid rgba(230, 224, 210, 0.7);
+}
+.kv-header .kv-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 62px;
+}
+.kv-logo {
+  font-family: var(--kv-serif);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--kv-forest);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.kv-logo-mark {
+  width: 22px;
+  height: 22px;
+}
+.kv-bag-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 10px 4px;
+  color: var(--kv-forest);
+  font-weight: 600;
+  font-size: 14px;
+}
+.kv-bag-count {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--kv-forest);
+  color: var(--kv-accent);
+  font-size: 11px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+}
+/* ---------- Sections ---------- */
+.kv-section {
+  padding: 72px 0;
+}
+.kv-section-tight {
+  padding: 48px 0;
+}
+.kv-section-dark {
+  background: var(--kv-forest);
+  color: var(--kv-ivory);
+}
+.kv-section-ink {
+  background: var(--kv-ink);
+  color: var(--kv-ivory);
+}
+.kv-section-head {
+  margin-bottom: 30px;
+}
+.kv-section-head .kv-display {
+  margin-top: 10px;
+}
+.kv-section-head .kv-lede {
+  margin-top: 14px;
+}
+/* ---------- Before / After ---------- */
+.kv-ba {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--kv-radius);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+  background: #0a1d18;
+  box-shadow: var(--kv-shadow);
+}
+.kv-ba img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.kv-ba-after {
+  clip-path: inset(0 0 0 var(--pos, 50%));
+}
+.kv-ba-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pos, 50%);
+  width: 2px;
+  background: var(--kv-accent);
+  transform: translateX(-1px);
+  box-shadow: 0 0 16px rgba(207, 227, 210, 0.8);
+}
+.kv-ba-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
+  border-radius: 50%;
+  background: var(--kv-accent);
+  color: var(--kv-ink);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  font-size: 18px;
+}
+.kv-ba-label {
+  position: absolute;
+  bottom: 14px;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(15, 42, 35, 0.6);
+  color: var(--kv-ivory);
+  backdrop-filter: blur(6px);
+}
+.kv-ba-label.l {
+  left: 14px;
+}
+.kv-ba-label.r {
+  right: 14px;
+  color: var(--kv-accent);
+}
+.kv-ba-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: ew-resize;
+  margin: 0;
+  touch-action: pan-y;
+}
+/* ---------- Product ---------- */
+.kv-product-grid {
+  display: grid;
+  gap: 28px;
+}
+.kv-gallery-main {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--kv-radius);
+  overflow: hidden;
+  background: var(--kv-ivory-2);
+}
+.kv-gallery-main img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.kv-gallery-caption {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: rgba(251, 248, 241, 0.85);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+.kv-thumbs {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.kv-thumbs::-webkit-scrollbar {
+  display: none;
+}
+.kv-thumb {
+  flex: 0 0 68px;
+  height: 68px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  padding: 0;
+  background: var(--kv-ivory-2);
+  scroll-snap-align: start;
+}
+.kv-thumb[aria-current="true"] {
+  border-color: var(--kv-forest);
+}
+.kv-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.kv-buy-box h2 {
+  font-family: var(--kv-serif);
+  font-weight: 500;
+  font-size: clamp(30px, 7vw, 44px);
+  line-height: 1.05;
+  margin: 8px 0 10px;
+}
+.kv-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 6px 0 18px;
+}
+.kv-price {
+  font-family: var(--kv-serif);
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--kv-forest);
+}
+.kv-price-note {
+  font-size: 13px;
+  color: var(--kv-muted);
+}
+.kv-option-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--kv-muted);
+  margin: 18px 0 10px;
+}
+.kv-moods {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.kv-mood {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1.5px solid var(--kv-line);
+  border-radius: 999px;
+  background: var(--kv-white);
+  padding: 8px 14px 8px 8px;
+  font-size: 13px;
+}
+.kv-mood[aria-pressed="true"] {
+  border-color: var(--kv-forest);
+}
+.kv-mood i {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.kv-buy-actions {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 14px;
+}
+.kv-ship-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--kv-white);
+  border: 1px solid var(--kv-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.kv-ship-note svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.kv-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+}
+.kv-feature-list li {
+  display: flex;
+  gap: 10px;
+}
+.kv-feature-list li::before {
+  content: "";
+  flex: 0 0 8px;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: var(--kv-sage);
+}
+/* ---------- Steps ---------- */
+.kv-steps {
+  display: grid;
+  gap: 16px;
+  counter-reset: s;
+}
+.kv-step {
+  background: var(--kv-white);
+  border: 1px solid var(--kv-line);
+  border-radius: var(--kv-radius);
+  padding: 22px 20px;
+}
+.kv-step-n {
+  font-family: var(--kv-serif);
+  font-size: 44px;
+  line-height: 1;
+  color: var(--kv-sage-deep);
+}
+.kv-step h3 {
+  font-family: var(--kv-serif);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 8px 0 6px;
+}
+.kv-step p {
+  margin: 0;
+  color: var(--kv-muted);
+  font-size: 15px;
+}
+.kv-diagram {
+  border-radius: var(--kv-radius);
+  background: var(--kv-white);
+  border: 1px solid var(--kv-line);
+  padding: 18px;
+}
+/* ---------- Specs ---------- */
+.kv-specs {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--kv-line);
+}
+.kv-spec {
+  display: grid;
+  grid-template-columns: 40% 1fr;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--kv-line);
+  font-size: 14px;
+}
+.kv-spec dt {
+  color: var(--kv-muted);
+}
+.kv-spec dd {
+  margin: 0;
+}
+/* ---------- FAQ ---------- */
+.kv-faq details {
+  border-bottom: 1px solid var(--kv-line);
+}
+.kv-faq summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 20px 36px 20px 0;
+  position: relative;
+  font-family: var(--kv-serif);
+  font-size: 21px;
+  font-weight: 600;
+}
+.kv-faq summary::-webkit-details-marker {
+  display: none;
+}
+.kv-faq summary::after {
+  content: "+";
+  position: absolute;
+  right: 4px;
+  top: 16px;
+  font-family: var(--kv-sans);
+  font-weight: 300;
+  font-size: 26px;
+  color: var(--kv-sage);
+  transition: transform 0.2s;
+}
+.kv-faq details[open] summary::after {
+  transform: rotate(45deg);
+}
+.kv-faq details p {
+  margin: 0 0 20px;
+  color: var(--kv-muted);
+  font-size: 15px;
+}
+/* ---------- Sticky bar ---------- */
+.kv-sticky-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  background: rgba(251, 248, 241, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--kv-line);
+  padding: 10px var(--kv-gutter) calc(10px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transform: translateY(110%);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.kv-sticky-bar.show {
+  transform: translateY(0);
+}
+.kv-sticky-bar .kv-sb-info {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+.kv-sticky-bar .kv-sb-info strong {
+  display: block;
+  font-family: var(--kv-serif);
+  font-size: 20px;
+  color: var(--kv-forest);
+}
+.kv-sticky-bar .kv-sb-info span {
+  font-size: 11px;
+  color: var(--kv-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.kv-sticky-bar .kv-btn {
+  min-height: 48px;
+  padding: 0 22px;
+}
+/* ---------- Free shipping tag ---------- */
+.kv-free-tag {
+  color: var(--kv-ok);
+  font-weight: 600;
+}
+/* ---------- Footer ---------- */
+.kv-footer {
+  background: var(--kv-ink);
+  color: rgba(251, 248, 241, 0.78);
+  padding: 56px 0 calc(90px + env(safe-area-inset-bottom));
+  font-size: 14px;
+}
+.kv-footer .kv-logo {
+  color: var(--kv-ivory);
+}
+.kv-footer-grid {
+  display: grid;
+  gap: 28px;
+}
+.kv-footer h4 {
+  color: var(--kv-accent);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.kv-footer ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.kv-footer a {
+  text-decoration: none;
+}
+.kv-footer a:hover {
+  color: var(--kv-ivory);
+}
+.kv-footer-legal {
+  border-top: 1px solid rgba(251, 248, 241, 0.12);
+  margin-top: 36px;
+  padding-top: 20px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(251, 248, 241, 0.55);
+}
+/* ---------- Responsive ---------- */
+@media (min-width: 640px) {
+  .kv-steps {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .kv-footer-grid {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+  .kv-ba {
+    aspect-ratio: 16 / 10;
+  }
+}
+@media (min-width: 960px) {
+  .kv-section {
+    padding: 112px 0;
+  }
+  .kv-product-grid {
+    grid-template-columns: 1.1fr 1fr;
+    gap: 56px;
+    align-items: start;
+  }
+  .kv-product-grid .kv-buy-box {
+    position: sticky;
+    top: 90px;
+  }
+  .kv-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+    align-items: center;
+  }
+  .kv-sticky-bar {
+    display: none;
+  }
+  .kv-footer {
+    padding-bottom: 40px;
+  }
+}
+/* Grid children must be allowed to shrink below their content's intrinsic width (e.g. the thumbnail strip). */
+.kv-product-grid > *,
+.kv-two-col > *,
+.kv-footer-grid > *,
+.kv-steps > * {
+  min-width: 0;
+}
+
+/* =====================================================================
+   From TreeAura: bundles, cart drawer, payment badges
+   ===================================================================== */
+/* ---------- Payment badges ---------- */
+.kv-paybadges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.kv-paybadges li {
+  display: flex;
+}
+.kv-paybadge {
+  display: block;
+  width: 46px;
+  height: 30px;
+}
+.kv-paybadges-mini {
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+.kv-paybadges-mini .kv-paybadge {
+  width: 34px;
+  height: 22px;
+}
+.kv-paybadges-pdp {
+  margin: 4px 0 14px;
+}
+/* ---------- Price row ---------- */
+.kv-price-was {
+  color: var(--kv-muted);
+  font-size: 18px;
+}
+/* ---------- Bundle selector ---------- */
+.kv-bundles {
+  display: grid;
+  gap: 12px;
+}
+.kv-bundle {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 16px 14px;
+  border: 1.5px solid var(--kv-line);
+  border-radius: 14px;
+  background: var(--kv-white);
+  color: var(--kv-ink);
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.kv-bundle.on {
+  border-color: var(--kv-forest);
+  background: #f1f6f0;
+  box-shadow: inset 0 0 0 1px var(--kv-forest);
+}
+.kv-bundle-flag {
+  position: absolute;
+  top: -10px;
+  right: 14px;
+  background: var(--kv-forest);
+  color: var(--kv-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.kv-bundle-radio {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid #b5b9ad;
+  background: var(--kv-white);
+  flex: 0 0 auto;
+  display: inline-block;
+  position: relative;
+}
+.kv-bundle.on .kv-bundle-radio,
+.kv-bundle-radio.on {
+  border-color: var(--kv-forest);
+}
+.kv-bundle.on .kv-bundle-radio::after,
+.kv-bundle-radio.on::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--kv-forest);
+}
+.kv-bundle-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.kv-bundle-title {
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.kv-save-pill {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(207, 227, 210, 0.55);
+  color: var(--kv-ink);
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.kv-bundle-sub {
+  font-size: 13px;
+  color: var(--kv-muted);
+}
+.kv-bundle-price {
+  display: grid;
+  justify-items: end;
+  line-height: 1.25;
+}
+.kv-bundle-price strong {
+  font-size: 17px;
+  color: var(--kv-forest);
+}
+.kv-bundle-price s {
+  font-size: 13px;
+  color: var(--kv-muted);
+}
+/* ---------- Trust row (PDP) ---------- */
+.kv-trust-row {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 14px 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 10px;
+  border-top: 1px solid var(--kv-line);
+  border-bottom: 1px solid var(--kv-line);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--kv-forest);
+}
+.kv-trust-row li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kv-trust-row svg {
+  flex: 0 0 auto;
+  color: var(--kv-sage);
+}
+/* ---------- Gallery overlays ---------- */
+.kv-gallery-mark {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--kv-serif);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(28, 82, 68, 0.72);
+}
+.kv-gallery-mark.on-img-dark {
+  color: rgba(251, 248, 241, 0.82);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
+.kv-gallery-badge {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 120px);
+  background: rgba(251, 248, 241, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(207, 227, 210, 0.9);
+  border-radius: 999px;
+  padding: 7px 16px 7px 7px;
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  color: var(--kv-ink);
+}
+.kv-gallery-badge-ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--kv-forest);
+  color: var(--kv-accent);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.kv-gallery-badge strong {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.2;
+}
+.kv-gallery-badge small {
+  display: block;
+  font-size: 11px;
+  color: var(--kv-muted);
+  line-height: 1.25;
+}
+/* ---------- Sticky bar strikethrough ---------- */
+.kv-sticky-bar .kv-sb-info strong s {
+  font-family: var(--kv-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--kv-muted);
+  margin-left: 4px;
+}
+/* ---------- Cart drawer ---------- */
+.kv-cart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--kv-line);
+}
+.kv-cart-head h2 {
+  margin: 0;
+  font-family: var(--kv-sans);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.kv-cart-close {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  display: grid;
+  place-items: center;
+  color: var(--kv-ink);
+  border-radius: 50%;
+}
+.kv-cart-close:hover {
+  background: var(--kv-ivory-2);
+}
+.kv-cart-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.kv-cart-line {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.kv-cart-thumb {
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--kv-ivory-2);
+}
+.kv-cart-info {
+  min-width: 0;
+}
+.kv-cart-title-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.kv-cart-title-row h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+.kv-cart-remove {
+  border: 0;
+  background: none;
+  color: var(--kv-muted);
+  padding: 4px;
+  margin: -4px -4px 0 0;
+  border-radius: 8px;
+}
+.kv-cart-remove:hover {
+  color: var(--kv-danger);
+  background: var(--kv-ivory-2);
+}
+.kv-cart-unit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
+  font-size: 13.5px;
+}
+.kv-cart-unit s {
+  color: var(--kv-muted);
+}
+.kv-cart-unit strong {
+  color: var(--kv-forest);
+}
+.kv-ring-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--kv-forest);
+  background: var(--kv-ivory-2);
+  border: 1px solid var(--kv-line);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.kv-cart-variant {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  color: var(--kv-muted);
+  line-height: 1.4;
+}
+.kv-cart-qty-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+.kv-stepper {
+  display: inline-flex;
+  align-items: center;
+  background: var(--kv-ivory);
+  border: 1px solid var(--kv-line);
+  border-radius: 10px;
+}
+.kv-stepper button {
+  width: 38px;
+  height: 36px;
+  border: 0;
+  background: none;
+  font-size: 18px;
+  color: var(--kv-ink);
+}
+.kv-stepper button:disabled {
+  opacity: 0.35;
+}
+.kv-stepper span {
+  min-width: 26px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+.kv-cart-line-total {
+  text-align: right;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.kv-cart-line-total s {
+  color: var(--kv-muted);
+  margin-right: 6px;
+}
+.kv-cart-line-total strong {
+  color: var(--kv-forest);
+  font-size: 15px;
+}
+.kv-cart-line-total b {
+  display: block;
+  font-size: 13px;
+  color: var(--kv-ink);
+}
+.kv-cart-foot {
+  border-top: 1px solid var(--kv-line);
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 12px;
+  background: var(--kv-white);
+}
+.kv-cart-sum {
+  border-top: 1px solid var(--kv-line);
+  padding-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+.kv-cart-sum-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+}
+.kv-cart-sum-row.savings {
+  font-weight: 700;
+  color: var(--kv-ok);
+}
+.kv-cart-sum-row.subtotal {
+  font-weight: 800;
+  font-size: 18px;
+}
+.kv-cart-checkout {
+  min-height: 56px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+@media (min-width: 640px) {
+  .kv-trust-row {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .kv-trust-row li {
+    flex-direction: column;
+    text-align: center;
+    gap: 6px;
+  }
+}
+
+/* =====================================================================
+   From TreeAura: minimal header, sticky bar, free shipping rows
+   ===================================================================== */
+/* ---------- Minimal header ---------- */
+.kv-header .kv-wrap {
+  height: 58px;
+}
+.kv-bag-btn {
+  padding: 8px 2px;
+  gap: 4px;
+}
+/* ---------- First screen ---------- */
+.kv-how-diagram {
+  max-width: 420px;
+  margin: 28px auto 0;
+}
+/* Sticky bar: fully inert until shown */
+.kv-sticky-bar {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s, visibility 0s linear 0.35s;
+}
+.kv-sticky-bar.show {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s, visibility 0s;
+}
+/* ---------- Free shipping rows ---------- */
+.kv-cart-sum-row.shipping span:last-child,
+.kv-free-tag {
+  color: var(--kv-ok);
+  font-weight: 700;
+}
+.kv-price-note b.kv-free-tag {
+  font-weight: 700;
+}
+
+/* =====================================================================
+   From TreeAura: the first screen (gallery and buy box), opaque header
+   ===================================================================== */
+/* Sticky header: fully opaque so nothing shows through while scrolling. */
+.kv-header {
+  background-color: var(--kv-ivory);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--kv-line);
+  z-index: 50;
+}
+/* ---------- Screen #1: compact product buy box ---------- */
+.kv-shop-top {
+  padding: 12px 0 36px;
+  background: var(--kv-ivory);
+}
+.kv-shop-top .kv-product-grid {
+  gap: 14px;
+}
+.kv-gallery {
+  min-width: 0;
+}
+.kv-gallery-main {
+  aspect-ratio: 4 / 3;
+  touch-action: pan-y;
+}
+.kv-gallery-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  padding-right: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  pointer-events: none;
+}
+.kv-gallery-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(251, 248, 241, 0.5);
+}
+.kv-gallery-dots i.on {
+  background: var(--kv-accent);
+  width: 16px;
+  border-radius: 3px;
+}
+.kv-gallery-badge {
+  padding: 5px 12px 5px 5px;
+  gap: 8px;
+}
+.kv-gallery-badge-ic {
+  width: 28px;
+  height: 28px;
+}
+.kv-gallery-badge strong {
+  font-size: 11.5px;
+}
+.kv-gallery-badge small {
+  font-size: 10px;
+}
+.kv-thumbs {
+  margin-top: 8px;
+  gap: 8px;
+}
+.kv-thumb {
+  flex: 0 0 50px;
+  height: 50px;
+  border-radius: 8px;
+}
+.kv-buy-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+}
+.kv-buy-eyebrow span {
+  background: var(--kv-forest);
+  color: var(--kv-accent);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.kv-buy-eyebrow em {
+  font-family: var(--kv-serif);
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--kv-sage-deep);
+}
+.kv-buy-title {
+  font-family: var(--kv-serif);
+  font-weight: 500;
+  font-size: clamp(27px, 7vw, 44px);
+  line-height: 1.05;
+  margin: 4px 0 4px;
+  color: var(--kv-ink);
+}
+.kv-buy-desc {
+  margin: 0;
+  color: var(--kv-muted);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.kv-shop-top .kv-price-row {
+  margin: 8px 0 10px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.kv-shop-top .kv-price {
+  font-size: 32px;
+  line-height: 1.1;
+}
+.kv-shop-top .kv-moods {
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 calc(var(--kv-gutter) * -1);
+  padding: 2px var(--kv-gutter);
+}
+.kv-shop-top .kv-moods::-webkit-scrollbar {
+  display: none;
+}
+.kv-shop-top .kv-mood {
+  flex: 0 0 auto;
+  padding: 6px 12px 6px 6px;
+  font-size: 12.5px;
+  gap: 6px;
+  white-space: nowrap;
+}
+.kv-shop-top .kv-mood i {
+  width: 18px;
+  height: 18px;
+}
+.kv-shop-top .kv-option-label {
+  margin: 14px 0 12px;
+}
+.kv-shop-top .kv-bundles {
+  gap: 11px;
+}
+.kv-shop-top .kv-bundle {
+  padding: 12px;
+  gap: 10px;
+}
+.kv-shop-top .kv-buy-actions {
+  margin: 14px 0 12px;
+  gap: 8px;
+}
+.kv-shop-top .kv-trust-row {
+  margin-bottom: 12px;
+  padding: 12px 0;
+}
+.kv-how-grid {
+  align-items: center;
+}
+.kv-how-diagram {
+  max-width: 440px;
+  margin: 24px auto 0;
+  width: 100%;
+}
+@media (min-width: 960px) {
+  .kv-shop-top {
+    padding: 36px 0 72px;
+  }
+  .kv-shop-top .kv-product-grid {
+    gap: 56px;
+  }
+  .kv-product-grid .kv-buy-box {
+    position: static;
+  }
+  .kv-product-grid .kv-gallery {
+    position: sticky;
+    top: 78px;
+  }
+  .kv-thumb {
+    flex: 0 0 72px;
+    height: 72px;
+  }
+  .kv-shop-top .kv-moods {
+    margin: 0;
+    padding: 2px 0;
+    flex-wrap: wrap;
+  }
+  .kv-how-diagram {
+    margin-top: 0;
+  }
+}
+
+/* =====================================================================
+   Kitvoy's own parts, in the same visual language
+   ===================================================================== */
+
+/* Tailwind's reset gives buttons the default cursor and draws SVG as blocks */
+.kv-btn,
+.kv-bundle,
+.kv-mood,
+.kv-thumb,
+.kv-bag-btn,
+.kv-menu-btn,
+.kv-cart-close,
+.kv-cart-remove,
+.kv-stepper button {
+  cursor: pointer;
+}
+.kv-bundle:disabled,
+.kv-stepper button:disabled {
+  cursor: not-allowed;
+}
+.kv-diagram svg {
+  display: inline;
+  vertical-align: baseline;
+}
+:where(.kv-topbar, .kv-header, .kv-page, .kv-footer, .kv-cart, .kv-sticky-bar, .cart-panel) :focus-visible {
+  outline: 2px solid var(--kv-sage-deep);
+  outline-offset: 2px;
+}
+
+/* ---------- Header ---------- */
+.kv-header .kv-wrap {
+  height: 62px;
+}
+.kv-logo img {
+  display: block;
+  width: auto;
+  height: 46px;
+}
+/* The links that pages other than a product page keep (TreeAura's .nav values) */
+.kv-header-nav {
+  display: none;
+  gap: 28px;
+  font-size: 14px;
+}
+.kv-header-nav a {
+  text-decoration: none;
+  color: var(--kv-ink);
+  opacity: 0.8;
+}
+.kv-header-nav a:hover {
+  opacity: 1;
+}
+.kv-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.kv-header-cta {
+  display: none;
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 13px;
+}
+.kv-menu-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  border: 0;
+  background: none;
+  color: var(--kv-forest);
+}
+@media (min-width: 640px) {
+  .kv-header-cta {
+    display: inline-flex;
+  }
+}
+@media (min-width: 960px) {
+  .kv-header-nav {
+    display: flex;
+  }
+  .kv-menu-btn {
+    display: none;
+  }
+}
+
+/* ---------- Footer ---------- */
+.kv-footer .kv-logo img {
+  height: 66px;
+}
+.kv-footer-brand p {
+  max-width: 360px;
+  margin-top: 14px;
+}
+.kv-footer ul a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Kitvoy has one more column of links than TreeAura */
+@media (min-width: 640px) {
+  .kv-footer-grid.kv-footer-grid--wide {
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+  }
+}
+
+/* ---------- Product page ---------- */
+.kv-page {
+  background: var(--kv-ivory);
+  overflow-x: clip;
+}
+#buy,
+#bundles,
+#before-after,
+#reviews {
+  scroll-margin-top: 74px;
+}
+.kv-mood {
+  color: var(--kv-ink);
+}
+.kv-bundle-flag {
+  text-transform: uppercase;
+}
+.kv-bundle:disabled {
+  opacity: 0.55;
+}
+.kv-price-soon {
+  font-size: 15px;
+  color: var(--kv-muted);
+}
+/* The watermark is the logo's wordmark, as an image */
+.kv-gallery-main .kv-gallery-mark img {
+  width: auto;
+  height: 15px;
+  object-fit: contain;
+  opacity: 0.72;
+}
+.kv-gallery-main .kv-gallery-mark.on-img-dark img {
+  opacity: 0.82;
+  filter: drop-shadow(0 1px 8px rgba(0, 0, 0, 0.45));
+}
+/* TreeAura's photos are night scenes; on a bright photo the position dots are drawn in ink */
+.kv-gallery-dots.on-img-light i {
+  background: rgba(15, 42, 35, 0.22);
+}
+.kv-gallery-dots.on-img-light i.on {
+  background: var(--kv-forest);
+}
+/* Shown in place of a photo that failed to load */
+.kv-image-fallback {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: linear-gradient(135deg, var(--kv-ivory-2), #e8e2d3);
+}
+/* A color for every ball in the pack: TreeAura's option chips, one row per ball */
+.kv-colour-rows {
+  display: grid;
+  gap: 8px;
+}
+.kv-colour-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.kv-colour-name {
+  flex: 0 0 44px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--kv-forest);
+}
+.kv-colour-row .kv-moods {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.kv-shop-top .kv-colour-name + .kv-moods {
+  margin-left: 0;
+  padding-left: 0;
+}
+@media (min-width: 960px) {
+  /* 62px of header plus TreeAura's 20px of air */
+  .kv-product-grid .kv-gallery {
+    top: 82px;
+  }
+}
+/* Customer reviews, shown once there are approved ones: the shared section, on this page's grid */
+.kv-page .reviews-section {
+  width: 100%;
+  max-width: var(--kv-maxw);
+  margin-inline: auto;
+  padding-inline: var(--kv-gutter);
+  border-bottom: 0;
+}
+@media (max-width: 959px) {
+  /* Keep the chat button clear of the buy bar while it is showing */
+  body:has(.kv-sticky-bar.show) .whatsapp-fab {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- Cart ---------- */
+/* TreeAura's drawer, on this store's sheet component */
+.cart-panel[data-slot="sheet-content"] {
+  width: min(460px, 100vw);
+  max-width: 100%;
+  height: 100dvh;
+  padding: 0;
+  gap: 0;
+  border: 0;
+  background: var(--kv-white);
+  box-shadow: -20px 0 60px -30px rgba(0, 0, 0, 0.5);
+  z-index: 61;
+}
+body:has(.cart-panel) [data-slot="sheet-overlay"],
+body:has(.store-menu) [data-slot="sheet-overlay"] {
+  background: rgba(15, 42, 35, 0.45);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  z-index: 60;
+}
+.kv-cart {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.kv-cart-head h2 {
+  color: var(--kv-ink);
+}
+/* One line per product and color */
+.kv-cart-lines {
+  display: grid;
+  gap: 22px;
+}
+.kv-cart-thumb img {
+  padding: 0;
+  object-fit: cover;
+}
+.kv-cart-title-row h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+.kv-cart-notice {
+  margin: 0 0 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--kv-ivory-2);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.kv-cart-notice.is-error,
+.kv-cart-stock {
+  color: var(--kv-danger);
+}
+.kv-cart-notice button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.kv-cart-stock {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+}
+.kv-cart-empty {
+  padding: 56px 20px;
+  text-align: center;
+}
+.kv-cart-empty .kv-lede {
+  margin: 0 auto 20px;
+}
+.kv-cart-continue {
+  justify-self: center;
+  font-size: 13px;
+  color: var(--kv-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Later additions ---------- */
+/* The chosen color: the chips are radios here, so the state TreeAura reads from aria-pressed is aria-checked */
+.kv-mood[aria-checked="true"] {
+  border-color: var(--kv-forest);
+}
+/* TreeAura's cart has a discount-code field above the totals; without one the totals open the footer */
+.kv-cart-foot > .kv-cart-sum:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+/* On a bright photo the comparison divider is drawn white with a soft edge, so it stays visible */
+.kv-ba-handle {
+  background: var(--kv-white);
+  box-shadow: 0 0 0 1px rgba(15, 42, 35, 0.14), 0 0 16px rgba(15, 42, 35, 0.35);
+}
+/* TreeAura scrolls smoothly to anchors (set on its root there) */
+html {
+  scroll-behavior: smooth;
+}
+/* The phone menu sits above the dimmed page, like the cart */
+.store-menu[data-slot="sheet-content"] {
+  z-index: 61;
+}

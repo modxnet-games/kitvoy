@@ -8,6 +8,7 @@ import { siteConfig } from "@/config/site";
 import { getProductBySlug } from "@/lib/data/products";
 import { getProductReviewSummary } from "@/lib/data/reviews";
 import { getStoreSettings } from "@/lib/data/store-settings";
+import { storeToday } from "@/lib/delivery-estimate";
 import { productFaqs } from "@/lib/product-faq";
 import { catalogProductSchema, faqSchema, graph, organizationSchema, websiteSchema } from "@/lib/seo/structured-data";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -84,7 +85,7 @@ export default async function CatalogProductPage({ params }: { params: Promise<P
   return (
     <>
       <JsonLd data={structured} />
-      <ProductPage product={product} entry={entry} content={content} faqs={faqs} reviews={reviews} visitorCountry={visitorCountry} />
+      <ProductPage product={product} entry={entry} content={content} faqs={faqs} reviews={reviews} visitorCountry={visitorCountry} today={storeToday()} />
     </>
   );
 }

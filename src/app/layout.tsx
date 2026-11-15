@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 
@@ -11,15 +11,21 @@ import { WhatsappFloatingWrapper } from "@/components/layout/whatsapp-floating-w
 import { MetaPixel } from "@/components/analytics/meta-pixel";
 import { META_PIXEL_ID } from "@/config/analytics";
 
-const inter = Inter({
+// The storefront's type pair: Manrope for text, Cormorant Garamond for display headings
+const sans = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap" });
+const serif = Cormorant_Garamond({
   subsets: ["latin"],
-  variable: "--font-sans",
+  weight: ["500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+  display: "swap",
 });
 
 export const viewport: Viewport = {
   // Lets fixed bars pad for the iPhone home indicator via env(safe-area-inset-bottom)
   viewportFit: "cover",
-  themeColor: "#FFFFFF",
+  // The logo green of the top bar, so the browser's own frame continues it
+  themeColor: "#1C5244",
 };
 
 export const metadata: Metadata = {
@@ -59,9 +65,10 @@ export default async function RootLayout({
   const isAdminOrderPrint =
     headerList.get("x-kitvoy-order-print") === "1";
 
+  // The font variables sit on <html>, where the --kv-* type tokens in globals.css read them
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${serif.variable}`}>
+      <body className="font-sans antialiased">
         {!isAdminOrderPrint && META_PIXEL_ID && (
           <>
             <MetaPixel />

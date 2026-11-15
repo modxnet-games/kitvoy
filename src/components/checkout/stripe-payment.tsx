@@ -61,9 +61,9 @@ const toMessageKey = (code: unknown) => (typeof code === "string" && code.includ
 export const appearance: Appearance = {
   theme: "stripe",
   variables: {
-    colorPrimary: "#C94B16",
-    colorText: "#171918",
-    colorTextSecondary: "#666a67",
+    colorPrimary: "#1C5244",
+    colorText: "#0f2a23",
+    colorTextSecondary: "#5b6b64",
     colorTextPlaceholder: "#9a9d99",
     colorDanger: "#b3261e",
     colorBackground: "#ffffff",
@@ -75,21 +75,21 @@ export const appearance: Appearance = {
     spacingUnit: "4px",
     spacingGridRow: "16px",
     spacingGridColumn: "16px",
-    focusBoxShadow: "0 0 0 4px rgba(201, 75, 22, 0.15)",
+    focusBoxShadow: "0 0 0 4px rgba(28, 82, 68, 0.15)",
     focusOutline: "none",
   },
   rules: {
-    ".Input": { padding: "13px 16px", border: "1px solid #dcd9d0", boxShadow: "none", transition: "border-color 0.2s, box-shadow 0.2s" },
-    ".Input:hover": { borderColor: "#bdb9ae" },
-    ".Input:focus": { borderColor: "#C94B16", boxShadow: "0 0 0 4px rgba(201, 75, 22, 0.15)" },
+    ".Input": { padding: "13px 16px", border: "1px solid #d8d1c0", boxShadow: "none", transition: "border-color 0.2s, box-shadow 0.2s" },
+    ".Input:hover": { borderColor: "#bdb8a8" },
+    ".Input:focus": { borderColor: "#1C5244", boxShadow: "0 0 0 4px rgba(28, 82, 68, 0.15)" },
     ".Input--invalid": { borderColor: "#d13b2b", boxShadow: "none" },
     ".Label": { fontSize: "14px", fontWeight: "500", marginBottom: "6px" },
     ".Error": { fontSize: "13px", fontWeight: "500" },
-    ".AccordionItem": { border: "1px solid #e7e5df", boxShadow: "none", padding: "14px 16px", transition: "border-color 0.2s, box-shadow 0.2s" },
-    ".AccordionItem:hover": { borderColor: "#bdb9ae" },
-    ".AccordionItem--selected": { borderColor: "#C94B16", boxShadow: "0 0 0 1px #C94B16", backgroundColor: "#fffaf6" },
-    ".Tab, .Block": { border: "1px solid #e7e5df", boxShadow: "none" },
-    ".Tab--selected": { borderColor: "#C94B16", boxShadow: "0 0 0 1px #C94B16" },
+    ".AccordionItem": { border: "1px solid #e6e0d2", boxShadow: "none", padding: "14px 16px", transition: "border-color 0.2s, box-shadow 0.2s" },
+    ".AccordionItem:hover": { borderColor: "#bdb8a8" },
+    ".AccordionItem--selected": { borderColor: "#1C5244", boxShadow: "0 0 0 1px #1C5244", backgroundColor: "#f1f6f0" },
+    ".Tab, .Block": { border: "1px solid #e6e0d2", boxShadow: "none" },
+    ".Tab--selected": { borderColor: "#1C5244", boxShadow: "0 0 0 1px #1C5244" },
   },
 };
 
@@ -151,7 +151,7 @@ function RetryNotice({ message, onRetry }: { message: string; onRetry: () => voi
       <button
         type="button"
         onClick={onRetry}
-        className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-[#e2c98f] bg-white px-4 text-sm font-semibold text-[#7a5a12] transition-colors duration-200 hover:bg-[#fbf1da] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c94b16]/40"
+        className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-[#e2c98f] bg-white px-4 text-sm font-semibold text-[#7a5a12] transition-colors duration-200 hover:bg-[#fbf1da] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1c5244]/40"
       >
         <RotateCw className="size-4" aria-hidden="true" />
         {t("checkout.cardFormRetry")}
@@ -165,7 +165,7 @@ function CardFormPlaceholder({ height, label }: { height: number; label: string 
   return (
     <div className="space-y-3 overflow-hidden" style={{ height }} role="status" aria-label={label}>
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="h-[52px] rounded-xl border border-[#eeece6] bg-[#f6f5f1] motion-safe:animate-pulse" />
+        <div key={i} className="h-[52px] rounded-xl border border-[#f3eee2] bg-[#f7f3ea] motion-safe:animate-pulse" />
       ))}
       <span className="sr-only">{label}</span>
     </div>
@@ -456,7 +456,7 @@ function PaymentForm({ orderReference, total, billing, layout, reserve, onPaid, 
         {t("checkout.payWithCard")} {formatPrice(total)}
       </CheckoutButton>
       {submitting && (
-        <p className="text-center text-xs text-[#666a67]" aria-live="polite">{t("checkout.keepPageOpen")}</p>
+        <p className="text-center text-xs text-[#5b6b64]" aria-live="polite">{t("checkout.keepPageOpen")}</p>
       )}
     </form>
   );

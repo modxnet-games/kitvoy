@@ -16,8 +16,8 @@ export default function NotFound() {
     <div className="store-container py-16 md:py-24">
       <div className="mx-auto flex max-w-xl flex-col items-center text-center">
         <p className="eyebrow">Error 404</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#171918] sm:text-4xl">We couldn&apos;t find that page.</h1>
-        <p className="mt-4 max-w-md text-base text-[#666a67]">
+        <h1 className="mt-3 font-serif text-4xl font-medium text-[#0f2a23] sm:text-5xl">We couldn&apos;t find that page.</h1>
+        <p className="mt-4 max-w-md text-base text-[#5b6b64]">
           The link may be old or mistyped. Our products, and help with an order, are one click away.
         </p>
         <div className="mt-8 flex flex-col items-center gap-4">

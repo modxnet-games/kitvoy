@@ -34,7 +34,7 @@ export function organizationSchema(details: OrganizationDetails = {}) {
     name: siteConfig.name,
     ...(legalName ? { legalName } : {}),
     url: absolute("/"),
-    logo: absolute("/apple-icon.png"),
+    logo: absolute("/brand/kitvoy-logo-512.png"),
     ...(address ? { address } : {}),
     ...(sameAs.length ? { sameAs } : {}),
     hasMerchantReturnPolicy: returnPolicySchema(),

@@ -1,7 +1,7 @@
 import { pouncepop } from "./pouncepop";
 import type { ProductContent } from "./types";
 
-export type { DemoLoop, GalleryImage, IconName, ProductContent } from "./types";
+export type { DemoLoop, DiagramId, GalleryBadge, GalleryImage, IconName, ProductContent } from "./types";
 
 /**
  * Page copy for the products that use the shared product page template

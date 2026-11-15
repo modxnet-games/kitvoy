@@ -98,7 +98,7 @@ function SuccessContent() {
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
         <div className="w-full max-w-lg rounded-2xl border bg-background p-6 text-center shadow-2xl sm:p-8" role="alert">
           <XCircle className="mx-auto size-16 text-destructive" />
-          <h1 className="mt-6 text-2xl font-bold tracking-tight">{t("checkout.paymentNotCompleted")}</h1>
+          <h1 className="mt-6 font-serif text-3xl font-medium">{t("checkout.paymentNotCompleted")}</h1>
           <div className="mt-8 flex justify-center">
             <Link href="/checkout" className={buttonVariants({ size: "lg" })}>
               {t("checkout.title")}
@@ -113,7 +113,7 @@ function SuccessContent() {
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-2xl border bg-background p-6 text-center shadow-2xl sm:p-8">
         <CheckCircle2 className="mx-auto size-16 text-green-500" />
-        <h1 className="mt-6 text-2xl font-bold tracking-tight sm:text-3xl">
+        <h1 className="mt-6 font-serif text-3xl font-medium sm:text-4xl">
           {t("order.successTitle")}
         </h1>
         <p className="mt-3 text-muted-foreground">

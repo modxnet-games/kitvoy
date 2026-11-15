@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Truck } from "lucide-react";
 
-import "@/app/product-page.css";
+import "@/app/catalog-hub.css";
 
 import { FEATURED_NICHES, NICHES, type CatalogProduct, type NicheKey } from "@/config/catalog";
 import { storePolicies } from "@/config/policies";

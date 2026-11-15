@@ -174,8 +174,11 @@ test("product copy carries the owner's spec, with no fake urgency, reviews, 'was
     const faqs = productFaqs(c, entry, c.database.price);
     const visible = [
       c.name, c.eyebrow, c.headline, c.subheadline, c.bundle.heading, c.bundle.intro, ...Object.values(c.bundle.tierNotes),
+      // What the page template of 2026-11-15 shows: the buy box, the comparison, the diagram and the closing band
+      c.tagline, c.description, ...c.features, c.trust.label, c.closing.heading, c.closing.cta, c.diagram?.caption ?? "",
+      ...(c.transformation ? [c.transformation.eyebrow, c.transformation.heading, c.transformation.lede, c.transformation.before.alt, c.transformation.after.alt] : []),
       ...c.benefits.flatMap((b) => [b.title, b.text]),
-      ...c.gallery.flatMap((g) => [g.alt, g.label]),
+      ...c.gallery.flatMap((g) => [g.alt, g.label, g.badge?.title ?? "", g.badge?.sub ?? ""]),
       ...c.demoLoops.flatMap((d) => [d.title, d.caption, d.posterAlt]),
       c.howItWorks.heading, c.howItWorks.tip ?? "", ...c.howItWorks.steps.flatMap((s) => [s.title, s.text]),
       c.comparison.heading, c.comparison.theirs, ...c.comparison.rows.flatMap((r) => [r.feature, r.ours, r.theirs]),
@@ -206,6 +209,9 @@ test("product copy carries the owner's spec, with no fake urgency, reviews, 'was
     assert.equal(new Set(c.gallery.map((g) => g.src)).size, c.gallery.length);
     assert.equal(c.benefits.length, 4);
     assert.equal(c.howItWorks.steps.length, 3);
+    assert.ok(c.features.length >= 4 && c.features.length <= 6, "the buy box closes with a short list of features");
+    assert.ok(c.tagline.length > 0 && c.description.length > 0 && c.description.length <= 140, "the buy box has a tagline and a short description");
+    if (c.transformation) assert.notEqual(c.transformation.before.src, c.transformation.after.src, "the comparison shows two different photos");
     assert.ok(c.merchant.title.length <= 150);
     assert.ok(c.merchant.description.length >= 500 && c.merchant.description.length <= 5000);
     assert.ok(c.merchant.highlights.length >= 2 && c.merchant.highlights.length <= 10);
@@ -335,4 +341,16 @@ test("an address with no region or postal code reaches Stripe and the customer's
   assert.match(abroad, /delivery to Spain usually takes 13–16 days/);
   assert.doesNotMatch(abroad, /4–9 business days/, "an order abroad is never promised the US delivery time");
   assert.match(buildOrderConfirmationEmail(base).text, /4–9 business days/);
+});
+
+test("the delivery estimate counts business days from the store's own date", async () => {
+  const { arrivalRange, storeToday } = await import("../src/lib/delivery-estimate");
+  // Ordered on Sunday 15 November: processed in 1–2 business days, then 4–9 business days in transit
+  assert.equal(arrivalRange("2026-11-15", { min: 4, max: 9 }), "Nov 20 – Nov 30");
+  // Ordered on the Friday before: the weekend isn't counted, so the dates are the same
+  assert.equal(arrivalRange("2026-11-13", { min: 4, max: 9 }), "Nov 20 – Nov 30");
+  assert.equal(arrivalRange("2026-12-28", { min: 4, max: 7 }), "Jan 4 – Jan 8", "across the new year");
+  assert.equal(arrivalRange("not a date", { min: 4, max: 9 }), null);
+  // 03:30 UTC is still the evening before in the store's time zone
+  assert.equal(storeToday(new Date("2026-11-15T03:30:00Z")), "2026-11-14");
 });

@@ -71,7 +71,7 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
     <div className="container px-4 py-12">
       <div className="mx-auto max-w-3xl space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="font-serif text-3xl font-medium">
             {t("account.orders.title")}
           </h1>
           <p className="mt-1 text-muted-foreground">
@@ -93,7 +93,7 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
             {order.review?.state === "open" && (
               <Link
                 href={order.review.href}
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-ink transition hover:bg-brand/90"
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-bold text-brand-foreground transition hover:bg-brand/90"
               >
                 {t("account.orders.writeReview")}
               </Link>
@@ -160,7 +160,7 @@ export function AccountOrdersListClient({ orders }: AccountOrdersListClientProps
                         {order.review?.state === "open" && (
                           <Link
                             href={order.review.href}
-                            className="hidden h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-brand px-3 text-xs font-bold text-ink transition hover:bg-brand/90 sm:inline-flex"
+                            className="hidden h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-brand px-3 text-xs font-bold text-brand-foreground transition hover:bg-brand/90 sm:inline-flex"
                           >
                             <Star className="size-3.5" aria-hidden="true" />
                             {t("account.orders.writeReview")}

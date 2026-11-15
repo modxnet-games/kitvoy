@@ -233,8 +233,8 @@ export function useExpressCompletion({ items, cartKey, sessionToken, host, onClo
   });
 
   const phonePrompt = phoneFor ? (
-    <form onSubmit={submitPhone} noValidate className="rounded-xl border border-[#e7e5df] bg-[#faf9f6] p-4" aria-busy={confirming} data-paypal-express-phone>
-      <label htmlFor="express-paypal-phone" className="block text-sm font-medium leading-snug text-[#171918]">
+    <form onSubmit={submitPhone} noValidate className="rounded-xl border border-[#e6e0d2] bg-[#fbf8f1] p-4" aria-busy={confirming} data-paypal-express-phone>
+      <label htmlFor="express-paypal-phone" className="block text-sm font-medium leading-snug text-[#0f2a23]">
         {t("checkout.expressPaypalPhone")}
       </label>
       <input
@@ -326,8 +326,8 @@ function ExpressButton({ items, cartKey, sessionToken, countries, host, onStatus
       {(status === "loading" || (confirming && !needsPhone)) && (
         <div
           className={cn(
-            "absolute inset-x-0 top-0 z-10 flex h-13 items-center justify-center gap-2 rounded-xl text-sm font-medium text-[#666a67]",
-            confirming ? "bg-white" : "pointer-events-none border border-[#eeece6] bg-[#f6f5f1] motion-safe:animate-pulse",
+            "absolute inset-x-0 top-0 z-10 flex h-13 items-center justify-center gap-2 rounded-xl text-sm font-medium text-[#5b6b64]",
+            confirming ? "bg-white" : "pointer-events-none border border-[#f3eee2] bg-[#f7f3ea] motion-safe:animate-pulse",
           )}
           role="status"
           aria-label={confirming ? undefined : t("checkout.expressLoading")}

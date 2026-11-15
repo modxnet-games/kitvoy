@@ -17,7 +17,7 @@ export function RegisterPageClient({ redirectUrl }: RegisterPageClientProps) {
     <div className="container flex min-h-[60vh] items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="font-serif text-3xl font-medium">
             {t("auth.register.title")}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -38,7 +38,7 @@ export function RegisterPageClient({ redirectUrl }: RegisterPageClientProps) {
         <RegisterForm redirectUrl={redirectUrl} />
         <p className="text-center text-sm text-muted-foreground">
           {t("auth.register.hasAccount")}{" "}
-          <Link href={loginHref} className="font-medium text-[#a83d10] hover:underline">
+          <Link href={loginHref} className="font-medium text-[#467253] hover:underline">
             {t("auth.register.loginLink")}
           </Link>
         </p>

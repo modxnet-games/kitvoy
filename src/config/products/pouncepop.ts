@@ -24,16 +24,33 @@ import type { ProductContent } from "./types";
  * Still not stated anywhere, because nobody has given a figure: battery life,
  * charging time, noise level, any waterproof rating or certification.
  *
- * Standing rules for every product page: no strike-through or "was" prices,
- * no invented reviews, ratings or customer counts, no countdowns or stock
- * warnings, no competitor names, and American English.
+ * Standing rules for every product page: no invented "was" prices (a pack may
+ * show the real cost of its balls bought singly, struck through, and nothing
+ * else), no invented reviews, ratings or customer counts, no countdowns or
+ * stock warnings, no competitor names, and American English.
+ *
+ * The before/after pair (before.webp, after.webp) is one staged living-room
+ * scene made for the page on 2026-11-15; originals in
+ * ad-production/petball/flow-v3.
  */
 const base = "/products/pouncepop";
 
 export const pouncepop: ProductContent = {
   slug: "pouncepop",
   name: "PouncePop Smart Interactive Dog & Cat Ball",
-  eyebrow: "PouncePop Smart Interactive Dog & Cat Ball",
+  eyebrow: "Smart Interactive Dog & Cat Ball",
+  tagline: "You work. They play. Nobody feels guilty.",
+  description: "A smart ball that rolls, bounces and reverses off furniture by itself, so your dog or cat stays happily busy.",
+  // The owner's six spec points, one line each
+  features: [
+    "Smart obstacle avoidance: it reverses when it meets a wall or furniture",
+    "Two play modes: an energetic bounce and an erratic roll",
+    "Wakes at a touch, then rests on standby to save battery",
+    "An LED light ring that is easy to follow across the floor",
+    "A durable, bite-resistant, pet-safe shell",
+    "USB-C fast recharging, with the charging cable in the box",
+  ],
+  trust: { icon: "paw", label: "Bite-Resistant Pet-Safe Shell" },
   headline: "You work. They play. Nobody feels guilty.",
   subheadline:
     "That look when you open the laptop? PouncePop answers it. A smart ball that rolls, bounces and reverses off furniture by itself, so your dog or cat stays happily busy.",
@@ -45,10 +62,10 @@ export const pouncepop: ProductContent = {
   ],
   // Five images at most: the hero, the chase, smart motion, the shell and the box
   gallery: [
-    { src: `${base}/hero.webp`, alt: "PouncePop smart ball in orange with its LED light ring glowing", label: "PouncePop" },
+    { src: `${base}/hero.webp`, alt: "PouncePop smart ball in orange with its LED light ring glowing", label: "PouncePop", badge: { icon: "ring", title: "Plays by Itself", sub: "Rolls, bounces and reverses" } },
     { src: `${base}/action-dog-cat.webp`, alt: "A Corgi puppy and a cat chasing the glowing PouncePop ball across a living-room floor", label: "The chase" },
-    { src: `${base}/smart-motion.webp`, alt: "The PouncePop ball bouncing back off furniture and rolling away in a new direction", label: "Smart motion" },
-    { src: `${base}/shell-detail.webp`, alt: "Close-up of the PouncePop's textured bite-resistant shell and LED light ring", label: "Shell & LED" },
+    { src: `${base}/smart-motion.webp`, alt: "The PouncePop ball bouncing back off furniture and rolling away in a new direction", label: "Smart motion", badge: { icon: "reverse", title: "Smart Obstacle Avoidance", sub: "Reverses off walls and furniture" } },
+    { src: `${base}/shell-detail.webp`, alt: "Close-up of the PouncePop's textured bite-resistant shell and LED light ring", label: "Shell & LED", badge: { icon: "shield", title: "Bite-Resistant Shell", sub: "Durable and pet-safe" } },
     { src: `${base}/in-the-box.webp`, alt: "What's in the box: one PouncePop smart ball and one USB-C charging cable", label: "In the box" },
   ],
   // Stills stand in until real clips of the product are filmed; set `src` to bind one
@@ -74,6 +91,18 @@ export const pouncepop: ProductContent = {
       { icon: "play", title: "Let them chase", text: "It bounces, rolls and reverses off walls and furniture, then rests on standby until the next nudge." },
     ],
   },
+  transformation: {
+    eyebrow: "The difference",
+    heading: "From bored to busy.",
+    lede: "The same living room, the same two pets. A ball that rolls and bounces by itself turns a slow afternoon into a chase across the floor.",
+    before: { src: `${base}/before.webp`, alt: "A Corgi puppy lying flat on the living-room floor beside a kitten, with nothing to do" },
+    after: { src: `${base}/after.webp`, alt: "The same puppy and kitten chasing the glowing PouncePop ball across the floor" },
+  },
+  diagram: {
+    id: "pouncepop-motion",
+    caption: "Seen from above: a nudge wakes the ball (1), it meets the sofa and reverses (2), then rests on standby until the next touch (3).",
+  },
+  closing: { heading: "One ball is fun. Two keeps the peace.", cta: "Order Your PouncePop" },
   comparison: {
     heading: "PouncePop vs. an ordinary pet toy.",
     ours: "PouncePop",
@@ -173,7 +202,7 @@ export const pouncepop: ProductContent = {
       { name: "Colors", value: "Orange, purple, blue" },
       { name: "In the box", value: "1 ball, 1 USB-C charging cable" },
     ],
-    lastModified: "2026-11-12",
+    lastModified: "2026-11-15",
   },
   merchant: {
     inFeed: false,

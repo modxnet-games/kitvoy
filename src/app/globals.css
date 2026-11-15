@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "lenis/dist/lenis.css";
 @import "./storefront.css";
+@import "./brand.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -10,6 +11,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -55,83 +57,115 @@
 }
 
 :root {
-  /* Kitvoy: white surfaces, near-black ink, orange accent */
-  --brand: #C94B16;
-  --brand-foreground: #ffffff;
-  --ink: #171918;
-  --ink-soft: #17171E;
-  --ink-deep: #050507;
-  --background: #FAF9F6;
-  --foreground: #171918;
+  /*
+   * Kitvoy brand: the three colours of the logo (public/brand/kitvoy-logo.svg)
+   * and the shades made from them. Everything on the storefront reads these.
+   */
+  --kv-forest: #1C5244;     /* logo green: buttons, prices, the top bar */
+  --kv-sage: #79A180;       /* logo sage: bullets, numerals, icons */
+  --kv-ivory: #FBF8F1;      /* logo cream: the page */
+  --kv-forest-2: #246554;   /* green, hovered */
+  --kv-ink: #0F2A23;        /* text and the darkest sections */
+  --kv-sage-deep: #467253;  /* accent text on the creams (4.8:1 or better on both) */
+  --kv-accent: #CFE3D2;     /* light sage: accents on the dark greens */
+  --kv-sage-tint: #EDF4EE;  /* soft sage fill */
+  --kv-ivory-2: #F3EEE2;    /* cream, one step down: alternate sections */
+  --kv-line: #E6E0D2;       /* hairlines */
+  --kv-muted: #5B6B64;      /* secondary text */
+  --kv-white: #FFFFFF;
+  --kv-danger: #9A3B2E;
+  --kv-ok: #2F6B4F;
+  --kv-radius: 14px;
+  --kv-shadow: 0 18px 50px -24px rgba(15, 42, 35, 0.35);
+  --kv-serif: var(--font-serif), "Cormorant Garamond", Georgia, serif;
+  --kv-sans: var(--font-sans), "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --kv-gutter: 20px;
+  --kv-maxw: 1240px;
+
+  /* The component library's names for the same palette */
+  --brand: #1C5244;
+  --brand-foreground: #FBF8F1;
+  --ink: #0F2A23;
+  --ink-soft: #17352C;
+  --ink-deep: #0A1D18;
+  --background: #FBF8F1;
+  --foreground: #0F2A23;
   --card: #FFFFFF;
-  --card-foreground: #0B0B0F;
+  --card-foreground: #0F2A23;
   --popover: #FFFFFF;
-  --popover-foreground: #0B0B0F;
-  --primary: #C94B16;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F4F4F6;
-  --secondary-foreground: #0B0B0F;
-  --muted: #F4F4F6;
-  --muted-foreground: #666A67;
-  --accent: #E56624;
-  --accent-foreground: #ffffff;
+  --popover-foreground: #0F2A23;
+  --primary: #1C5244;
+  --primary-foreground: #FBF8F1;
+  --secondary: #F3EEE2;
+  --secondary-foreground: #0F2A23;
+  --muted: #F3EEE2;
+  --muted-foreground: #5B6B64;
+  --accent: #79A180;
+  --accent-foreground: #0F2A23;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #E7E5DF;
-  --input: #C7CAC6;
-  --ring: #C94B16;
-  --chart-1: #FF7A1A;
-  --chart-2: #E5640A;
-  --chart-3: #0B0B0F;
-  --chart-4: #5A5A66;
-  --chart-5: #FFB27A;
+  --border: #E6E0D2;
+  --input: #C6CCC3;
+  --ring: #1C5244;
+  --chart-1: #1C5244;
+  --chart-2: #79A180;
+  --chart-3: #0F2A23;
+  --chart-4: #5B6B64;
+  --chart-5: #CFE3D2;
   --radius: 0.75rem;
-  --sidebar: #FAFAFB;
-  --sidebar-foreground: #0B0B0F;
-  --sidebar-primary: #0B0B0F;
+  --sidebar: #FBFAF6;
+  --sidebar-foreground: #0F2A23;
+  --sidebar-primary: #0F2A23;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F4F4F6;
-  --sidebar-accent-foreground: #0B0B0F;
-  --sidebar-border: #E6E6EB;
-  --sidebar-ring: #FF7A1A;
+  --sidebar-accent: #F3EEE2;
+  --sidebar-accent-foreground: #0F2A23;
+  --sidebar-border: #E6E0D2;
+  --sidebar-ring: #79A180;
+}
+
+/* The page gutter widens from 640px up, as on TreeAura */
+@media (min-width: 640px) {
+  :root {
+    --kv-gutter: 32px;
+  }
 }
 
 .dark {
-  --brand: #FF7A1A;
-  --brand-foreground: #0B0B0F;
-  --ink: #0B0B0F;
-  --ink-soft: #17171E;
-  --ink-deep: #050507;
-  --background: #0B0B0F;
-  --foreground: #F4F4F6;
-  --card: #17171E;
-  --card-foreground: #F4F4F6;
-  --popover: #17171E;
-  --popover-foreground: #F4F4F6;
-  --primary: #FF7A1A;
-  --primary-foreground: #0B0B0F;
-  --secondary: #22222B;
-  --secondary-foreground: #F4F4F6;
-  --muted: #22222B;
-  --muted-foreground: #A1A1AD;
-  --accent: #FF7A1A;
-  --accent-foreground: #0B0B0F;
+  --brand: #79A180;
+  --brand-foreground: #0F2A23;
+  --ink: #0A1D18;
+  --ink-soft: #17352C;
+  --ink-deep: #06140F;
+  --background: #0A1D18;
+  --foreground: #F3EEE2;
+  --card: #17352C;
+  --card-foreground: #F3EEE2;
+  --popover: #17352C;
+  --popover-foreground: #F3EEE2;
+  --primary: #79A180;
+  --primary-foreground: #0F2A23;
+  --secondary: #1F4037;
+  --secondary-foreground: #F3EEE2;
+  --muted: #1F4037;
+  --muted-foreground: #A9B8B0;
+  --accent: #79A180;
+  --accent-foreground: #0F2A23;
   --destructive: oklch(0.704 0.191 22.216);
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.15);
-  --ring: #FF7A1A;
-  --chart-1: #FF7A1A;
-  --chart-2: #FFB27A;
-  --chart-3: #E5640A;
-  --chart-4: #22222B;
-  --chart-5: #0B0B0F;
-  --sidebar: #17171E;
-  --sidebar-foreground: #F4F4F6;
-  --sidebar-primary: #FF7A1A;
-  --sidebar-primary-foreground: #0B0B0F;
-  --sidebar-accent: #22222B;
-  --sidebar-accent-foreground: #F4F4F6;
+  --ring: #79A180;
+  --chart-1: #79A180;
+  --chart-2: #CFE3D2;
+  --chart-3: #1C5244;
+  --chart-4: #1F4037;
+  --chart-5: #0A1D18;
+  --sidebar: #17352C;
+  --sidebar-foreground: #F3EEE2;
+  --sidebar-primary: #79A180;
+  --sidebar-primary-foreground: #0F2A23;
+  --sidebar-accent: #1F4037;
+  --sidebar-accent-foreground: #F3EEE2;
   --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-ring: #FF7A1A;
+  --sidebar-ring: #79A180;
 }
 
 @layer base {

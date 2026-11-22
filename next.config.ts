@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/products", destination: "/", permanent: false },
+      // One segment only: the product photos live under /products/<slug>/ in the public folder
+      { source: "/products/:slug([a-z0-9-]+)", destination: "/", permanent: false },
+      { source: "/review/:path*", destination: "/", permanent: false },
+      { source: "/feeds/:path*", destination: "/", permanent: false },
       { source: "/inflator", destination: "/", permanent: false },
       { source: "/shop", destination: "/", permanent: false },
       { source: "/shop/:slug*", destination: "/", permanent: false },

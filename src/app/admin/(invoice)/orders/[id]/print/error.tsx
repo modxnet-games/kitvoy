@@ -11,10 +11,10 @@ export default function OrderPrintError({
     <div className="min-h-screen bg-white px-4 py-8">
       <div className="mx-auto max-w-xl rounded-lg border border-destructive/30 bg-destructive/5 p-6">
         <h1 className="text-lg font-semibold text-destructive">
-          Unable to load invoice
+          Unable to load the delivery slip
         </h1>
         <p className="mt-2 text-sm text-destructive/90">
-          {error.message || "The invoice data could not be loaded."}
+          {error.message || "The order could not be loaded."}
         </p>
         <button
           type="button"

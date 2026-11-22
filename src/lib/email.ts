@@ -1,5 +1,6 @@
 import { ADMIN_SENDERS } from "@/config/mail-senders";
-import { formatPrice } from "@/lib/formatters";
+import { siteConfig } from "@/config/site";
+import { formatDateTime, formatPrice } from "@/lib/formatters";
 import nodemailer from "nodemailer";
 
 /** Recipient for new order notifications. */
@@ -62,9 +63,7 @@ export interface OrderNotificationPayload {
 }
 
 function paymentLabel(method?: string | null): string {
-  if (method === "paypal") return "PayPal";
-  if (method === "card") return "Credit / debit card (Stripe)";
-  return "Online payment";
+  return method === "cod" ? "Cash on delivery" : "Not recorded";
 }
 
 function escapeHtml(s: string): string {
@@ -225,12 +224,9 @@ export async function sendOrderNotification(
     return { sent: false, reason };
   }
 
-  const dateStr = new Date(order.createdAt).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const dateStr = formatDateTime(order.createdAt) + " (Morocco)";
 
-  const storeName = "Kitvoy";
+  const storeName = siteConfig.name;
   const storeUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const adminOrdersUrl = `${storeUrl.replace(/\/$/, "")}/admin/orders`;
   const shippingLabel = order.shippingCost === 0 ? "Free" : formatPrice(order.shippingCost);
@@ -287,7 +283,7 @@ export async function sendOrderNotification(
     await transport.sendMail({
       from: process.env.SMTP_FROM?.trim() || SMTP_USER,
       to: NOTIFY_EMAIL,
-      subject: `New order: ${order.orderReference}`,
+      subject: `New order ${order.orderReference}: ${order.customerName}, ${formatPrice(order.total)}`,
       text,
       html,
     });
@@ -311,7 +307,7 @@ export async function sendOwnerAlert(subject: string, lines: string[]): Promise<
     await transport.sendMail({
       from: { name: ADMIN_SENDERS.orders.name, address: ADMIN_SENDERS.orders.email },
       to: NOTIFY_EMAIL,
-      subject: `[Kitvoy] ${subject}`,
+      subject: `[${siteConfig.name}] ${subject}`,
       text: lines.join("\n"),
     });
   } catch (err) {
@@ -321,12 +317,12 @@ export async function sendOwnerAlert(subject: string, lines: string[]): Promise<
 
 /**
  * A layout helper for branded emails, as a table row: the logo on the logo's
- * own green. Mail apps that hold images back show the store's name in its
+ * own terracotta. Mail apps that hold images back show the store's name in its
  * place (the image's alt text, styled like the heading it stands in for).
  * Nothing sends a branded email at the moment.
  */
 export function brandHeader(storeName: string): string {
   const origin = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
-  const type = "color:#FBF8F1;font-size:20px;font-weight:800;";
-  return `<tr><td style="background:#1C5244;padding:18px 28px;${type}"><img src="${origin}/brand/kitvoy-logo-email.png" alt="${escapeHtml(storeName)}" height="48" style="display:block;border:0;outline:none;height:48px;width:auto;${type}"></td></tr>`;
+  const type = "color:#FBF5EC;font-size:20px;font-weight:800;";
+  return `<tr><td style="background:#A8443A;padding:18px 28px;${type}"><img src="${origin}/brand/chrilik-logo-email.png" alt="${escapeHtml(storeName)}" height="48" style="display:block;border:0;outline:none;height:48px;width:auto;${type}"></td></tr>`;
 }

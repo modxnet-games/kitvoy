@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { Cairo, Cormorant_Garamond, El_Messiri, Manrope } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 
@@ -10,51 +10,50 @@ import { FooterWrapper } from "@/components/layout/footer-wrapper";
 import { WhatsappFloatingWrapper } from "@/components/layout/whatsapp-floating-wrapper";
 import { MetaPixel } from "@/components/analytics/meta-pixel";
 import { META_PIXEL_ID } from "@/config/analytics";
+import { dirOf } from "@/lib/i18n";
+import { getLocale } from "@/lib/locale-server";
 
-// The storefront's type pair: Manrope for text, Cormorant Garamond for display headings
-const sans = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap" });
+// Arabic, the default language: Cairo for text, El Messiri for display headings. These are preloaded.
+const arabic = Cairo({ subsets: ["arabic", "latin"], variable: "--font-ar", display: "swap" });
+const arabicDisplay = El_Messiri({ subsets: ["arabic"], variable: "--font-ar-display", display: "swap" });
+// French: Manrope for text, Cormorant Garamond for display headings; fetched only when a page uses them
+const sans = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap", preload: false });
 const serif = Cormorant_Garamond({
   subsets: ["latin"],
   weight: ["500", "600"],
   style: ["normal", "italic"],
   variable: "--font-serif",
   display: "swap",
+  preload: false,
 });
 
 export const viewport: Viewport = {
   // Lets fixed bars pad for the iPhone home indicator via env(safe-area-inset-bottom)
   viewportFit: "cover",
-  // The logo green of the top bar, so the browser's own frame continues it
-  themeColor: "#1C5244",
+  // The logo terracotta of the top bar, so the browser's own frame continues it
+  themeColor: "#A8443A",
 };
 
-export const metadata: Metadata = {
-  title: {
-    default: siteConfig.name,
-    template: `%s | ${siteConfig.name}`,
-  },
-  description: siteConfig.description,
-  metadataBase: new URL(siteConfig.url),
-  openGraph: {
-    type: "website",
-    locale: "en_US",
-    url: siteConfig.url,
-    title: siteConfig.name,
-    description: siteConfig.description,
-    siteName: siteConfig.name,
-    images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: siteConfig.name }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: siteConfig.name,
-    description: siteConfig.description,
-    images: [siteConfig.ogImage],
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const description = siteConfig.description[locale];
+  return {
+    title: { default: siteConfig.name, template: `%s | ${siteConfig.name}` },
+    description,
+    metadataBase: new URL(siteConfig.url),
+    openGraph: {
+      type: "website",
+      locale: locale === "ar" ? "ar_MA" : "fr_MA",
+      url: siteConfig.url,
+      title: siteConfig.name,
+      description,
+      siteName: siteConfig.name,
+      images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: siteConfig.name }],
+    },
+    twitter: { card: "summary_large_image", title: siteConfig.name, description, images: [siteConfig.ogImage] },
+    robots: { index: true, follow: true },
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -62,14 +61,27 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const headerList = await headers();
-  const isAdminOrderPrint =
-    headerList.get("x-kitvoy-order-print") === "1";
+  const isAdminOrderPrint = headerList.get("x-store-order-print") === "1";
+  // The owner's dashboard is English and left to right, without the shop's header, footer or tracking
+  const isAdmin = isAdminOrderPrint || headerList.get("x-store-area") === "admin";
+  const locale = await getLocale();
+  const fonts = `${arabic.variable} ${arabicDisplay.variable} ${sans.variable} ${serif.variable}`;
+
+  if (isAdmin) {
+    return (
+      <html lang="en" dir="ltr" suppressHydrationWarning className={fonts}>
+        <body className="font-sans antialiased">
+          <LanguageProvider locale="fr">{isAdminOrderPrint ? <div className="min-h-screen bg-[#f5f5f5]">{children}</div> : children}</LanguageProvider>
+        </body>
+      </html>
+    );
+  }
 
   // The font variables sit on <html>, where the --kv-* type tokens in globals.css read them
   return (
-    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${serif.variable}`}>
+    <html lang={locale} dir={dirOf(locale)} suppressHydrationWarning className={fonts}>
       <body className="font-sans antialiased">
-        {!isAdminOrderPrint && META_PIXEL_ID && (
+        {META_PIXEL_ID && (
           <>
             <MetaPixel />
             {/* Meta Pixel fallback for browsers without JavaScript */}
@@ -79,17 +91,13 @@ export default async function RootLayout({
             </noscript>
           </>
         )}
-        <LanguageProvider>
-          {isAdminOrderPrint ? (
-            <div className="min-h-screen bg-[#f5f5f5]">{children}</div>
-          ) : (
-            <div className="relative flex min-h-screen flex-col">
-              <NavbarWrapper />
-              <main id="main-content" className="flex-1">{children}</main>
-              <FooterWrapper />
-              <WhatsappFloatingWrapper />
-            </div>
-          )}
+        <LanguageProvider locale={locale}>
+          <div className="relative flex min-h-screen flex-col">
+            <NavbarWrapper />
+            <main id="main-content" className="flex-1">{children}</main>
+            <FooterWrapper />
+            <WhatsappFloatingWrapper />
+          </div>
         </LanguageProvider>
       </body>
     </html>

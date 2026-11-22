@@ -1,251 +1,289 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, ChevronDown, ShoppingBag } from "lucide-react";
 
+import { getCatalogProduct, getCatalogVariant, variantLabel } from "@/config/catalog";
 import { useLanguage } from "@/contexts/language-context";
-import { getShippingForItems, useCartStore } from "@/store/cart-store";
-import { countriesForCart, getCatalogProduct, type CountryCode } from "@/config/catalog";
-import { Breadcrumbs, EmptyState } from "@/components/storefront";
-import { CheckoutForm, OrderSummary } from "@/components/checkout";
-import type { CheckoutFormData } from "@/components/checkout";
-import { placeOrder } from "@/lib/client/place-order";
-import { logCheckoutEvent } from "@/lib/client/checkout-log";
-import { clearCheckoutRecord, readCheckoutRecord, saveCheckoutDraft, type CheckoutDraft } from "@/lib/client/checkout-storage";
-import { isCountryCode } from "@/lib/us-address";
-import { useMounted } from "@/hooks/use-mounted";
-import { CheckoutSkeleton } from "@/components/checkout/checkout-skeleton";
-import { formatPrice } from "@/lib/formatters";
 import { toContents, trackInitiateCheckout, trackPurchase } from "@/lib/analytics/meta-pixel";
-import { cn } from "@/lib/utils";
+import { CHECKOUT_FIELDS, EMPTY_DETAILS, readCheckoutDetails, validateCheckoutDetails, type CheckoutDetails, type CheckoutField } from "@/lib/checkout-details";
+import { logCheckoutEvent } from "@/lib/client/checkout-log";
+import { placeOrder, rememberPlacedOrder } from "@/lib/client/place-order";
+import { formatPrice } from "@/lib/formatters";
+import { CITIES, parseMoroccanPhone } from "@/lib/morocco";
+import { cartLineSavings, cartLineTotals, getShippingForItems, lineKey, productQuantity, useCartStore } from "@/store/cart-store";
+import { useMounted } from "@/hooks/use-mounted";
+import { CodBadge } from "@/components/product/trust";
+import { ProductLineImage } from "@/components/storefront/product-line-image";
 
-interface CheckoutClientProps {
-  /** Where the visitor is browsing from (Cloudflare's CF-IPCountry header), to pre-select the shipping country */
-  visitorCountry?: string | null;
-}
-
-const DRAFT_SAVE_DELAY_MS = 400;
-
-/** Cart → Details, with the finished step ticked and the current one in brand color. */
-function Steps() {
-  const { t } = useLanguage();
-  const steps = [t("checkout.stepCart"), t("checkout.stepDetails")];
-  const current = 1;
-  return (
-    <nav aria-label="Checkout progress" className="checkout-progress mt-4">
-      <ol className="flex items-center gap-2 text-sm sm:gap-3">
-        {steps.map((label, i) => {
-          const done = i < current;
-          const active = i === current;
-          const circle = cn(
-            "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors duration-200",
-            done && "bg-[#2f7d4f] text-white",
-            active && "bg-[#1c5244] text-white",
-            !done && !active && "border border-[#d8d1c0] bg-white text-[#5b6b64]",
-          );
-          const text = cn("font-medium", active ? "text-[#0f2a23]" : "text-[#5b6b64]");
-          return (
-            <li key={label} className="flex items-center gap-2 sm:gap-3" aria-current={active ? "step" : undefined}>
-              {i === 0 ? (
-                <Link href="/cart" className="group flex items-center gap-2 rounded-md transition-colors duration-200 hover:text-[#0f2a23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1c5244]/40">
-                  <span className={circle}>{done ? <Check className="size-3.5" aria-hidden="true" /> : i + 1}</span>
-                  <span className={cn(text, "group-hover:text-[#0f2a23]")}>{label}</span>
-                </Link>
-              ) : (
-                <>
-                  <span className={circle}>{done ? <Check className="size-3.5" aria-hidden="true" /> : i + 1}</span>
-                  <span className={text}>{label}</span>
-                </>
-              )}
-              {i < steps.length - 1 && <span className="h-px w-6 bg-[#d8d1c0] sm:w-10" aria-hidden="true" />}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
-
-/**
- * One step: the details form. Submitting it saves the order (POST /api/orders),
- * empties the cart and goes to the confirmation page. What is typed is kept in
- * local storage until then, so a reload doesn't wipe the form.
+/*
+ * The cash-on-delivery order form: name, phone, city and address beside the
+ * order summary. Nothing is paid here; the button places the order and the
+ * store calls back to confirm it. What is typed survives a reload (kept in the
+ * tab's session storage until the order is placed).
  */
-export function CheckoutClient({ visitorCountry = null }: CheckoutClientProps) {
-  const { t } = useLanguage();
+
+const DRAFT_KEY = "chrilik-checkout-draft";
+const OTHER_CITY = "__other__";
+
+function readDraft(): CheckoutDetails {
+  try {
+    return readCheckoutDetails(JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "{}"));
+  } catch {
+    return EMPTY_DETAILS;
+  }
+}
+
+export function CheckoutClient() {
+  const { t, m, locale } = useLanguage();
   const router = useRouter();
   const mounted = useMounted();
   const items = useCartStore((s) => s.items);
+  const refreshCatalog = useCartStore((s) => s.refreshCatalog);
   const clearCart = useCartStore((s) => s.clearCart);
-  const subtotal = useCartStore((s) => s.getSubtotal());
-  // Details typed on an earlier visit to this page
-  const [draft] = useState<CheckoutDraft | null>(() => (typeof window === "undefined" ? null : (readCheckoutRecord()?.draft ?? null)));
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // The same lock as `isSubmitting`, readable inside a submit handler before React has drawn the page again
-  const submitting = useRef(false);
-  const errorRef = useRef<HTMLDivElement>(null);
+
+  // What was typed before a reload comes back. The form is not rendered until the page has mounted
+  // (the placeholder below), so starting from the tab's storage cannot differ from the server's HTML
+  const [details, setDetails] = useState<CheckoutDetails>(readDraft);
+  // The city select offers the largest cities; "another city" opens a text field
+  const [cityChoice, setCityChoice] = useState(() => {
+    const { city } = readDraft();
+    return city ? (CITIES.some((c) => c.fr === city) ? city : OTHER_CITY) : "";
+  });
+  const [website, setWebsite] = useState("");
+  const [errors, setErrors] = useState<Partial<Record<CheckoutField, string>>>({});
+  const [failure, setFailure] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const placed = useRef(false);
+  const opened = useRef(false);
+  const fieldRefs = useRef<Partial<Record<CheckoutField, HTMLElement | null>>>({});
+  const money = (amount: number) => formatPrice(amount, locale);
 
   useEffect(() => {
-    if (error) errorRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [error]);
+    if (!mounted || placed.current) return;
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(details));
+    } catch {
+      // Private mode: the form simply starts empty after a reload
+    }
+  }, [details, mounted]);
 
-  // What is typed is saved as a draft until the order exists
-  const draftTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pendingDraft = useRef<CheckoutFormData | null>(null);
-  const flushDraft = useCallback(() => {
-    clearTimeout(draftTimer.current);
-    if (pendingDraft.current) saveCheckoutDraft(pendingDraft.current);
-    pendingDraft.current = null;
-  }, []);
-  const handleDraftChange = useCallback(
-    (values: CheckoutFormData) => {
-      pendingDraft.current = values;
-      clearTimeout(draftTimer.current);
-      draftTimer.current = setTimeout(flushDraft, DRAFT_SAVE_DELAY_MS);
-    },
-    [flushDraft],
-  );
+  // Current prices and stock, so the total shown is the total the server will confirm
+  const ids = [...new Set(items.map((i) => i.product.id))].sort().join(",");
   useEffect(() => {
-    // An in-app browser can discard the page the moment the app goes to the background
-    const onHide = () => {
-      if (document.visibilityState === "hidden") flushDraft();
-    };
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", flushDraft);
+    if (!ids) return;
+    let active = true;
+    fetch("/api/cart/quote?ids=" + encodeURIComponent(ids), { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((products) => {
+        if (active && Array.isArray(products)) refreshCatalog(products);
+      })
+      .catch(() => {});
     return () => {
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", flushDraft);
-      flushDraft();
+      active = false;
     };
-  }, [flushDraft]);
+  }, [ids, refreshCatalog]);
 
-  // The checkout log: opened once per page load
-  const openedLogged = useRef(false);
-  const hasItems = items.length > 0;
+  const lineTotals = cartLineTotals(items);
+  const lineSavings = cartLineSavings(items);
+  const subtotal = Math.round(lineTotals.reduce((sum, v) => sum + v * 100, 0)) / 100;
+  const savings = Math.round(lineSavings.reduce((sum, v) => sum + v * 100, 0)) / 100;
+  const shipping = getShippingForItems(items);
+  const total = subtotal + shipping;
+  const stockIssue = items.some((item) => item.product.stock < 1 || productQuantity(items, item.product.id) > item.product.stock);
+
   useEffect(() => {
-    if (!mounted || !hasItems || openedLogged.current) return;
-    openedLogged.current = true;
-    logCheckoutEvent("checkout_opened", { step: 1, code: draft ? "draft" : undefined });
-  }, [mounted, hasItems, draft]);
+    if (!mounted || opened.current || items.length === 0) return;
+    opened.current = true;
+    logCheckoutEvent("checkout_opened", { step: 1 });
+    trackInitiateCheckout(items, total);
+  }, [mounted, items, total]);
 
-  const handleDetails = async (data: CheckoutFormData) => {
-    if (submitting.current) return;
-    setError(null);
-    submitting.current = true;
-    setIsSubmitting(true);
-    const result = await placeOrder(data, items);
+  const set = (field: CheckoutField, value: string) => {
+    setDetails((current) => ({ ...current, [field]: value }));
+    if (errors[field]) setErrors((current) => ({ ...current, [field]: undefined }));
+  };
 
-    if (!result.ok) {
-      submitting.current = false;
-      setIsSubmitting(false);
-      setError(t(result.errorKey));
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (sending) return;
+    const clean = readCheckoutDetails(details);
+    const found = validateCheckoutDetails(clean);
+    const first = CHECKOUT_FIELDS.find((field) => found[field]);
+    setErrors(found);
+    setFailure(null);
+    if (first) {
+      logCheckoutEvent("order_invalid", { step: 1, code: first });
+      fieldRefs.current[first]?.focus();
       return;
     }
 
-    // The order exists: nothing about this checkout stays in the browser
-    pendingDraft.current = null;
-    clearTimeout(draftTimer.current);
-    clearCheckoutRecord();
-    logCheckoutEvent("details_saved", { ref: result.orderReference, step: 1 });
-    // Meta's events for the order, each once per order, with the order reference as their event_id
-    trackInitiateCheckout(result.orderReference, items, result.totals.total);
+    setSending(true);
+    const started = Date.now();
+    logCheckoutEvent("order_submitted", { step: 1 });
+    const result = await placeOrder(clean, locale, items, website);
+    if (!result.ok) {
+      setSending(false);
+      logCheckoutEvent("order_failed", { step: 1, code: result.errorKey, ms: Date.now() - started });
+      if (result.fields) setErrors(result.fields);
+      setFailure(t(result.errorKey));
+      return;
+    }
+
+    placed.current = true;
+    logCheckoutEvent("order_placed", { ref: result.orderReference, step: 2, ms: Date.now() - started });
     trackPurchase({ orderReference: result.orderReference, value: result.totals.total, contents: toContents(items) });
+    rememberPlacedOrder({ reference: result.orderReference, name: clean.fullName, phone: parseMoroccanPhone(clean.phone)?.national ?? clean.phone, total: result.totals.total });
+    try {
+      sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // Nothing to clear
+    }
+    router.replace(`/checkout/success?ref=${encodeURIComponent(result.orderReference)}`);
     clearCart();
-    router.push(`/checkout/success?ref=${encodeURIComponent(result.orderReference)}`);
-  };
+  }
 
-  if (!mounted) return <CheckoutSkeleton />;
-
-  if (items.length === 0) {
+  if (!mounted) {
     return (
-      <div className="container mx-auto px-4 py-12 md:py-16">
-        <Breadcrumbs
-          items={[{ label: t("cart.title"), href: "/cart" }, { label: t("checkout.title") }]}
-          className="mb-8"
-        />
-        <EmptyState
-          icon={ShoppingBag}
-          title={t("empty.checkoutTitle")}
-          description={t("empty.checkoutDescription")}
-          action={{ label: t("empty.continueShopping"), href: "/" }}
-        />
+      <div className="kv-checkout kv-wrap" aria-busy="true">
+        <p className="kv-checkout-loading" role="status">{m.common.loading}</p>
       </div>
     );
   }
 
-  // The address can only be in a country every item in the cart ships to
-  const shipCountries = countriesForCart(items.map((i) => i.product.slug));
-  const deliveryDays = Object.fromEntries(
-    shipCountries.map((code) => {
-      const quotes = items.flatMap((i) => { const q = getCatalogProduct(i.product.slug)?.shipping[code]; return q ? [q.days] : []; });
-      return [code, quotes.length ? { min: Math.max(...quotes.map((q) => q.min)), max: Math.max(...quotes.map((q) => q.max)) } : undefined];
-    }),
-  ) as Partial<Record<CountryCode, { min: number; max: number }>>;
-  const itemCount = items.reduce((n, i) => n + i.quantity, 0);
-  const displayTotal = subtotal + getShippingForItems(items);
-  const saved = draft ?? {};
-  const formDefaults: Partial<CheckoutFormData> = { ...saved, country: isCountryCode(saved.country) ? saved.country : undefined };
+  if (items.length === 0) {
+    // After the order is placed the cart is emptied while the thank-you page loads, and `sending` is
+    // still on (only a refusal turns it off): show nothing rather than "empty"
+    if (sending) return <div className="kv-checkout kv-wrap" aria-busy="true" />;
+    return (
+      <div className="kv-checkout kv-wrap">
+        <div className="kv-checkout-empty">
+          <h1 className="kv-display">{m.checkout.emptyTitle}</h1>
+          <Link className="kv-btn kv-btn-primary" href="/">{m.checkout.emptyCta}</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const errorCount = CHECKOUT_FIELDS.filter((field) => errors[field]).length;
+  const field = (name: CheckoutField) => ({
+    id: `co-${name}`,
+    "aria-invalid": errors[name] ? true : undefined,
+    "aria-describedby": errors[name] ? `co-${name}-error` : name === "phone" ? "co-phone-hint" : undefined,
+  });
+  const problem = (name: CheckoutField) => errors[name] && <p className="kv-field-error" id={`co-${name}-error`}>{t(errors[name]!)}</p>;
 
   return (
-    <div className="store-container checkout-page py-8 md:py-12">
-      <header>
-        <h1 className="font-serif text-4xl font-medium text-[#0f2a23] sm:text-5xl">{t("checkout.title")}</h1>
-        <Steps />
-      </header>
+    <div className="kv-checkout kv-wrap">
+      <ol className="kv-checkout-steps" aria-label={m.checkout.title}>
+        <li><Link href="/cart">{m.checkout.stepCart}</Link></li>
+        <li aria-current="step">{m.checkout.stepDetails}</li>
+        <li>{m.checkout.stepDone}</li>
+      </ol>
+      <h1 className="kv-display kv-checkout-title">{m.checkout.title}</h1>
+      <p className="kv-checkout-intro">{m.checkout.intro}</p>
 
-      {error && (
-        <div ref={errorRef} role="alert" className="mt-6 flex items-start gap-3 rounded-xl border border-[#f1c7c0] bg-[#fdf3f1] px-4 py-3.5 text-sm font-medium text-[#8f2a1f]">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <p>{error}</p>
-        </div>
-      )}
+      <div className="kv-checkout-grid">
+        <form className="kv-checkout-form" onSubmit={submit} noValidate>
+          <h2>{m.checkout.details}</h2>
+          {errorCount > 0 && <p className="kv-checkout-alert" role="alert">{t("checkout.fixErrors", { count: errorCount })}</p>}
+          {failure && <p className="kv-checkout-alert" role="alert">{failure}</p>}
 
-      {/* Phones: the order folds into one line with the total; tap to see the items */}
-      <details className="group mt-6 rounded-2xl border border-[#e6e0d2] bg-white shadow-[0_1px_2px_rgba(15, 42, 35,0.04)] lg:hidden">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 text-sm transition-colors duration-200 hover:bg-[#fbf8f1] [&::-webkit-details-marker]:hidden">
-          <span className="flex items-center gap-2 font-medium text-[#0f2a23]">
-            <ShoppingBag className="size-4 text-[#467253]" aria-hidden="true" />
-            {t("cart.orderSummary")}
-            <span className="text-[#5b6b64]">· {itemCount} {itemCount === 1 ? "item" : "items"}</span>
-            <ChevronDown className="size-4 text-[#5b6b64] transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
-          </span>
-          <strong className="text-base font-semibold text-[#0f2a23]">{formatPrice(displayTotal)}</strong>
-        </summary>
-        <div className="border-t border-[#f3eee2] px-5 py-5">
-          <OrderSummary embedded />
-        </div>
-      </details>
-
-      <div className="mt-6 grid gap-8 lg:mt-8 lg:grid-cols-12 lg:items-start lg:gap-10">
-        <div className="min-w-0 lg:col-span-7">
-          <div className="rounded-2xl border border-[#e6e0d2] bg-white p-5 shadow-[0_1px_2px_rgba(15, 42, 35,0.04)] sm:p-8">
-            <CheckoutForm
-              onSubmit={handleDetails}
-              onDraftChange={handleDraftChange}
-              isSubmitting={isSubmitting}
-              initialValues={formDefaults}
-              countries={shipCountries}
-              visitorCountry={visitorCountry}
-              deliveryDays={deliveryDays}
-            />
+          <div className="kv-field">
+            <label htmlFor="co-fullName">{m.checkout.fullName}</label>
+            <input {...field("fullName")} ref={(el) => { fieldRefs.current.fullName = el; }} type="text" name="name" autoComplete="name" enterKeyHint="next" placeholder={m.checkout.fullNamePlaceholder} value={details.fullName} onChange={(e) => set("fullName", e.target.value)} />
+            {problem("fullName")}
           </div>
-        </div>
 
-        <aside className="hidden lg:col-span-5 lg:block">
-          <div className="sticky top-24">
-            <OrderSummary />
+          <div className="kv-field">
+            <label htmlFor="co-phone">{m.checkout.phone}</label>
+            <input {...field("phone")} ref={(el) => { fieldRefs.current.phone = el; }} type="tel" name="tel" inputMode="tel" autoComplete="tel" dir="ltr" enterKeyHint="next" placeholder={m.checkout.phonePlaceholder} value={details.phone} onChange={(e) => set("phone", e.target.value)} />
+            {problem("phone") || <p className="kv-field-hint" id="co-phone-hint">{m.checkout.phoneHint}</p>}
           </div>
+
+          <div className="kv-field">
+            <label htmlFor="co-city">{m.checkout.city}</label>
+            <select
+              {...field("city")}
+              ref={(el) => { fieldRefs.current.city = el; }}
+              name="city"
+              autoComplete="address-level2"
+              value={cityChoice}
+              onChange={(e) => {
+                setCityChoice(e.target.value);
+                set("city", e.target.value === OTHER_CITY ? "" : e.target.value);
+              }}
+            >
+              <option value="" disabled>{m.checkout.cityPlaceholder}</option>
+              {CITIES.map((city) => (
+                <option key={city.fr} value={city.fr}>{city[locale]}</option>
+              ))}
+              <option value={OTHER_CITY}>{m.checkout.cityOther}</option>
+            </select>
+            {cityChoice === OTHER_CITY && (
+              <input className="kv-field-extra" type="text" aria-label={m.checkout.cityOtherLabel} placeholder={m.checkout.cityOtherLabel} autoComplete="address-level2" value={details.city} onChange={(e) => set("city", e.target.value)} />
+            )}
+            {problem("city")}
+          </div>
+
+          <div className="kv-field">
+            <label htmlFor="co-address">{m.checkout.address}</label>
+            <textarea {...field("address")} ref={(el) => { fieldRefs.current.address = el; }} name="address" rows={2} autoComplete="street-address" placeholder={m.checkout.addressPlaceholder} value={details.address} onChange={(e) => set("address", e.target.value)} />
+            {problem("address")}
+          </div>
+
+          {/* Not for people: hidden from sight, the keyboard and screen readers */}
+          <div className="kv-hp" aria-hidden="true">
+            <label htmlFor="co-website">Website</label>
+            <input id="co-website" type="text" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+          </div>
+
+          <button type="submit" className="kv-btn kv-btn-primary kv-btn-block kv-checkout-submit" disabled={sending || stockIssue}>
+            {sending ? m.checkout.submitting : t("checkout.submit", { price: money(total) })}
+          </button>
+          <CodBadge title={m.product.codTitle} sub={m.checkout.codNote} className="kv-cod-checkout" />
+        </form>
+
+        <aside className="kv-checkout-summary" aria-labelledby="co-summary">
+          <div className="kv-checkout-summary-head">
+            <h2 id="co-summary">{m.checkout.summary}</h2>
+            <Link href="/cart" className="kv-checkout-edit">{m.checkout.edit}</Link>
+          </div>
+          <ul className="kv-checkout-lines">
+            {items.map((item, index) => {
+              const variant = getCatalogVariant(item.product.slug, item.product.variant?.key);
+              return (
+                <li key={lineKey(item.product)}>
+                  <ProductLineImage className="kv-cart-thumb" imageUrl={item.product.images[0]} alt="" fallbackLetter="C" />
+                  <div>
+                    <strong>{getCatalogProduct(item.product.slug)?.displayName[locale] ?? item.product.name}</strong>
+                    {variant && <span>{variantLabel(variant, locale)}</span>}
+                    <span>{t("checkout.quantity", { count: item.quantity })}</span>
+                  </div>
+                  <b>{money(lineTotals[index])}</b>
+                </li>
+              );
+            })}
+          </ul>
+          <dl className="kv-checkout-sums">
+            {savings > 0 && (
+              <div className="is-saving">
+                <dt>{m.checkout.savings}</dt>
+                <dd>&minus; {money(savings)}</dd>
+              </div>
+            )}
+            <div>
+              <dt>{m.checkout.delivery}</dt>
+              <dd>{shipping === 0 ? <b className="kv-free-tag">{m.checkout.free}</b> : money(shipping)}</dd>
+            </div>
+            <div className="is-total">
+              <dt>{m.checkout.total}</dt>
+              <dd className="kv-checkout-total">{money(total)}</dd>
+            </div>
+          </dl>
         </aside>
       </div>
-
-      <p className="mt-8 text-center text-sm">
-        <Link href="/cart" className="inline-flex min-h-11 items-center text-[#5b6b64] underline-offset-4 transition-colors duration-200 hover:text-[#0f2a23] hover:underline">
-          {t("checkout.backToCart")}
-        </Link>
-      </p>
     </div>
   );
 }

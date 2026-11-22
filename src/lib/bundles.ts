@@ -3,24 +3,17 @@
  * (server) so the price a customer sees is the price they are charged.
  *
  * Each product has its own tiers (config/catalog.ts). A product bought in
- * several colours is still one bundle: the tier follows the product's total
- * quantity, not each colour's.
+ * several colours or sizes is still one pack: the tier follows the product's
+ * total quantity, not each variant's.
  */
 import { getCatalogProduct, type BundleTier } from "@/config/catalog";
 
 export type { BundleTier };
 
-/**
- * The store's original rule, which a product the catalog doesn't know still
- * gets: two are a fixed 19.99 off, three or more are 25% off each.
- */
+/** A product the catalog doesn't know has no packs: every piece costs its price. */
 const DEFAULT_RULES: { tiers: BundleTier[]; maxDiscount: number } = {
-  tiers: [
-    { quantity: 1, discount: 0, label: "Buy 1" },
-    { quantity: 2, discount: 0, amountOff: 19.99, label: "Buy 2" },
-    { quantity: 3, discount: 0.25, label: "Buy 3" },
-  ],
-  maxDiscount: 0.25,
+  tiers: [{ quantity: 1, discount: 0 }],
+  maxDiscount: 0,
 };
 
 function rulesFor(slug?: string | null): { tiers: BundleTier[]; maxDiscount: number } {

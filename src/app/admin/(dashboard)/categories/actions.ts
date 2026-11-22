@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth/admin-session";
 import {
   createCategory,
   updateCategory,
@@ -17,6 +18,7 @@ function trimSlug(s: string) {
 export async function createCategoryAction(
   formData: FormData
 ): Promise<{ error?: string }> {
+  await requireAdmin();
   const name = (formData.get("name") as string)?.trim() ?? "";
   const slug = trimSlug((formData.get("slug") as string) ?? "");
   const description = (formData.get("description") as string)?.trim() ?? "";
@@ -39,7 +41,6 @@ export async function createCategoryAction(
   revalidatePath("/admin/categories");
   revalidatePath("/admin/products");
   revalidatePath("/admin/products/new");
-  revalidatePath("/shop");
   revalidatePath("/");
   redirect("/admin/categories");
 }
@@ -47,6 +48,7 @@ export async function createCategoryAction(
 export async function updateCategoryAction(
   formData: FormData
 ): Promise<{ error?: string }> {
+  await requireAdmin();
   const categoryId = (formData.get("categoryId") as string)?.trim();
   if (!categoryId) return { error: "Category not found." };
 
@@ -75,7 +77,6 @@ export async function updateCategoryAction(
   revalidatePath("/admin/categories");
   revalidatePath(`/admin/categories/${categoryId}/edit`);
   revalidatePath("/admin/products");
-  revalidatePath("/shop");
   revalidatePath("/");
   redirect("/admin/categories");
 }
@@ -83,6 +84,7 @@ export async function updateCategoryAction(
 export async function deleteCategoryAction(
   categoryId: string
 ): Promise<{ error?: string }> {
+  await requireAdmin();
   const result = await deleteCategory(categoryId);
   if (!result.ok) {
     if (result.error === "CATEGORY_IN_USE") {
@@ -95,7 +97,6 @@ export async function deleteCategoryAction(
   }
   revalidatePath("/admin/categories");
   revalidatePath("/admin/products");
-  revalidatePath("/shop");
   revalidatePath("/");
   return {};
 }

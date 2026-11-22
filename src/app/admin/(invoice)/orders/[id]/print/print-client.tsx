@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 
 /**
- * Floating toolbar with Print + Back buttons (hidden when printing).
- * Auto-triggers print dialog only after data is rendered.
+ * The Print and Close buttons above the slip (hidden when printing).
+ * Opens the print dialog by itself once the slip and its logo are on the page.
  */
 export function OrderPrintClient({ orderId }: { orderId: string }) {
   useEffect(() => {
@@ -14,14 +14,16 @@ export function OrderPrintClient({ orderId }: { orderId: string }) {
     const triggerWhenReady = () => {
       const nameEl = document.querySelector(".ship-to .name");
       const hasRenderedData = Boolean(nameEl?.textContent?.trim());
+      // A logo still loading would print as an empty box (a logo that failed to load counts as done)
+      const imagesDone = Array.from(document.images).every((img) => img.complete);
 
-      if (hasRenderedData) {
+      if (hasRenderedData && imagesDone) {
         window.print();
         return;
       }
 
       if (attempts >= 80) {
-        console.warn("[print] invoice render timeout; print not triggered", {
+        console.warn("[print] delivery slip not ready in time; print not triggered", {
           orderId,
           attempts,
         });
@@ -39,15 +41,14 @@ export function OrderPrintClient({ orderId }: { orderId: string }) {
   }, [orderId]);
 
   return (
+    // Above the slip rather than floating over it: on a phone a floating bar hides the slip's heading
     <div
       className="no-print"
       style={{
-        position: "fixed",
-        top: 16,
-        right: 16,
-        zIndex: 100,
         display: "flex",
+        justifyContent: "flex-end",
         gap: 8,
+        padding: "12px 16px",
       }}
     >
       <button
@@ -64,11 +65,15 @@ export function OrderPrintClient({ orderId }: { orderId: string }) {
           cursor: "pointer",
         }}
       >
-        🖨️ Print / Save PDF
+        Print / Save PDF
       </button>
       <button
         type="button"
-        onClick={() => window.history.back()}
+        onClick={() => {
+          // The slip opens in its own tab: with nothing to go back to, the tab closes
+          if (window.history.length > 1) window.history.back();
+          else window.close();
+        }}
         style={{
           padding: "8px 20px",
           fontSize: 13,
@@ -80,7 +85,7 @@ export function OrderPrintClient({ orderId }: { orderId: string }) {
           cursor: "pointer",
         }}
       >
-        ← Back
+        Close
       </button>
     </div>
   );

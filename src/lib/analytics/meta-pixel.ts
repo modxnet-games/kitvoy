@@ -17,9 +17,9 @@ declare global {
     fbq?: Fbq;
     _fbq?: Fbq;
     /** Set once fbq('init') ran, whichever copy of this module ran it */
-    __kitvoyPixelInit?: boolean;
+    __storePixelInit?: boolean;
     /** The path the last PageView was sent for */
-    __kitvoyPixelPath?: string;
+    __storePixelPath?: string;
   }
   interface Navigator {
     /** Global Privacy Control: the visitor asked sites not to sell or share their data */
@@ -96,8 +96,8 @@ export const countItems = (items: TrackableItem[]) => items.reduce((n, i) => n +
 export function ensurePixel(): void {
   // No pixel configured (a local run): nothing loads and every track() is a no-op
   if (!META_PIXEL_ID) return;
-  if (typeof window === "undefined" || window.__kitvoyPixelInit) return;
-  window.__kitvoyPixelInit = true;
+  if (typeof window === "undefined" || window.__storePixelInit) return;
+  window.__storePixelInit = true;
 
   if (!window.fbq) {
     const fbq = function (...args: unknown[]) {
@@ -140,14 +140,14 @@ export function track(name: MetaEventName, params: Record<string, unknown> = {},
 
 /** One PageView per path; the client-side router changes the path without a page load. */
 export function trackPageView(pathname: string): void {
-  if (typeof window === "undefined" || window.__kitvoyPixelPath === pathname) return;
-  window.__kitvoyPixelPath = pathname;
+  if (typeof window === "undefined" || window.__storePixelPath === pathname) return;
+  window.__storePixelPath = pathname;
   track("PageView");
 }
 
 export function trackViewContent(product: { id: string; sku: string; name: string; price: number; slug?: string }): void {
   track("ViewContent", {
-    currency: "USD",
+    currency: "MAD",
     value: round2(product.price),
     content_ids: [contentId(product)],
     content_type: "product",
@@ -160,7 +160,7 @@ export function trackViewContent(product: { id: string; sku: string; name: strin
 export function trackAddToCart(items: TrackableItem[], value: number): void {
   if (items.length === 0) return;
   track("AddToCart", {
-    currency: "USD",
+    currency: "MAD",
     value: round2(value),
     content_ids: items.map((i) => contentId(i.product)),
     content_type: "product",
@@ -170,7 +170,6 @@ export function trackAddToCart(items: TrackableItem[], value: number): void {
   });
 }
 
-const CHECKOUT_KEY = "kitvoy-checkout-tracked";
 
 /** Remembers which orders this browser already counted for an event, so a reload or a restored page can't count twice. */
 function claimOnce(storageKey: string, orderReference: string): boolean {
@@ -184,45 +183,44 @@ function claimOnce(storageKey: string, orderReference: string): boolean {
   return true;
 }
 
+/** Whether this page load has already reported its checkout */
+let checkoutStarted = false;
+
 /**
- * InitiateCheckout, sent when the checkout details are saved and the order
- * exists. Its event_id is the order reference, the same id the server event
- * uses, and each order counts once per browser: saving the same checkout
- * again (reload, Edit, a retry) updates that order and sends nothing new.
+ * InitiateCheckout, sent once per page load when the order form opens with
+ * something in the cart. There is no order yet, so the event has its own
+ * random id and no server twin.
  */
-export function trackInitiateCheckout(orderReference: string, items: TrackableItem[], value: number): boolean {
+export function trackInitiateCheckout(items: TrackableItem[], value: number): boolean {
   if (typeof window === "undefined" || typeof window.fbq !== "function") return false;
-  if (items.length === 0 || !claimOnce(CHECKOUT_KEY, orderReference)) return false;
-  track(
-    "InitiateCheckout",
-    {
-      currency: "USD",
-      value: round2(value),
-      content_ids: items.map((i) => contentId(i.product)),
-      content_type: "product",
-      contents: toContents(items),
-      num_items: countItems(items),
-      ...contentCategory(items),
-    },
-    orderReference,
-  );
+  if (items.length === 0 || checkoutStarted) return false;
+  checkoutStarted = true;
+  track("InitiateCheckout", {
+    currency: "MAD",
+    value: round2(value),
+    content_ids: items.map((i) => contentId(i.product)),
+    content_type: "product",
+    contents: toContents(items),
+    num_items: countItems(items),
+    ...contentCategory(items),
+  });
   return true;
 }
 
-const PURCHASE_KEY = "kitvoy-purchase-tracked";
+const PURCHASE_KEY = "chrilik-purchase-tracked";
 
 export interface PurchaseData {
-  /** KTV-… reference: the event_id on both the browser and the server event */
+  /** The order reference: the event_id on both the browser and the server event */
   orderReference: string;
-  /** The amount actually charged, after bundle savings */
+  /** The amount due on delivery, after pack savings */
   value: number;
   contents: MetaContent[];
 }
 
 /**
- * Standard Purchase event, sent once the payment has been captured. The
+ * Standard Purchase event, sent when a cash-on-delivery order is placed. The
  * event_id is the order reference, so Meta can de-duplicate it against the
- * server-side event from the payment webhook. Once per order per browser.
+ * server-side event sent for the same order. Once per order per browser.
  */
 export function trackPurchase(p: PurchaseData): boolean {
   if (typeof window === "undefined" || typeof window.fbq !== "function") return false;
@@ -231,7 +229,7 @@ export function trackPurchase(p: PurchaseData): boolean {
   track(
     "Purchase",
     {
-      currency: "USD",
+      currency: "MAD",
       value: round2(p.value),
       content_ids: p.contents.map((c) => c.id),
       content_type: "product",

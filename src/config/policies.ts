@@ -1,35 +1,22 @@
 /**
- * Store policy terms. The policy pages, the product page's FAQ and the product
- * structured data all read these, so change a term here and every place that
- * states it follows.
+ * Store policy terms. The policy pages, the product page (trust row, FAQ) and
+ * the structured data all read these, so change a term here and every place
+ * that states it follows. The wording itself is in config/policy-content.ts.
  */
 export const storePolicies = {
-  /** Shown on every policy page; update it whenever a policy's wording changes */
-  effectiveDate: "November 12, 2026",
-  supportEmail: "support@kitvoy.com",
-  shipping: {
-    /** Business days from payment to handing the order to the carrier */
-    processingDays: { min: 1, max: 2 },
-    /** Business days in transit once shipped, for US orders; other countries are per product in config/catalog.ts */
-    deliveryDays: { min: 4, max: 9 },
-    carrier: "CJPacket",
-    destinations: "all 50 US states and Washington, DC",
-  },
-  returns: { windowDays: 30 },
-  /** Jurisdiction named in the terms of service */
-  governingLaw: "the State of New Mexico, United States",
+  /** Shown on every policy page (YYYY-MM-DD); update it whenever a policy's wording changes */
+  effectiveDate: "2026-11-22",
+  /** Free delivery everywhere in Morocco, counted from the confirmation call */
+  delivery: { hours: { min: 24, max: 72 }, free: true },
+  /** A size can be swapped within this many days of delivery, unworn */
+  exchange: { windowDays: 7 },
 } as const;
 
 export const policyLinks = [
-  { href: "/shipping", label: "Shipping policy" },
-  { href: "/returns", label: "Returns & refunds" },
-  { href: "/privacy", label: "Privacy policy" },
-  { href: "/terms", label: "Terms of service" },
+  { href: "/shipping", key: "shipping" },
+  { href: "/returns", key: "returns" },
+  { href: "/privacy", key: "privacy" },
+  { href: "/terms", key: "terms" },
 ] as const;
 
-const { processingDays: p, deliveryDays: d } = storePolicies.shipping;
-
-/** "1–2 business days" */
-export const processingText = `${p.min}–${p.max} business days`;
-/** "4–9 business days" */
-export const deliveryText = `${d.min}–${d.max} business days`;
+export type PolicyKey = (typeof policyLinks)[number]["key"];

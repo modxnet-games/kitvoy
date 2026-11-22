@@ -1,15 +1,20 @@
-import { pouncepop } from "./pouncepop";
-import type { ProductContent } from "./types";
+import type { Locale } from "@/lib/i18n";
+import { sanadi } from "./sanadi";
+import type { ProductContent, ProductEntry } from "./types";
 
-export type { DemoLoop, DiagramId, GalleryBadge, GalleryImage, IconName, ProductContent } from "./types";
+export type { GalleryBadge, GalleryImage, ProductContent, ProductEntry, SizeGuideRow } from "./types";
 
-/** Page copy for the products that use the shared product page template (/products/<slug>). */
-const contents: Record<string, ProductContent> = {
-  [pouncepop.slug]: pouncepop,
+/** Page copy for the products the store sells, by database slug. */
+const entries: Record<string, ProductEntry> = {
+  [sanadi.slug]: sanadi,
 };
 
-export function getProductContent(slug: string): ProductContent | undefined {
-  return contents[slug];
+export function getProductEntry(slug: string): ProductEntry | undefined {
+  return entries[slug];
 }
 
-export const productContents: ProductContent[] = Object.values(contents);
+export function getProductContent(slug: string, locale: Locale): ProductContent | undefined {
+  return entries[slug]?.content[locale];
+}
+
+export const productEntries: ProductEntry[] = Object.values(entries);

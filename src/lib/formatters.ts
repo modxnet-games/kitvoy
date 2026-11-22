@@ -1,25 +1,33 @@
-const usdFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+import type { Locale } from "@/lib/i18n";
 
-/** Format price in US Dollars ($) */
-export function formatPrice(price: number): string {
-  return usdFormatter.format(price);
+/**
+ * Prices are Moroccan dirhams. A whole amount is written without decimals
+ * ("199 DH", "199 درهم"); anything else keeps two. Digits are Western in both
+ * languages, as Moroccan shops write them.
+ */
+export function formatPrice(price: number, locale: Locale | "en" = "fr"): string {
+  const amount = Math.round(price * 100) / 100;
+  const [int, dec] = amount.toFixed(Number.isInteger(amount) ? 0 : 2).split(".");
+  // Thousands: a thin gap, never a comma that reads as decimals
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const number = dec ? grouped + (locale === "en" ? "." : ",") + dec : grouped;
+  if (locale === "ar") return `${number} درهم`;
+  if (locale === "en") return `${number} MAD`;
+  return `${number} DH`;
 }
 
 /**
- * Dates use one fixed timezone (US Eastern) so the server-rendered HTML and
- * the browser agree; formatting in the viewer's local zone causes hydration
+ * Dates use one fixed time zone (Morocco) so the server-rendered HTML and the
+ * browser agree; formatting in the viewer's own zone causes hydration
  * mismatches and shifts dates across midnight.
  */
-export const STORE_TIME_ZONE = "America/New_York";
+export const STORE_TIME_ZONE = "Africa/Casablanca";
 
-/** Format a date for US display (e.g. "Oct 29, 2026") */
-export function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString("en-US", {
+const DATE_LOCALE: Record<Locale | "en", string> = { ar: "ar-MA-u-nu-latn", fr: "fr-MA", en: "en-GB" };
+
+/** A date, e.g. "22 Nov 2026" in the admin, "22 nov. 2026" in French */
+export function formatDate(date: Date | string, locale: Locale | "en" = "en"): string {
+  return new Date(date).toLocaleDateString(DATE_LOCALE[locale], {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -27,15 +35,15 @@ export function formatDate(date: Date | string): string {
   });
 }
 
-/** Date and time, labeled with the zone (e.g. "Oct 29, 2026, 9:38 PM EDT") */
-export function formatDateTime(date: Date | string): string {
-  return new Date(date).toLocaleString("en-US", {
+/** Date and time in Morocco, e.g. "22 Nov 2026, 18:42" */
+export function formatDateTime(date: Date | string, locale: Locale | "en" = "en"): string {
+  return new Date(date).toLocaleString(DATE_LOCALE[locale], {
     year: "numeric",
     month: "short",
     day: "numeric",
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
     timeZone: STORE_TIME_ZONE,
-    timeZoneName: "short",
   });
 }

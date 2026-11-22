@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { isAdminAuthenticated } from "@/lib/auth/admin-session";
 
 /**
- * Standalone admin routes (invoice PDF) — auth only, no dashboard sidebar.
+ * Standalone admin routes (the delivery slip) — auth only, no dashboard sidebar.
  */
 export default async function AdminInvoiceLayout({
   children,

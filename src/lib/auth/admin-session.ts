@@ -1,5 +1,6 @@
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 export interface AdminSession {
   isAdmin: true;
@@ -46,4 +47,17 @@ export async function isAdminAuthenticated(): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+/**
+ * The first line of every admin server action.
+ *
+ * A server action is a public POST endpoint: anyone can call it directly,
+ * whatever page its form is on. The dashboard layout's redirect protects the
+ * pages, not the actions, so each action checks the session itself. Without a
+ * valid one the caller is sent to the sign-in page and the action's body never
+ * runs (redirect throws). Call it before any `try`, so nothing catches it.
+ */
+export async function requireAdmin(): Promise<void> {
+  if (!(await isAdminAuthenticated())) redirect("/admin/login");
 }

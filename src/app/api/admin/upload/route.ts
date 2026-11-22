@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminFromRequest } from "@/lib/auth/admin-jwt";
+import { isAuthorizedAdminRequest } from "@/lib/auth/admin-request";
 import {
   uploadProductImage,
   uploadHomepageImage,
@@ -9,8 +9,9 @@ import {
 const ALLOWED_TYPES = new Set(["product", "banner", "category"]);
 
 export async function POST(request: NextRequest) {
-  const admin = getAdminFromRequest(request);
-  if (!admin) {
+  // The app's token, or the dashboard session. A session is only accepted on same-origin JSON
+  // requests, which a file upload is not: the dashboard uploads through POST /api/upload
+  if (!(await isAuthorizedAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

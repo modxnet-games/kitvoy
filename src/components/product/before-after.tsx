@@ -12,8 +12,10 @@ interface Photo {
  * Two photos of one scene under a divider: the "after" photo shows to the
  * right of it. Drag anywhere on the picture, or use the arrow keys (the whole
  * picture is a range slider underneath, so it works from the keyboard too).
+ * The slider always runs left to right, in Arabic too (brand.css pins its
+ * direction), so "before" is on the left in both languages.
  */
-export function BeforeAfter({ before, after }: { before: Photo; after: Photo }) {
+export function BeforeAfter({ before, after, labels }: { before: Photo; after: Photo; labels: { before: string; after: string; drag: string; hint: string } }) {
   const [pos, setPos] = useState(50);
   const box = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
@@ -47,8 +49,8 @@ export function BeforeAfter({ before, after }: { before: Photo; after: Photo }) 
       >
         <Image src={before.src} alt={before.alt} fill sizes="(min-width: 1240px) 1200px, 100vw" />
         <Image className="kv-ba-after" src={after.src} alt={after.alt} fill sizes="(min-width: 1240px) 1200px, 100vw" />
-        <span className="kv-ba-label l">Before</span>
-        <span className="kv-ba-label r">After</span>
+        <span className="kv-ba-label l">{labels.before}</span>
+        <span className="kv-ba-label r">{labels.after}</span>
         <div className="kv-ba-handle" aria-hidden="true">
           <div className="kv-ba-knob">
             <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
@@ -63,11 +65,11 @@ export function BeforeAfter({ before, after }: { before: Photo; after: Photo }) 
           max={100}
           value={Math.round(pos)}
           onChange={(e) => setPos(Number(e.target.value))}
-          aria-label="Drag to compare before and after"
+          aria-label={labels.drag}
         />
       </div>
-      <figcaption className="kv-caption" style={{ marginTop: 10, color: "rgba(251, 248, 241, 0.6)" }}>
-        Drag the handle to compare.
+      <figcaption className="kv-caption" style={{ marginTop: 10, color: "rgba(251, 245, 236, 0.6)" }}>
+        {labels.hint}
       </figcaption>
     </figure>
   );

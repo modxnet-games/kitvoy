@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getAdminFromRequest } from "@/lib/auth/admin-jwt";
-import { getSalesOverview } from "@/lib/data/sales-overview";
+import { isAuthorizedAdminRequest } from "@/lib/auth/admin-request";
+import { getDashboardOverview } from "@/lib/data/sales-overview";
 
 /**
  * GET /api/admin/dashboard/overview
- * Sales (delivered orders) for today, this calendar week (Mon–Sun, with the
- * same days of last week for comparison) and this month. Days follow the
- * store's time zone. `month.profit` keeps its keys for the admin app, all 0.
+ * The figures of the home screen, from cash-on-delivery orders, in the store's
+ * time zone.
+ * - `cod`: what there is to do (to call, to ship, in delivery), today, this
+ *   month, the last 7 days and the newest orders.
+ * - `timeZone`, `today`, `week`, `month`: the keys an older version of the app
+ *   reads, filled from delivered orders (`month.profit` is all 0).
  */
 export async function GET(request: NextRequest) {
-  if (!getAdminFromRequest(request)) {
+  if (!(await isAuthorizedAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    return NextResponse.json(await getSalesOverview());
+    return NextResponse.json(await getDashboardOverview());
   } catch (err) {
     console.error("[admin/dashboard/overview] failed:", err);
     return NextResponse.json({ error: "Failed to load sales figures" }, { status: 500 });

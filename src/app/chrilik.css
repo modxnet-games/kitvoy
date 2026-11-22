@@ -1,0 +1,652 @@
+/*
+ * Chrilik: what the cash-on-delivery store adds to the page design in
+ * brand.css (the owner's TreeAura layout): the language switch, the size
+ * picker and size guide, the pay-on-delivery badge, the order form, the
+ * thank-you page, and the adjustments Arabic needs. Sides are written as
+ * start/end so every rule reads right in both directions.
+ */
+
+/* ---------- Header: the logo lockup and the language switch ---------- */
+.kv-header .kv-logo img {
+  height: 38px;
+  width: auto;
+}
+.kv-footer .kv-logo-stacked img {
+  height: 132px;
+  width: auto;
+}
+.kv-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--kv-line);
+  border-radius: 999px;
+  background: var(--kv-white);
+  color: var(--kv-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.kv-lang:hover {
+  border-color: var(--kv-forest);
+  color: var(--kv-forest);
+}
+.kv-lang[lang="ar"] {
+  font-family: var(--kv-sans-ar);
+}
+.kv-lang[lang="fr"] {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+.kv-gallery-main .kv-gallery-mark img {
+  height: 14px;
+}
+
+/* ---------- Arabic ---------- */
+html[lang="ar"] .kv-display,
+html[lang="ar"] .kv-buy-title {
+  line-height: 1.3;
+  font-weight: 700;
+}
+html[lang="ar"] .kv-buy-eyebrow em,
+html[lang="ar"] em {
+  font-style: normal;
+}
+html[lang="ar"] .kv-price,
+html[lang="ar"] .kv-bundle-price strong,
+html[lang="ar"] .kv-step-n {
+  font-family: var(--kv-sans-ar);
+  font-weight: 700;
+}
+/* The comparison slider always runs left to right: its handle is positioned from the left edge */
+.kv-ba {
+  direction: ltr;
+}
+
+/* ---------- Size picker ---------- */
+.kv-size-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  scroll-margin-top: 90px;
+}
+.kv-size-guide-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--kv-sage-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.kv-sizes {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.kv-size {
+  min-height: 44px;
+  border: 1.5px solid var(--kv-line);
+  border-radius: 12px;
+  background: var(--kv-white);
+  color: var(--kv-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kv-size:hover {
+  border-color: var(--kv-forest);
+}
+.kv-size[aria-checked="true"] {
+  border-color: var(--kv-forest);
+  background: var(--kv-forest);
+  color: var(--kv-white);
+}
+.kv-sizes.is-missing .kv-size {
+  border-color: var(--kv-danger);
+}
+.kv-size-error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kv-danger);
+}
+.kv-colour-row {
+  flex-wrap: wrap;
+}
+.kv-colour-row .kv-moods {
+  flex: 1 1 200px;
+}
+.kv-size-select {
+  flex: 0 0 auto;
+  min-height: 40px;
+  min-width: 86px;
+  padding: 0 10px;
+  border: 1.5px solid var(--kv-line);
+  border-radius: 999px;
+  background: var(--kv-white);
+  color: var(--kv-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.kv-size-select.is-missing {
+  border-color: var(--kv-danger);
+}
+.kv-colour-name {
+  flex: 0 0 auto;
+  min-width: 52px;
+}
+
+/* ---------- Pay on delivery ---------- */
+.kv-cod {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #CBE3D6;
+  border-radius: 12px;
+  background: #EEF7F1;
+  color: #1F5239;
+}
+.kv-cod-ic {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--kv-ok);
+  color: var(--kv-white);
+}
+.kv-cod-text {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.kv-cod-text strong {
+  font-size: 14.5px;
+}
+.kv-cod-text small {
+  font-size: 12.5px;
+  opacity: 0.9;
+}
+.kv-cod-pdp {
+  margin-bottom: 14px;
+}
+.kv-cod-cart {
+  margin-top: 12px;
+}
+.kv-cod-checkout {
+  margin-top: 14px;
+}
+
+/* ---------- Size guide ---------- */
+.kv-size-guide {
+  background: var(--kv-white);
+  scroll-margin-top: 74px;
+}
+.kv-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--kv-line);
+  border-radius: 14px;
+  background: var(--kv-white);
+}
+.kv-size-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+.kv-size-table th,
+.kv-size-table td {
+  padding: 12px 16px;
+  text-align: start;
+  border-bottom: 1px solid var(--kv-line);
+}
+.kv-size-table tr:last-child th,
+.kv-size-table tr:last-child td {
+  border-bottom: 0;
+}
+.kv-size-table thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kv-muted);
+  background: var(--kv-ivory);
+}
+.kv-size-table tbody th {
+  width: 96px;
+  font-weight: 700;
+  color: var(--kv-forest);
+  white-space: nowrap;
+}
+.kv-size-table-bands th {
+  width: auto;
+  min-width: 150px;
+  color: var(--kv-ink);
+  font-weight: 600;
+  font-size: 13px;
+}
+.kv-size-table-bands td {
+  text-align: center;
+  white-space: nowrap;
+  padding-inline: 10px;
+}
+.kv-size-tip {
+  margin: 14px 0 0;
+  font-weight: 600;
+  color: var(--kv-sage-deep);
+}
+.kv-size-sub {
+  margin: 30px 0 6px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.kv-size-text {
+  margin: 0 0 14px;
+  color: var(--kv-muted);
+}
+
+/* ---------- Closing band ---------- */
+.kv-product-logo {
+  display: block;
+  width: auto;
+  height: 62px;
+  margin: 0 auto 6px;
+}
+
+/* ---------- Order form ---------- */
+.kv-checkout {
+  padding-block: 28px 72px;
+  font-family: var(--kv-sans);
+  color: var(--kv-ink);
+}
+.kv-checkout-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--kv-muted);
+}
+.kv-checkout-steps li + li::before {
+  content: "›";
+  margin-inline-end: 8px;
+  opacity: 0.6;
+}
+[dir="rtl"] .kv-checkout-steps li + li::before {
+  content: "‹";
+}
+.kv-checkout-steps [aria-current="step"] {
+  color: var(--kv-forest);
+  font-weight: 700;
+}
+.kv-checkout-steps a {
+  color: inherit;
+}
+.kv-checkout-title {
+  margin: 0 0 8px;
+  font-size: clamp(30px, 6vw, 44px);
+}
+.kv-checkout-intro {
+  max-width: 640px;
+  margin: 0 0 26px;
+  color: var(--kv-muted);
+}
+.kv-checkout-grid {
+  display: grid;
+  gap: 22px;
+}
+.kv-checkout-form,
+.kv-checkout-summary {
+  padding: 22px 18px;
+  border: 1px solid var(--kv-line);
+  border-radius: 18px;
+  background: var(--kv-white);
+}
+.kv-checkout-form h2,
+.kv-checkout-summary h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.kv-checkout-alert {
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: #FDECEA;
+  color: var(--kv-danger);
+  font-size: 14px;
+  font-weight: 600;
+}
+.kv-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.kv-field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.kv-field input,
+.kv-field select,
+.kv-field textarea {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1.5px solid #D9C9B8;
+  border-radius: 12px;
+  background: var(--kv-white);
+  color: var(--kv-ink);
+  font: inherit;
+  font-size: 16px;
+}
+.kv-field textarea {
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.kv-field input[dir="ltr"] {
+  text-align: start;
+}
+[dir="rtl"] .kv-field input[dir="ltr"] {
+  text-align: right;
+}
+.kv-field input:focus-visible,
+.kv-field select:focus-visible,
+.kv-field textarea:focus-visible,
+.kv-size-select:focus-visible {
+  outline: 3px solid rgba(168, 68, 58, 0.3);
+  outline-offset: 1px;
+  border-color: var(--kv-forest);
+}
+.kv-field [aria-invalid="true"] {
+  border-color: var(--kv-danger);
+  background: #FFF8F7;
+}
+.kv-field-extra {
+  margin-top: 4px;
+}
+.kv-field-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--kv-muted);
+}
+.kv-field-error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kv-danger);
+}
+.kv-hp {
+  position: absolute;
+  inset-inline-start: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.kv-checkout-submit {
+  margin-top: 6px;
+  min-height: 58px;
+  font-size: 16.5px;
+}
+.kv-checkout-summary-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.kv-checkout-edit {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kv-sage-deep);
+}
+.kv-checkout-lines {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.kv-checkout-lines li {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+.kv-checkout-lines .kv-cart-thumb {
+  width: 64px;
+  height: 64px;
+}
+.kv-checkout-lines div {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--kv-muted);
+}
+.kv-checkout-lines strong {
+  font-size: 14.5px;
+  color: var(--kv-ink);
+}
+.kv-checkout-lines b {
+  font-size: 15px;
+  white-space: nowrap;
+}
+.kv-checkout-sums {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--kv-line);
+  font-size: 14.5px;
+}
+.kv-checkout-sums div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.kv-checkout-sums dd {
+  margin: 0;
+  font-weight: 600;
+}
+.kv-checkout-sums .is-saving {
+  color: var(--kv-ok);
+}
+.kv-checkout-sums .is-total {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--kv-line);
+  align-items: baseline;
+  font-weight: 700;
+}
+.kv-checkout-total {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--kv-forest);
+  white-space: nowrap;
+}
+.kv-checkout-empty,
+.kv-checkout-loading {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  padding-block: 60px;
+  text-align: center;
+}
+@media (min-width: 900px) {
+  .kv-checkout-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    align-items: start;
+    gap: 32px;
+  }
+  .kv-checkout-form,
+  .kv-checkout-summary {
+    padding: 28px;
+  }
+  .kv-checkout-summary {
+    position: sticky;
+    top: 86px;
+  }
+}
+
+/* ---------- Thank you ---------- */
+.kv-thanks {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  max-width: 720px;
+  padding-block: 48px 80px;
+  text-align: center;
+  font-family: var(--kv-sans);
+  color: var(--kv-ink);
+}
+.kv-thanks-check {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--kv-ok);
+  color: var(--kv-white);
+}
+.kv-thanks .kv-eyebrow {
+  margin: 6px 0 0;
+}
+.kv-thanks .kv-display {
+  margin: 0;
+  font-size: clamp(28px, 6vw, 42px);
+}
+.kv-thanks-ref {
+  margin: 4px 0 8px;
+  padding: 10px 18px;
+  border: 1px dashed #D9C9B8;
+  border-radius: 12px;
+  background: var(--kv-white);
+  font-size: 15px;
+}
+.kv-thanks-ref strong {
+  font-size: 17px;
+  letter-spacing: 0.04em;
+}
+.kv-thanks-steps {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  margin: 6px 0 14px;
+  padding: 0;
+  list-style: none;
+  text-align: start;
+}
+.kv-thanks-steps li {
+  padding: 16px 18px;
+  border: 1px solid var(--kv-line);
+  border-radius: 14px;
+  background: var(--kv-white);
+}
+.kv-thanks-steps h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--kv-forest);
+}
+.kv-thanks-steps p {
+  margin: 0;
+  color: var(--kv-muted);
+}
+
+/* ---------- Page not found ---------- */
+.kv-notfound {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding-block: 72px 96px;
+  text-align: center;
+}
+.kv-notfound h1 {
+  margin: 0;
+  font-family: var(--kv-serif);
+  font-size: clamp(32px, 7vw, 52px);
+  font-weight: 500;
+}
+.kv-notfound p {
+  margin: 0;
+  color: var(--kv-muted);
+}
+
+/* ---------- Per-piece rows: on phones the name and the size sit above the colour chips ---------- */
+.kv-colour-name::first-letter {
+  text-transform: uppercase;
+}
+@media (max-width: 559px) {
+  .kv-colour-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--kv-line);
+    border-radius: 12px;
+    background: var(--kv-white);
+  }
+  .kv-colour-row .kv-moods,
+  .kv-shop-top .kv-colour-row .kv-moods {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0;
+    padding: 0;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+}
+
+/* ---------- Arabic reads small at Latin sizes: the smallest text steps up ---------- */
+html[lang="ar"] .kv-eyebrow,
+html[lang="ar"] .kv-option-label,
+html[lang="ar"] .kv-buy-eyebrow span {
+  font-size: 13.5px;
+}
+html[lang="ar"] .kv-buy-desc,
+html[lang="ar"] .kv-feature-list,
+html[lang="ar"] .kv-step p,
+html[lang="ar"] .kv-faq p {
+  font-size: 16px;
+  line-height: 1.8;
+}
+html[lang="ar"] .kv-mood,
+html[lang="ar"] .kv-bundle-sub,
+html[lang="ar"] .kv-ship-note,
+html[lang="ar"] .kv-trust-row li,
+html[lang="ar"] .kv-price-note,
+html[lang="ar"] .kv-cod-text,
+html[lang="ar"] .kv-save-pill,
+html[lang="ar"] .kv-gallery-badge small {
+  font-size: 14px;
+}
+html[lang="ar"] .kv-cod-text small {
+  font-size: 13.5px;
+}
+html[lang="ar"] .kv-bundle-flag {
+  font-size: 12px;
+}
+html[lang="ar"] .kv-spec,
+html[lang="ar"] .kv-size-table {
+  font-size: 15.5px;
+}
+
+/* ---------- Contrast and focus ---------- */
+/* The pack flags: white on the terracotta (the light clay was 3.9:1) */
+.kv-bundle-flag {
+  color: var(--kv-white);
+}
+.kv-table-wrap:focus-visible {
+  outline: 3px solid rgba(168, 68, 58, 0.35);
+  outline-offset: 2px;
+}
+/* The size tables scroll inside their wrapper (a global rule for phones would make the table itself the scroller) */
+table.kv-size-table {
+  display: table;
+  overflow: visible;
+}

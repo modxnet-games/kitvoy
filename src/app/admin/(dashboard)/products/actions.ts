@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth/admin-session";
 import {
   createProduct,
   updateProduct,
@@ -32,9 +33,7 @@ function parseProductFormData(formData: FormData) {
   const badge = badgeRaw && BADGE_OPTIONS.includes(badgeRaw as (typeof BADGE_OPTIONS)[number])
     ? badgeRaw
     : null;
-  const rating = parseFloat(formData.get("rating") as string) || 0;
-  const reviewCount = parseInt(formData.get("reviewCount") as string, 10) || 0;
-  const stock = parseInt(formData.get("stock") as string, 10) ?? 0;
+  const stock = parseInt(formData.get("stock") as string, 10);
   const sku = (formData.get("sku") as string)?.trim() ?? "";
   const isFeatured = formData.get("isFeatured") === "on";
   const categoryId = (formData.get("categoryId") as string)?.trim() ?? "";
@@ -57,8 +56,6 @@ function parseProductFormData(formData: FormData) {
     shippingTax,
     compareAtPrice,
     badge,
-    rating,
-    reviewCount,
     stock,
     sku,
     isFeatured,
@@ -76,12 +73,10 @@ function validateProduct(data: ReturnType<typeof parseProductFormData>): string[
   if (!data.description) errors.push("Description is required");
   if (!data.details) errors.push("Details are required");
   if (data.price < 0) errors.push("Price must be 0 or greater");
-  if (data.shippingTax < 0) errors.push("Shipping tax must be 0 or greater");
+  if (data.shippingTax < 0) errors.push("Delivery cost must be 0 or greater");
   if (data.compareAtPrice !== null && data.compareAtPrice < 0)
     errors.push("Compare at price must be 0 or greater");
-  if (data.rating < 0 || data.rating > 5) errors.push("Rating must be between 0 and 5");
-  if (data.reviewCount < 0) errors.push("Review count must be 0 or greater");
-  if (data.stock < 0) errors.push("Stock must be 0 or greater");
+  if (!Number.isInteger(data.stock) || data.stock < 0) errors.push("Stock must be a whole number, 0 or greater");
   if (!data.sku) errors.push("SKU is required");
   const hasCategory = data.categoryId || data.categoryNameNew;
   if (!hasCategory) errors.push("Category is required: select one or type a new category name");
@@ -94,16 +89,18 @@ export async function createProductAction(
   _prev: CreateProductState,
   formData: FormData
 ): Promise<CreateProductState> {
+  await requireAdmin();
   const data = parseProductFormData(formData);
   const errors = validateProduct(data);
   if (errors.length > 0) {
     return { error: errors.join(". ") };
   }
 
-  let categoryId = data.categoryId;
-  if (data.categoryNameNew) {
+  const { categoryNameNew, ...fields } = data;
+  let categoryId = fields.categoryId;
+  if (categoryNameNew) {
     try {
-      const resolved = await findOrCreateCategoryByName(data.categoryNameNew);
+      const resolved = await findOrCreateCategoryByName(categoryNameNew);
       categoryId = resolved.id;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to resolve category";
@@ -111,13 +108,15 @@ export async function createProductAction(
     }
   }
 
-  const { categoryNameNew: _n, ...rest } = data;
   try {
     await createProduct({
-      ...rest,
+      ...fields,
       categoryId,
       compareAtPrice: data.compareAtPrice ?? null,
       badge: data.badge ?? null,
+      // The store shows no ratings or reviews; the columns stay at zero
+      rating: 0,
+      reviewCount: 0,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to create product";
@@ -126,7 +125,6 @@ export async function createProductAction(
 
   revalidatePath("/admin/products");
   revalidatePath("/admin");
-  revalidatePath("/shop");
   revalidatePath("/");
   redirect("/admin/products");
 }
@@ -138,6 +136,7 @@ export async function updateProductAction(
   _prev: UpdateProductState,
   formData: FormData
 ): Promise<UpdateProductState> {
+  await requireAdmin();
   const data = parseProductFormData(formData);
   const errors = validateProduct(data);
   if (errors.length > 0) {
@@ -149,10 +148,11 @@ export async function updateProductAction(
     return { error: "Product not found" };
   }
 
-  let categoryId = data.categoryId;
-  if (data.categoryNameNew) {
+  const { categoryNameNew, ...fields } = data;
+  let categoryId = fields.categoryId;
+  if (categoryNameNew) {
     try {
-      const resolved = await findOrCreateCategoryByName(data.categoryNameNew);
+      const resolved = await findOrCreateCategoryByName(categoryNameNew);
       categoryId = resolved.id;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to resolve category";
@@ -160,13 +160,15 @@ export async function updateProductAction(
     }
   }
 
-  const { categoryNameNew: _n2, ...rest } = data;
   try {
     await updateProduct(productId, {
-      ...rest,
+      ...fields,
       categoryId,
       compareAtPrice: data.compareAtPrice ?? null,
       badge: data.badge ?? null,
+      // Not on the form any more: what the row holds is kept
+      rating: existing.rating,
+      reviewCount: existing.reviewCount,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to update product";
@@ -176,9 +178,7 @@ export async function updateProductAction(
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${productId}/edit`);
   revalidatePath("/admin");
-  revalidatePath("/shop");
   revalidatePath("/");
-  revalidatePath(`/shop/${existing.slug}`);
   redirect("/admin/products");
 }
 
@@ -186,6 +186,7 @@ export async function updateProductAction(
 export async function createProductFormAction(
   formData: FormData
 ): Promise<{ error?: string }> {
+  await requireAdmin();
   return createProductAction({}, formData);
 }
 
@@ -193,6 +194,7 @@ export async function createProductFormAction(
 export async function updateProductFormAction(
   formData: FormData
 ): Promise<{ error?: string }> {
+  await requireAdmin();
   const productId = (formData.get("productId") as string)?.trim();
   if (!productId) return { error: "Product ID required" };
   return updateProductAction(productId, {}, formData);
@@ -202,12 +204,14 @@ export async function updateProductFormAction(
 export async function uploadProductImageAction(
   formData: FormData
 ): Promise<{ url?: string; error?: string }> {
+  await requireAdmin();
   const file = formData.get("file") as File | null;
   if (!file?.size) return { error: "No file provided" };
   return uploadProductImage(file);
 }
 
 export async function deleteProductAction(productId: string): Promise<{ error?: string }> {
+  await requireAdmin();
   try {
     // Fetch product images before deletion so we can clean up storage
     const existing = await getAdminProductById(productId);
@@ -224,7 +228,6 @@ export async function deleteProductAction(productId: string): Promise<{ error?: 
 
   revalidatePath("/admin/products");
   revalidatePath("/admin");
-  revalidatePath("/shop");
   revalidatePath("/");
   return {};
 }

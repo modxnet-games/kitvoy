@@ -10,26 +10,46 @@ import {
   serializeAttribution,
   validFbc,
 } from "@/lib/analytics/attribution";
+import { LOCALE_COOKIE, LOCALE_MAX_AGE, isLocale } from "@/lib/i18n";
 
 /** Matches `/admin/orders/:orderId/print` (optional trailing slash). */
 const ADMIN_ORDER_PRINT_PATH = /^\/admin\/orders\/[^/]+\/print\/?$/;
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
 
   if (ADMIN_ORDER_PRINT_PATH.test(pathname)) {
     const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-kitvoy-order-print", "1");
+    requestHeaders.set("x-store-order-print", "1");
     return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+  if (pathname.startsWith("/admin")) {
+    // The dashboard renders without the shop around it (app/layout.tsx)
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-store-area", "admin");
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
+  // A link that names a language (an ad, the header switch without JavaScript): the page renders in it now, and the choice is kept
+  const lang = searchParams.get("lang");
+  const requestHeaders = new Headers(request.headers);
+  // Never trust these headers from outside
+  requestHeaders.delete("x-store-lang");
+  requestHeaders.delete("x-store-area");
+  requestHeaders.delete("x-store-order-print");
+  if (isLocale(lang)) requestHeaders.set("x-store-lang", lang);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const secure = request.nextUrl.protocol === "https:";
+  if (isLocale(lang)) {
+    response.cookies.set(LOCALE_COOKIE, lang, { maxAge: LOCALE_MAX_AGE, path: "/", sameSite: "lax", secure });
   }
 
   // A visit from an ad: remember which one for 30 days (last click wins), so
   // the order can say which campaign and creative drove it
-  const attribution = pathname.startsWith("/admin") ? null : attributionFromUrl(request.nextUrl);
-  if (!attribution) return NextResponse.next();
+  const attribution = attributionFromUrl(request.nextUrl);
+  if (!attribution) return response;
 
-  const response = NextResponse.next();
-  const secure = request.nextUrl.protocol === "https:";
   response.cookies.set(ATTRIBUTION_COOKIE, serializeAttribution(attribution), {
     maxAge: ATTRIBUTION_MAX_AGE,
     path: "/",

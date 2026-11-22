@@ -1,7 +1,16 @@
 "use client";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { CartContents } from "@/components/storefront/cart-contents";
+import { useLanguage } from "@/contexts/language-context";
+
 export default function CartPage() {
-  return <div className="store-container cart-page"><Link href="/" className="text-link"><ArrowLeft size={16} />Continue shopping</Link><h1>Your cart.</h1><p className="cart-page-intro">Review your items before checkout.</p><CartContents /></div>;
+  const { m } = useLanguage();
+  return (
+    <div className="store-container cart-page">
+      <Link href="/" className="text-link">{m.cart.continue}</Link>
+      <h1>{m.cart.title}</h1>
+      <p className="cart-page-intro">{m.cart.intro}</p>
+      <CartContents />
+    </div>
+  );
 }

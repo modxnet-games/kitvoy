@@ -1,3 +1,4 @@
+import { orderReferenceOf } from "@/lib/order-reference";
 import { createHash } from "node:crypto";
 import { getCatalogProduct, getCatalogVariant } from "@/config/catalog";
 
@@ -16,7 +17,7 @@ import type { OrderAttribution } from "@/lib/analytics/attribution";
 const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION?.trim() || "v26.0";
 const REQUEST_TIMEOUT_MS = 5000;
 
-const orderReference = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
+const orderReference = orderReferenceOf;
 
 export function getMetaCapiConfig(): { pixelId: string; accessToken: string; testEventCode?: string } | null {
   const accessToken = process.env.META_CAPI_ACCESS_TOKEN?.trim();
@@ -40,11 +41,11 @@ export const normalizeEmail = (email: string | undefined | null) => {
   return e.includes("@") ? e : undefined;
 };
 
-/** Dialling codes of the countries the store ships to, for numbers typed without one */
-const DIAL_CODES: Record<string, string> = { us: "1", gb: "44", de: "49", fr: "33", nl: "31", es: "34", mx: "52", cl: "56" };
+/** Dialling codes for numbers typed without one: Morocco, where the store delivers */
+const DIAL_CODES: Record<string, string> = { ma: "212", us: "1", fr: "33", es: "34" };
 
 /** ph: digits only, with the country code; a national number gets its country's code in front */
-export const normalizePhone = (phone: string | undefined | null, country = "us") => {
+export const normalizePhone = (phone: string | undefined | null, country = "ma") => {
   const raw = (phone ?? "").trim();
   let digits = raw.replace(/\D/g, "").replace(/^0+/, "");
   if (!digits) return undefined;
@@ -121,7 +122,7 @@ export interface MetaUserData {
 /** Hashes what Meta requires hashed; the browser identifiers go as they are. */
 export function buildUserData(identity: CustomerIdentity, attribution: OrderAttribution): MetaUserData {
   const { first, last } = splitName(identity.fullName);
-  const country = normalizeCountry(identity.country) ?? "us";
+  const country = normalizeCountry(identity.country) ?? "ma";
   const one = (hashed: string | undefined) => (hashed ? [hashed] : undefined);
   const data: MetaUserData = {
     em: one(hashOrSkip(normalizeEmail(identity.email))),
@@ -151,7 +152,7 @@ export interface MetaContent {
 }
 
 export interface MetaCustomData {
-  currency: "USD";
+  currency: "MAD";
   value: number;
   content_type?: "product";
   content_ids?: string[];
@@ -304,13 +305,13 @@ export function buildOrderEvent(
         city: address.city,
         state: address.state,
         zip: address.zip,
-        country: address.country ?? "US",
+        country: address.country ?? "MA",
         externalId: order.userId ?? order.id,
       },
       attribution,
     ),
     custom_data: {
-      currency: "USD",
+      currency: "MAD",
       value: round2(order.total),
       content_type: "product",
       content_ids: contents.map((c) => c.id),
@@ -323,22 +324,16 @@ export function buildOrderEvent(
 }
 
 /**
- * Server-side Purchase for a paid order. Claims the order first
- * (metaPurchaseSentAt), so Stripe retries, the PayPal webhook and the PayPal
- * return path can never send two; a failed send releases the claim for the
- * next attempt.
+ * Server-side Purchase for a cash-on-delivery order, sent when the order is
+ * placed (the moment the ad did its job). Claims the order first
+ * (metaPurchaseSentAt), so it can never be sent twice; a failed send releases
+ * the claim for the next attempt.
  */
 export async function sendPurchaseEvent(orderId: string): Promise<void> {
   if (!getMetaCapiConfig()) return;
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
-  if (!order || order.paymentStatus !== "paid") return;
+  if (!order || order.paymentMethod !== "cod") return;
   const reference = orderReference(order.id);
-
-  // A Stripe test-mode payment is not a sale; it only goes to Test Events, never the live pixel
-  if (order.testPayment && !getMetaCapiConfig()?.testEventCode) {
-    console.info(`[meta-capi] ${reference} is a test payment; Purchase not sent`);
-    return;
-  }
 
   const { count } = await prisma.order.updateMany({
     where: { id: order.id, metaPurchaseSentAt: null },

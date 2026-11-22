@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getAdminSession } from "@/lib/auth/admin-session";
+import { getAdminSession, requireAdmin } from "@/lib/auth/admin-session";
 import { validateAdminCredentials } from "@/lib/auth/admin-auth";
 
 export async function loginAction(
@@ -26,6 +26,8 @@ export async function loginAction(
 }
 
 export async function logoutAction() {
+  // Nobody signed in: there is nothing to sign out of, and the sign-in page is where this ends anyway
+  await requireAdmin();
   const session = await getAdminSession();
   session.isAdmin = undefined;
   session.username = undefined;

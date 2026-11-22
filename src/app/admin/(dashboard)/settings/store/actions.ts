@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/auth/admin-session";
 import {
   type StoreSocialSettings,
   upsertStoreSettings,
@@ -26,6 +27,7 @@ const BOOLEAN_FIELDS: (keyof StoreSocialSettings)[] = [
 ];
 
 export async function saveStoreSettingsAction(formData: FormData) {
+  await requireAdmin();
   const data: Partial<StoreSocialSettings> = {};
 
   for (const field of STRING_FIELDS) {

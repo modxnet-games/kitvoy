@@ -1,58 +1,86 @@
 "use client";
 
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
 
+import { mainProduct } from "@/config/catalog";
 import { useLanguage } from "@/contexts/language-context";
-import { buttonVariants } from "@/components/ui/button";
+import { parsePlacedOrder, readPlacedOrderText } from "@/lib/client/place-order";
+import { formatPrice } from "@/lib/formatters";
+import { formatMoroccanPhone } from "@/lib/morocco";
 
-/** Shows the order reference the checkout passed in ?ref=. The checkout page has already emptied the cart and counted the order. */
+/** A phone number inside a sentence: kept on one line (no-break spaces) and left to right inside Arabic text (an isolate). */
+const phoneForText = (national: string) => String.fromCharCode(0x2066) + formatMoroccanPhone(national).split(" ").join(String.fromCharCode(0xa0)) + String.fromCharCode(0x2069);
+
+/** The saved order is written once, before this page opens: there is nothing to listen for. */
+const neverChanges = () => () => {};
+
+/**
+ * Thank you: the order reference from the address, and (in the tab that placed
+ * the order) the customer's name, the number we will call and the amount to
+ * hand the courier. The checkout has already emptied the cart and counted the
+ * order.
+ */
 function SuccessContent() {
-  const { t } = useLanguage();
-  const orderReference = useSearchParams().get("ref") ?? "";
-
-  const audioPlayed = useRef(false);
+  const { t, m, locale } = useLanguage();
+  const reference = (useSearchParams().get("ref") ?? "").slice(0, 20);
+  // The tab's saved order: nothing on the server and while the page hydrates, then what the checkout left
+  const saved = useSyncExternalStore(neverChanges, readPlacedOrderText, () => null);
+  const order = useMemo(() => parsePlacedOrder(saved, reference), [saved, reference]);
   useEffect(() => {
-    if (audioPlayed.current) return;
-    audioPlayed.current = true;
-    const audio = new Audio("/confirm_order.mp3");
-    audio.volume = 0.7;
-    audio.play().catch(() => {});
-  }, []);
+    // The order form was scrolled down to its button; this page starts at its top
+    // Older phones reject "instant" outright; they get the plain call
+    try {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+  }, [reference]);
+  const { min, max } = mainProduct.deliveryHours;
+  const firstName = order?.name.split(" ")[0];
+
+  if (!/^[A-Z]{2,5}-[A-Z0-9]{8}$/.test(reference)) {
+    return (
+      <div className="kv-thanks kv-wrap">
+        <p className="kv-lede">{m.success.missing}</p>
+        <Link href="/" className="kv-btn kv-btn-primary">{m.success.back}</Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border bg-background p-6 text-center shadow-2xl sm:p-8">
-        <CheckCircle2 className="mx-auto size-16 text-green-500" />
-        <h1 className="mt-6 font-serif text-3xl font-medium sm:text-4xl">
-          {t("order.successTitle")}
-        </h1>
-        <p className="mt-3 text-muted-foreground">
-          {t("order.successMessage")}
-        </p>
-        {orderReference && (
-          <p className="mt-4 rounded-lg bg-muted/50 px-4 py-2 font-mono text-sm">
-            {t("order.orderReference")}: {orderReference}
-          </p>
-        )}
-        <div className="mt-8 flex justify-center">
-          <Link
-            href="/"
-            className={buttonVariants({ size: "lg" })}
-          >
-            {t("order.continueShopping")}
-          </Link>
-        </div>
-      </div>
+    <div className="kv-thanks kv-wrap">
+      <span className="kv-thanks-check" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M5 12.500l4.500 4.500L19 7.500" stroke="currentColor" strokeWidth="2.200" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </span>
+      <p className="kv-eyebrow">{m.success.eyebrow}</p>
+      <h1 className="kv-display">{firstName ? t("success.title", { name: firstName }) : m.success.titleNoName}</h1>
+      <p className="kv-thanks-ref">
+        {m.success.reference} <strong dir="ltr">{reference}</strong>
+      </p>
+      <ol className="kv-thanks-steps">
+        <li>
+          <h2>{m.success.next1Title}</h2>
+          <p>{order ? t("success.next1", { phone: phoneForText(order.phone) }) : m.success.next1NoPhone}</p>
+        </li>
+        <li>
+          <h2>{m.success.next2Title}</h2>
+          <p>{t("success.next2", { min, max })}</p>
+        </li>
+        <li>
+          <h2>{m.success.next3Title}</h2>
+          <p>{order ? t("success.next3", { total: formatPrice(order.total, locale) }) : m.success.next3NoTotal}</p>
+        </li>
+      </ol>
+      <Link href="/" className="kv-btn kv-btn-primary">{m.success.back}</Link>
     </div>
   );
 }
 
 export default function CheckoutSuccessPage() {
   return (
-    <Suspense fallback={<div className="container mx-auto px-4 py-16" />}>
+    <Suspense fallback={<div className="kv-thanks kv-wrap" />}>
       <SuccessContent />
     </Suspense>
   );

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/auth/admin-session";
 import {
   upsertNavigationItem,
   deleteNavigationItem,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/data/navigation";
 
 export async function saveNavigationItemAction(formData: FormData) {
+  await requireAdmin();
   const id = formData.get("id") as string | null;
   const label = (formData.get("label") as string)?.trim();
   const link = (formData.get("link") as string)?.trim();
@@ -32,6 +34,7 @@ export async function saveNavigationItemAction(formData: FormData) {
 }
 
 export async function deleteNavigationItemAction(id: string) {
+  await requireAdmin();
   await deleteNavigationItem(id);
   revalidatePath("/");
   revalidatePath("/admin/navigation");
@@ -39,6 +42,7 @@ export async function deleteNavigationItemAction(id: string) {
 }
 
 export async function seedNavigationAction() {
+  await requireAdmin();
   await seedDefaultNavigation();
   revalidatePath("/");
   revalidatePath("/admin/navigation");

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminFromRequest } from "@/lib/auth/admin-jwt";
+import { isAuthorizedAdminRequest } from "@/lib/auth/admin-request";
 import { getAllAdminProducts, createProduct } from "@/lib/data/admin-products";
 import { findOrCreateCategoryByName } from "@/lib/data/admin-categories";
 
 export async function GET(request: NextRequest) {
-  const admin = getAdminFromRequest(request);
-  if (!admin) {
+  if (!(await isAuthorizedAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -21,8 +20,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const admin = getAdminFromRequest(request);
-  if (!admin) {
+  if (!(await isAuthorizedAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

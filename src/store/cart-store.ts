@@ -184,7 +184,7 @@ export const useCartStore = create<CartState>()(
       },
     }),
     {
-      name: "kitvoy-cart",
+      name: "chrilik-cart",
       partialize: (state) => ({ items: state.items }),
     },
   ),

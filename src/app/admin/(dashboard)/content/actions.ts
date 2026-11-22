@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/auth/admin-session";
 import {
   upsertHomepageContent,
   type HomepageContent,
@@ -24,6 +25,7 @@ const BOOLEAN_FIELDS: (keyof HomepageContent)[] = [
 ];
 
 export async function saveHomepageContentAction(formData: FormData) {
+  await requireAdmin();
   const data: Partial<HomepageContent> = {};
 
   for (const field of STRING_FIELDS) {
@@ -48,6 +50,7 @@ export async function saveHomepageContentAction(formData: FormData) {
 export async function uploadHomepageImageAction(
   formData: FormData
 ): Promise<{ url?: string; error?: string }> {
+  await requireAdmin();
   const file = formData.get("file") as File | null;
   if (!file?.size) return { error: "No file provided" };
   return uploadHomepageImage(file);

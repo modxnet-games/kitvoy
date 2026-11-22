@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Kitvoy release deploy. Copied to the server next to the bundle and run there:
+# Release deploy for the store (Chrilik, still served at kitvoy.com and from the server's kitvoy
+# directories and PM2 process). Copied to the server next to the bundle and run there:
 #
 #   git bundle create kitvoy.bundle <live sha>..kitvoy-main
 #   scp kitvoy.bundle scripts/deploy/release.sh root@<server>:/root/kitvoy-deploy/
@@ -16,15 +17,15 @@
 #      The live server keeps serving its own build the whole time; nothing is
 #      rebuilt underneath it.
 #   2. Switches the /var/www/kitvoy symlink to the new release and reloads PM2.
-#   3. Smoke-tests the result with GET requests only (home, /checkout, a script
-#      of the new build, the cart quote, Stripe.js), on the server and through
-#      the public URL.
+#   3. Smoke-tests the result with GET requests only (the product page in both
+#      languages, a photo, the order form, the policy pages, a script of the new
+#      build, the cart quote), on the server and through the public URL.
 #   4. If any check fails, switches back to the previous release and reloads again.
 #
 # --db-push     back up PostgreSQL, then apply the Prisma schema (additive changes only)
 # --seed-catalog  after the build and before the switch, add any catalog product the database
 #               doesn't have yet (prisma/seed-catalog.ts --apply: it only adds, never edits or deletes)
-# --allow-peak  deploy between 23:00 and 06:00 UTC (US evening), which is refused otherwise
+# --allow-peak  deploy between 23:00 and 06:00 UTC, which is refused otherwise (the owner's rule)
 # --pm2-time    turn on timestamps in the PM2 logs with this reload (needed once; PM2 remembers it)
 #
 # It never prints secrets, never sources .env into the PM2 shell, and reloads
@@ -165,33 +166,33 @@ check() { # check <name> <ok: 0|1> <detail>
 
 smoke() {
   FAILED=0
-  local html code chunk train page body
-  html="$(curl -s -m 20 "$ORIGIN/checkout" || true)"
+  local html code chunk page body
+  # The store is one product page at "/", Arabic by default. The Product markup is only printed when the
+  # product loaded from the database, so it also proves the page can sell. Bodies are read into variables
+  # first: a grep that stops early on a pipe can fail curl under pipefail.
+  html="$(curl -s -m 20 "$ORIGIN/" || true)"
   code="$(http "$ORIGIN/")"; check "origin  GET /" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
-  check "origin  GET / names the store" "$(curl -s -m 20 "$ORIGIN/" | grep -q 'Kitvoy' && echo 1 || echo 0)" ""
-  # The catalog, each product page and the inflator's page at its new address. The Product markup is
-  # only printed when the product loaded from the database, so it also proves the page can sell.
-  # Bodies are read into variables first: a grep that stops early on a pipe can fail curl under pipefail.
-  for page in /products /products/pouncepop /inflator; do
+  check "origin  / names the store" "$([[ "$html" == *'Chrilik'* ]] && echo 1 || echo 0)" ""
+  check "origin  / is Arabic, right to left" "$([[ "$html" == *'lang="ar"'* && "$html" == *'dir="rtl"'* ]] && echo 1 || echo 0)" ""
+  check "origin  / sells the product" "$([[ "$html" == *'"@type":"Product"'* ]] && echo 1 || echo 0)" ""
+  body="$(curl -s -m 20 "$ORIGIN/?lang=fr" || true)"
+  check "origin  /?lang=fr is French" "$([[ "$body" == *'lang="fr"'* && "$body" == *'dir="ltr"'* ]] && echo 1 || echo 0)" ""
+  body=""
+  code="$(http "$ORIGIN/products/sanadi/hero.webp")"; check "origin  GET a product photo" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
+  for page in /checkout /cart /shipping /returns /privacy /terms /support /admin/login; do
     code="$(http "$ORIGIN$page")"; check "origin  GET $page" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   done
-  body="$(curl -s -m 20 "$ORIGIN/inflator" || true)"
-  check "origin  /inflator sells the inflator" "$([[ "$body" == *'"@type":"Product"'* ]] && echo 1 || echo 0)" ""
-  body="$(curl -s -m 20 "$ORIGIN/products/pouncepop" || true)"
-  check "origin  /products/pouncepop sells PouncePop" "$([[ "$body" == *'"@type":"ProductGroup"'* ]] && echo 1 || echo 0)" ""
-  code="$(http "$ORIGIN/products/pouncepop/hero.webp")"; check "origin  GET a PouncePop photo" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
-  body=""
-  code="$(http "$ORIGIN/checkout")"; check "origin  GET /checkout" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
-  check "origin  /checkout renders the checkout outline" "$(printf '%s' "$html" | grep -q 'Loading checkout' && echo 1 || echo 0)" ""
+  # Addresses of the store this one replaced lead to the home page
+  for page in /products/pouncepop /inflator /products; do
+    code="$(http "$ORIGIN$page")"; check "origin  GET $page redirects" "$([ "$code" = 307 ] && echo 1 || echo 0)" "($code)"
+  done
   chunk="$(printf '%s' "$html" | grep -oE '/_next/static/chunks/[A-Za-z0-9._-]+\.js' | head -n 1)"
   code="$(http "$ORIGIN$chunk")"; check "origin  GET a script of this build" "$([ -n "$chunk" ] && [ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   code="$(http "$ORIGIN/api/cart/quote?ids=smoke-test")"; check "origin  GET /api/cart/quote" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   code="$(http "$PUBLIC/")"; check "public  GET /" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   code="$(http "$PUBLIC/checkout")"; check "public  GET /checkout" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
+  code="$(http "$PUBLIC/products/sanadi/hero.webp")"; check "public  GET a product photo" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   code="$(http "$PUBLIC$chunk")"; check "public  GET a script of this build" "$([ -n "$chunk" ] && [ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
-  check "public  /checkout has no policy blocking Stripe" "$(curl -s -m 20 -D - -o /dev/null "$PUBLIC/checkout" | grep -i '^content-security-policy' | grep -qv 'js.stripe.com' && echo 0 || echo 1)" ""
-  train="$(grep -ohE "RELEASE_TRAIN = '[a-z0-9]+'" "$NEW/node_modules/@stripe/stripe-js/dist/index.js" 2>/dev/null | head -n 1 | cut -d"'" -f2)"
-  code="$(http "https://js.stripe.com/${train:-v3}/stripe.js")"; check "Stripe.js reachable (${train:-v3})" "$([ "$code" = 200 ] && echo 1 || echo 0)" "($code)"
   return "$FAILED"
 }
 

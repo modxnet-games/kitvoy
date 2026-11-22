@@ -1,144 +1,83 @@
 import { prisma } from "@/lib/db";
-import {
-  validateStockForCheckout,
-  type StockValidationItem,
-} from "@/lib/stock";
-import type { ProductDisplay } from "@/types/product";
+import { getCatalogProduct, getCatalogVariant } from "@/config/catalog";
 import type { OrderAttribution } from "@/lib/analytics/attribution";
 import { priceLines } from "@/lib/bundles";
-import { countriesForCart, getCatalogProduct, getCatalogVariant, type CountryCode } from "@/config/catalog";
-import { toCents, type OrderTotals } from "@/lib/payments/money";
-import {
-  formatAddressLine,
-  isCountryCode,
-  toShippingAddress,
-  validateCheckoutDetails,
-  type CheckoutDetails,
-  type ShippingAddress,
-} from "@/lib/us-address";
+import { readCheckoutDetails, readLocale, validateCheckoutDetails, type CheckoutDetails } from "@/lib/checkout-details";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
+import { toCents, type OrderTotals } from "@/lib/money";
+import { parseMoroccanPhone } from "@/lib/morocco";
+import { orderReferenceOf } from "@/lib/order-reference";
+
+/*
+ * Cash-on-delivery orders. The customer fills in a name, a phone number, a
+ * city and an address; the order is saved as PENDING (new, waiting for the
+ * confirmation call) and its pieces leave the stock at once. Nothing is paid
+ * online: the courier collects the cash, and the order becomes paid when it
+ * is marked delivered (lib/data/admin-orders.ts).
+ */
 
 export interface CartItemPayload {
-  product: ProductDisplay;
+  productId: string;
   quantity: number;
-  /** The colour picked, for products sold in several (config/catalog.ts) */
-  variantKey?: string;
+  /** Colour and size ("black-xl"), for products sold in several */
+  variantKey: string | null;
 }
 
 export interface CreateOrderInput {
-  customerName: string;
-  email: string;
-  phone: string;
-  shippingAddress: ShippingAddress;
+  details: CheckoutDetails;
+  locale: Locale;
   items: CartItemPayload[];
   /** Ad attribution and Conversions API inputs read from the request (cookies, IP, user agent) */
   attribution?: OrderAttribution;
 }
 
 export type CreateOrderResult =
-  | { success: true; orderId: string; orderReference: string; totals: OrderTotals }
-  | { success: false; error: string; errorKey?: string };
+  | { success: true; orderId: string; orderReference: string; totals: OrderTotals; duplicate: boolean }
+  | { success: false; error: string; fields?: Record<string, string> };
 
-/** A cart line as pricing reads it: the product's id, the quantity and the colour. Everything else about the product comes from the database. */
-function cartLine(product: { id: string; slug: string; name: string; price: number }, quantity: number, variantKey?: string): CartItemPayload {
-  return {
-    product: {
-      ...product,
-      shortDescription: "",
-      description: "",
-      details: "",
-      rating: 0,
-      reviewCount: 0,
-      stock: 999,
-      sku: "",
-      isFeatured: false,
-      category: { id: "", name: "", slug: "" },
-      images: [],
-    } as ProductDisplay,
-    quantity,
-    ...(variantKey && { variantKey }),
-  };
-}
+const MAX_UNITS = 12;
+/** A phone number that keeps ordering is a mistake or a prank; the owner would call it once anyway */
+const MAX_ORDERS_PER_PHONE_PER_DAY = 3;
+/** Mobile networks put many customers behind one address, so this only stops a flood */
+const MAX_ORDERS_PER_IP_PER_HOUR = 30;
+const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
 
 /**
- * The cart lines of a request body, in the one shape the checkout sends them.
- * Anything malformed is dropped; the prices here are the browser's and are
- * never used (the cart is priced from the database).
+ * The cart lines of a request body. Anything malformed is dropped; nothing
+ * the browser says about a price is read (the cart is priced from the
+ * database).
  */
 export function parseCartItems(input: unknown): CartItemPayload[] {
   if (!Array.isArray(input)) return [];
   const items: CartItemPayload[] = [];
-  for (const item of input) {
+  for (const item of input.slice(0, 40)) {
     if (!item || typeof item !== "object") continue;
     const it = item as Record<string, unknown>;
-    const product = it.product;
-    const quantity = typeof it.quantity === "number" ? Math.floor(it.quantity) : 0;
-    if (!product || typeof product !== "object" || quantity <= 0) continue;
-
-    const p = product as Record<string, unknown>;
-    const id = typeof p.id === "string" ? p.id : "";
-    const slug = typeof p.slug === "string" ? p.slug : "";
-    const name = typeof p.name === "string" ? p.name : "";
-    const price = typeof p.price === "number" ? p.price : 0;
-    const variant = p.variant && typeof p.variant === "object" ? (p.variant as Record<string, unknown>).key : undefined;
-    const rawVariantKey = typeof it.variantKey === "string" ? it.variantKey : typeof variant === "string" ? variant : "";
-    const variantKey = /^[a-z0-9-]{1,40}$/.test(rawVariantKey) ? rawVariantKey : undefined;
-
-    if (!id || !name || !slug || price <= 0) continue;
-
-    items.push(cartLine({ id, slug, name, price }, quantity, variantKey));
+    const product = it.product && typeof it.product === "object" ? (it.product as Record<string, unknown>) : null;
+    const productId = typeof it.productId === "string" ? it.productId : typeof product?.id === "string" ? product.id : "";
+    const quantity = typeof it.quantity === "number" && Number.isInteger(it.quantity) ? it.quantity : 0;
+    const rawKey = typeof it.variantKey === "string" ? it.variantKey : "";
+    if (!/^[a-z0-9]{1,40}$/i.test(productId) || quantity < 1 || quantity > MAX_UNITS) continue;
+    items.push({ productId, quantity, variantKey: /^[a-z0-9-]{1,40}$/.test(rawKey) ? rawKey : null });
   }
-
   return items;
 }
 
-/** Details that passed the checkout's rules, as the order they become. */
-export function orderInputFromDetails(details: CheckoutDetails, items: CartItemPayload[]): CreateOrderInput {
-  return {
-    customerName: details.fullName,
-    email: details.email.toLowerCase(),
-    phone: details.phone,
-    shippingAddress: toShippingAddress(details),
-    items,
-  };
-}
-
-export function validateOrderInput(input: unknown): { valid: false; error: string } | { valid: true; data: CreateOrderInput } {
-  if (!input || typeof input !== "object") {
-    return { valid: false, error: "Invalid request body" };
-  }
-
+/** The request body as an order to create, or the first problem with it. */
+export function validateOrderInput(input: unknown): { valid: false; error: string; fields?: Record<string, string> } | { valid: true; data: Omit<CreateOrderInput, "attribution"> } {
+  if (!input || typeof input !== "object") return { valid: false, error: "order.errorGeneric" };
   const body = input as Record<string, unknown>;
-  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-  const details: CheckoutDetails = {
-    email: str(body.email),
-    fullName: str(body.fullName),
-    phone: str(body.phone),
-    address1: str(body.address1),
-    address2: str(body.address2),
-    city: str(body.city),
-    state: str(body.state),
-    zip: str(body.zip),
-  };
-  // A checkout page loaded before the store shipped abroad sends no country: that is a US order
-  const country = str(body.country).toUpperCase() || "US";
-  if (!isCountryCode(country)) {
-    return { valid: false, error: "validation.country" };
-  }
-  details.country = country;
-  // US states are two-letter codes; a region typed elsewhere keeps its own spelling
-  if (country === "US") details.state = details.state.toUpperCase();
+  // A field no person sees or fills in; a script that fills every input gives itself away
+  if (typeof body.website === "string" && body.website.trim()) return { valid: false, error: "order.errorGeneric" };
 
-  const firstError = Object.values(validateCheckoutDetails(details))[0];
-  if (firstError) {
-    return { valid: false, error: firstError };
-  }
+  const details = readCheckoutDetails(body);
+  const fields = validateCheckoutDetails(details);
+  const first = Object.values(fields)[0];
+  if (first) return { valid: false, error: first, fields };
 
   const items = parseCartItems(body.items);
-  if (items.length === 0) {
-    return { valid: false, error: "EMPTY_CART" };
-  }
-
-  return { valid: true, data: orderInputFromDetails(details, items) };
+  if (items.length === 0) return { valid: false, error: "order.errorEmptyCart" };
+  return { valid: true, data: { details, locale: readLocale(body.locale, DEFAULT_LOCALE), items } };
 }
 
 export type PricedItem = {
@@ -147,167 +86,173 @@ export type PricedItem = {
   productSlug: string;
   variantKey: string | null;
   unitPrice: number;
-  shippingTax: number;
   quantity: number;
   lineTotal: number;
 };
 
-export type PricedOrder = { items: PricedItem[]; subtotal: number; shippingCost: number; total: number };
+export type PricedOrder = { items: PricedItem[]; totals: OrderTotals; unitsByProduct: Map<string, number> };
 
-type OrderFailure = { success: false; error: string; errorKey?: string };
-
-const failed = (error: string, errorKey?: string) => ({ ok: false as const, failure: { success: false as const, error, ...(errorKey && { errorKey }) } });
-
-type CartProduct = { id: string; name: string; slug: string; price: number; shippingTax: number };
-type CartLine = { product: CartProduct; variantKey: string | null; variantLabel: string | null; quantity: number };
+type Failure = { success: false; error: string };
+const failed = (error: string): { ok: false; failure: Failure } => ({ ok: false, failure: { success: false, error } });
 
 /**
- * The cart as the database knows it: one line per product and colour, with
- * colours checked against the catalog, and the countries every product in it
- * ships to. Nothing the browser sent about a product is used beyond its id.
+ * Prices the cart from the database: one line per product, colour and size,
+ * each checked against the catalog; a product bought in several variants is
+ * priced as one pack. Stock is read here and taken when the order is saved.
  */
-async function readCartLines(items: CartItemPayload[]): Promise<{ ok: true; lines: CartLine[]; allowedCountries: CountryCode[] } | { ok: false; failure: OrderFailure }> {
-  const productIds = Array.from(new Set(items.map((i) => i.product.id)));
+export async function priceCart(items: CartItemPayload[]): Promise<{ ok: true; priced: PricedOrder } | { ok: false; failure: Failure }> {
   const products = await prisma.product.findMany({
-    where: { id: { in: productIds } },
-    select: { id: true, name: true, slug: true, price: true, shippingTax: true },
+    where: { id: { in: [...new Set(items.map((i) => i.productId))] } },
+    select: { id: true, name: true, slug: true, price: true, shippingTax: true, stock: true },
   });
-  const productMap = new Map(products.map((p) => [p.id, p]));
+  const byId = new Map(products.map((p) => [p.id, p]));
 
-  // One line per product and colour, however the browser split them
-  const lines = new Map<string, CartLine>();
+  type Line = { product: (typeof products)[number]; variantKey: string | null; label: string | null; quantity: number };
+  const lines = new Map<string, Line>();
   for (const item of items) {
-    const product = productMap.get(item.product.id);
-    if (!product) return failed("Product not found");
-
+    const product = byId.get(item.productId);
+    if (!product) return failed("order.errorUnavailable");
+    // Only what the catalog sells can be ordered: rows left from the store this one replaced are not for sale
     const entry = getCatalogProduct(product.slug);
+    if (!entry) return failed("order.errorUnavailable");
     let variantKey: string | null = null;
-    let variantLabel: string | null = null;
-    if (entry?.hasColourChoice) {
+    let label: string | null = null;
+    if (entry.colours.length > 0) {
       const variant = getCatalogVariant(product.slug, item.variantKey);
-      if (!item.variantKey || !variant) return failed("order.errorChooseColour", "order.errorChooseColour");
+      if (!variant) return failed("order.errorChooseVariant");
       variantKey = variant.key;
-      variantLabel = variant.label;
+      // The owner reads orders in French: "Noir, XL"
+      label = `${variant.colour.label.fr}, ${variant.size}`;
     }
-
     const key = `${product.id}:${variantKey ?? ""}`;
     const line = lines.get(key);
     if (line) line.quantity += item.quantity;
-    else lines.set(key, { product, variantKey, variantLabel, quantity: item.quantity });
+    else lines.set(key, { product, variantKey, label, quantity: item.quantity });
   }
   const merged = [...lines.values()];
-  return { ok: true, lines: merged, allowedCountries: countriesForCart(merged.map((l) => l.product.slug)) };
-}
 
-/** Checks stock and prices the lines; a product bought in several colours is priced as one bundle. */
-async function priceCartLines(merged: CartLine[]): Promise<{ ok: true; priced: PricedOrder } | { ok: false; failure: OrderFailure }> {
-  // Stock is kept per product, so a product's colours are counted together
-  const perProduct = new Map<string, StockValidationItem>();
-  for (const line of merged) {
-    const current = perProduct.get(line.product.id);
-    if (current) current.quantity += line.quantity;
-    else perProduct.set(line.product.id, { productId: line.product.id, productName: line.product.name, quantity: line.quantity });
-  }
-  const stockValidation = await validateStockForCheckout([...perProduct.values()]);
-  if (!stockValidation.valid && stockValidation.errorKey) {
-    return failed(stockValidation.errorKey, stockValidation.errorKey);
+  // Stock is kept per product, so its colours and sizes are counted together
+  const unitsByProduct = new Map<string, number>();
+  for (const line of merged) unitsByProduct.set(line.product.id, (unitsByProduct.get(line.product.id) ?? 0) + line.quantity);
+  for (const [productId, units] of unitsByProduct) {
+    const stock = byId.get(productId)!.stock;
+    if (units > MAX_UNITS) return failed("order.errorNotEnough");
+    if (stock <= 0) return failed("order.errorUnavailable");
+    if (units > stock) return failed("order.errorNotEnough");
   }
 
-  const totals = priceLines(merged.map((l) => ({ productId: l.product.id, slug: l.product.slug, unitPrice: l.product.price, quantity: l.quantity })));
-  const items: PricedItem[] = merged.map((line, i) => ({
+  const lineTotals = priceLines(merged.map((l) => ({ productId: l.product.id, slug: l.product.slug, unitPrice: l.product.price, quantity: l.quantity })));
+  const pricedItems: PricedItem[] = merged.map((line, i) => ({
     productId: line.product.id,
-    // The colour is part of the name wherever the order is read: emails, admin, packing slip
-    productName: line.variantLabel ? `${line.product.name} (${line.variantLabel})` : line.product.name,
+    // The colour and size are part of the name wherever the order is read: admin, app, packing slip
+    productName: line.label ? `${line.product.name} (${line.label})` : line.product.name,
     productSlug: line.product.slug,
     variantKey: line.variantKey,
     unitPrice: line.product.price,
-    shippingTax: line.product.shippingTax,
     quantity: line.quantity,
-    lineTotal: totals[i],
+    lineTotal: lineTotals[i],
   }));
 
-  // Work in cents so the stored total is exact
-  const subtotalCents = items.reduce((sum, i) => sum + toCents(i.lineTotal), 0);
-  const shippingCents = items.reduce((sum, i) => sum + toCents(i.shippingTax * i.quantity), 0);
+  const subtotalCents = pricedItems.reduce((sum, i) => sum + toCents(i.lineTotal), 0);
+  const fullCents = pricedItems.reduce((sum, i) => sum + toCents(i.unitPrice) * i.quantity, 0);
+  const shippingCents = merged.reduce((sum, l) => sum + toCents(l.product.shippingTax) * l.quantity, 0);
   return {
     ok: true,
     priced: {
-      items,
-      subtotal: subtotalCents / 100,
-      shippingCost: shippingCents / 100,
-      total: (subtotalCents + shippingCents) / 100,
-    },
-  };
-}
-
-/**
- * Checks stock and prices the cart from the database, never from what the
- * browser sent. Colours are checked against the catalog, the shipping country
- * against the countries every product in the cart ships to, and a product
- * bought in several colours is priced as one bundle.
- */
-async function priceOrder(input: CreateOrderInput): Promise<{ ok: true; priced: PricedOrder } | { ok: false; failure: OrderFailure }> {
-  const cart = await readCartLines(input.items);
-  if (!cart.ok) return cart;
-  if (!cart.allowedCountries.includes(input.shippingAddress.country)) {
-    return failed("order.errorCountryUnavailable", "order.errorCountryUnavailable");
-  }
-  return priceCartLines(cart.lines);
-}
-
-const orderReferenceOf = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
-
-/**
- * Saves the checkout as a pending, unpaid order. Stock is checked when the
- * cart is priced, but nothing here takes the items out of stock.
- */
-export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
-  const pricing = await priceOrder(input);
-  if (!pricing.ok) return pricing.failure;
-  const { items: pricedItems, subtotal, shippingCost, total } = pricing.priced;
-
-  const order = await prisma.order.create({
-    data: {
-      customerName: input.customerName,
-      email: input.email,
-      phone: input.phone,
-      location: formatAddressLine(input.shippingAddress),
-      shippingAddress: { ...input.shippingAddress },
-      status: "PENDING",
-      subtotal,
-      shippingCost,
-      total,
-      currency: "USD",
-      locale: "en",
-      paymentStatus: "unpaid",
-      ...(input.attribution && {
-        utmSource: input.attribution.utm_source ?? null,
-        utmMedium: input.attribution.utm_medium ?? null,
-        utmCampaign: input.attribution.utm_campaign ?? null,
-        utmContent: input.attribution.utm_content ?? null,
-        utmTerm: input.attribution.utm_term ?? null,
-        fbclid: input.attribution.fbclid ?? null,
-        attribution: { ...input.attribution },
-      }),
-      items: {
-        create: pricedItems.map((item) => ({
-          productId: item.productId,
-          productName: item.productName,
-          productSlug: item.productSlug,
-          variantKey: item.variantKey,
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-          lineTotal: item.lineTotal,
-        })),
+      items: pricedItems,
+      unitsByProduct,
+      totals: {
+        subtotal: subtotalCents / 100,
+        shippingCost: shippingCents / 100,
+        total: (subtotalCents + shippingCents) / 100,
+        savings: Math.max(0, fullCents - subtotalCents) / 100,
       },
     },
-    include: { items: true },
-  });
-
-  return {
-    success: true,
-    orderId: order.id,
-    orderReference: orderReferenceOf(order.id),
-    totals: { subtotal, shippingCost, total },
   };
+}
+
+/** The same lines whatever order the browser sent them in. */
+const signatureOf = (items: { productId: string | null; variantKey: string | null; quantity: number }[]) =>
+  items
+    .map((i) => `${i.productId}:${i.variantKey ?? ""}:${i.quantity}`)
+    .sort()
+    .join("|");
+
+class OutOfStock extends Error {}
+
+/**
+ * Saves a cash-on-delivery order and takes its pieces out of stock. A second
+ * submit of the same cart from the same phone within ten minutes returns the
+ * first order instead of making another.
+ */
+export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
+  const phone = parseMoroccanPhone(input.details.phone);
+  if (!phone) return { success: false, error: "validation.phone", fields: { phone: "validation.phone" } };
+
+  const pricing = await priceCart(input.items);
+  if (!pricing.ok) return pricing.failure;
+  const { items, totals, unitsByProduct } = pricing.priced;
+  const clientIp = input.attribution?.clientIp ?? null;
+  const now = Date.now();
+
+  const recent = await prisma.order.findMany({
+    where: { phone: phone.national, paymentMethod: "cod", createdAt: { gt: new Date(now - 24 * 60 * 60 * 1000) } },
+    select: { id: true, status: true, total: true, createdAt: true, subtotal: true, shippingCost: true, items: { select: { productId: true, variantKey: true, quantity: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  const signature = signatureOf(items);
+  const twin = recent.find((o) => o.status === "PENDING" && now - o.createdAt.getTime() < DUPLICATE_WINDOW_MS && signatureOf(o.items) === signature);
+  if (twin) {
+    return { success: true, orderId: twin.id, orderReference: orderReferenceOf(twin.id), totals: { ...totals, subtotal: twin.subtotal, shippingCost: twin.shippingCost, total: twin.total }, duplicate: true };
+  }
+  if (recent.length >= MAX_ORDERS_PER_PHONE_PER_DAY) return { success: false, error: "order.errorTooMany" };
+  if (clientIp) {
+    const fromIp = await prisma.order.count({ where: { clientIp, paymentMethod: "cod", createdAt: { gt: new Date(now - 60 * 60 * 1000) } } });
+    if (fromIp >= MAX_ORDERS_PER_IP_PER_HOUR) return { success: false, error: "order.errorTooMany" };
+  }
+
+  const { details, attribution } = input;
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      for (const [productId, units] of unitsByProduct) {
+        // Only succeeds while that many are still there: two customers can't both take the last piece
+        const taken = await tx.product.updateMany({ where: { id: productId, stock: { gte: units } }, data: { stock: { decrement: units } } });
+        if (taken.count !== 1) throw new OutOfStock();
+      }
+      return tx.order.create({
+        data: {
+          customerName: details.fullName,
+          phone: phone.national,
+          city: details.city,
+          location: `${details.address}, ${details.city}`,
+          shippingAddress: { address1: details.address, city: details.city, country: "MA" },
+          status: "PENDING",
+          subtotal: totals.subtotal,
+          shippingCost: totals.shippingCost,
+          total: totals.total,
+          currency: "MAD",
+          locale: input.locale,
+          paymentMethod: "cod",
+          paymentStatus: "unpaid",
+          stockHeld: true,
+          clientIp,
+          ...(attribution && {
+            utmSource: attribution.utm_source ?? null,
+            utmMedium: attribution.utm_medium ?? null,
+            utmCampaign: attribution.utm_campaign ?? null,
+            utmContent: attribution.utm_content ?? null,
+            utmTerm: attribution.utm_term ?? null,
+            fbclid: attribution.fbclid ?? null,
+            attribution: { ...attribution },
+          }),
+          items: { create: items.map((item) => ({ ...item })) },
+        },
+        select: { id: true },
+      });
+    });
+    return { success: true, orderId: order.id, orderReference: orderReferenceOf(order.id), totals, duplicate: false };
+  } catch (err) {
+    if (err instanceof OutOfStock) return { success: false, error: "order.errorNotEnough" };
+    throw err;
+  }
 }

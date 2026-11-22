@@ -16,6 +16,8 @@ function WhatsAppIcon({ className }: { className?: string }) {
 
 interface WhatsappFloatingButtonProps {
   enabled: boolean;
+  /** What a screen reader says, in the page's language */
+  label: string;
   whatsappLink?: string;
   whatsappNumber?: string;
 }
@@ -30,6 +32,7 @@ function buildWhatsappHref(link?: string, number?: string): string | null {
 
 export function WhatsappFloatingButton({
   enabled,
+  label,
   whatsappLink,
   whatsappNumber,
 }: WhatsappFloatingButtonProps) {
@@ -43,8 +46,8 @@ export function WhatsappFloatingButton({
       href={href}
       target="_blank"
       rel="noreferrer"
-      aria-label="Contact us on WhatsApp"
-      className="whatsapp-fab fixed bottom-4 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105 hover:shadow-xl md:bottom-6 md:right-6"
+      aria-label={label}
+      className="whatsapp-fab fixed bottom-4 end-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105 hover:shadow-xl md:bottom-6 md:right-6"
     >
       <WhatsAppIcon className="size-6" />
     </a>

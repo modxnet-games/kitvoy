@@ -5,20 +5,25 @@
  *
  * An event carries only: its name, the order reference once there is one, the
  * in-app browser (if any), a timing or a short code, the screen width, and a
- * random id that lasts for one page load. No name, email, address, IP address,
+ * random id that lasts for one page load. No name, phone, address, IP address,
  * user agent or cookie is read or stored. No Node imports here: the browser
  * uses the same list.
  */
 export const CHECKOUT_EVENTS = [
   "checkout_opened",
-  "details_saved",
+  // The form was sent but a field failed the check (`code` names the first one)
+  "order_invalid",
+  "order_submitted",
+  "order_placed",
+  // The server refused the order (`code` is the reason)
+  "order_failed",
 ] as const;
 
 export type CheckoutEventName = (typeof CHECKOUT_EVENTS)[number];
 
 export interface CheckoutEvent {
   e: CheckoutEventName;
-  /** KTV-… once the order exists */
+  /** The order reference, once the order exists */
   ref?: string;
   /** facebook | instagram | threads, when in one of Meta's in-app browsers */
   app?: string;
@@ -34,7 +39,7 @@ export interface CheckoutEvent {
   sid?: string;
 }
 
-const REFERENCE_RE = /^KTV-[A-Z0-9]{8}$/;
+const REFERENCE_RE = /^[A-Z]{2,5}-[A-Z0-9]{8}$/;
 const CODE_RE = /^[A-Za-z0-9_.:,-]{1,48}$/;
 const SID_RE = /^[a-z0-9]{6,12}$/;
 const APPS = new Set(["facebook", "instagram", "threads"]);

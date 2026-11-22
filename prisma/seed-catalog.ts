@@ -21,7 +21,7 @@ import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 
 import { getCatalogProduct } from "../src/config/catalog";
-import { productContents } from "../src/config/products";
+import { productEntries } from "../src/config/products";
 
 loadEnvConfig(process.cwd());
 
@@ -40,7 +40,9 @@ async function main() {
 
   const prisma = new PrismaClient();
   try {
-    for (const content of productContents) {
+    for (const page of productEntries) {
+      // The gallery is the same photos in both languages; the database keeps the French alt texts
+      const content = { slug: page.slug, database: page.database, gallery: page.content.fr.gallery };
       const entry = getCatalogProduct(content.slug);
       if (!entry) {
         console.log(`- ${content.slug}: not in config/catalog.ts, skipped`);
@@ -67,8 +69,8 @@ async function main() {
         continue;
       }
 
-      console.log(`- ${content.slug}: ${apply ? "creating" : "would create"} "${db.name}" at $${db.price}, stock ${db.stock}, SKU ${db.sku}, category "${db.categoryName}", ${content.gallery.length} images`);
-      console.log(`  colours: ${entry.variants.map((v) => `${v.label} = ${v.sku}`).join("; ")}`);
+      console.log(`- ${content.slug}: ${apply ? "creating" : "would create"} "${db.name}" at ${db.price} MAD, stock ${db.stock}, SKU ${db.sku}, category "${db.categoryName}", ${content.gallery.length} images`);
+      console.log(`  colours: ${entry.colours.map((c) => c.label.fr).join(", ")} · sizes: ${entry.sizes.join(", ")}`);
       if (!apply) continue;
 
       const category = await prisma.category.upsert({

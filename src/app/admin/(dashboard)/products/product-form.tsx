@@ -140,7 +140,7 @@ export function ProductForm({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <label htmlFor="price" className="mb-1.5 block text-sm font-medium">
-              Price (USD) *
+              Price (MAD) *
             </label>
             <Input
               id="price"
@@ -154,7 +154,7 @@ export function ProductForm({
           </div>
           <div>
             <label htmlFor="compareAtPrice" className="mb-1.5 block text-sm font-medium">
-              Compare at price (USD)
+              Compare at price (MAD)
             </label>
             <Input
               id="compareAtPrice"
@@ -168,7 +168,7 @@ export function ProductForm({
           </div>
           <div>
             <label htmlFor="shippingTax" className="mb-1.5 block text-sm font-medium">
-              Shipping tax / delivery cost (USD)
+              Delivery cost per piece (MAD)
             </label>
             <Input
               id="shippingTax"
@@ -208,7 +208,7 @@ export function ProductForm({
       </div>
 
       <div className="space-y-6 rounded-xl border bg-card p-6">
-        <h2 className="font-semibold">Display & reviews</h2>
+        <h2 className="font-semibold">Display</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label htmlFor="badge" className="mb-1.5 block text-sm font-medium">
@@ -225,32 +225,6 @@ export function ProductForm({
               <option value="Sale">Sale</option>
               <option value="Bestseller">Bestseller</option>
             </select>
-          </div>
-          <div>
-            <label htmlFor="rating" className="mb-1.5 block text-sm font-medium">
-              Rating (0–5)
-            </label>
-            <Input
-              id="rating"
-              name="rating"
-              type="number"
-              step="0.1"
-              min="0"
-              max="5"
-              defaultValue={product?.rating}
-            />
-          </div>
-          <div>
-            <label htmlFor="reviewCount" className="mb-1.5 block text-sm font-medium">
-              Review count
-            </label>
-            <Input
-              id="reviewCount"
-              name="reviewCount"
-              type="number"
-              min="0"
-              defaultValue={product?.reviewCount}
-            />
           </div>
           <div className="flex items-end pb-2">
             <label className="flex cursor-pointer items-center gap-2">

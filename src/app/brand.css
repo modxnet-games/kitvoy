@@ -1,23 +1,23 @@
 /*
- * Kitvoy brand layer: the top bar, header, footer, cart drawer and product page.
+ * Brand layer (Chrilik): the top bar, header, footer, cart drawer and product page.
  *
  * The layout is the owner's TreeAura store (treeaura.shop), brought over rule
  * for rule: same spacing, sizes and type, so the two stores share one design.
- * What changes is the palette, which is the Kitvoy logo's: every colour reads a
+ * What changes is the palette, which is the store logo's: every colour reads a
  * --kv-* variable from globals.css. Class names carry a kv- prefix so nothing
  * here meets the older storefront.css.
  *
  * Order matters and follows TreeAura's own files (base rules, then its three
  * rounds of refinements): later blocks deliberately restate earlier ones.
- * Kitvoy's additions come last.
+ * The store's own additions come last, and chrilik.css adds the cash-on-delivery parts.
  *
  * Deliberate departures from TreeAura's values (the store's accessibility
  * checks hold text to WCAG AA, and the logo needs its room):
  *  - Accent text on cream (eyebrows, the step numerals, the italic tagline)
- *    uses --kv-sage-deep. The logo sage itself is kept for icons, bullets and
+ *    uses --kv-sage-deep. The lighter accent is kept for icons, bullets and
  *    other marks that are not text.
  *  - Struck prices in the cart use the muted text colour, not a paler grey.
- *  - The header is 62px, not 58px: the stacked Kitvoy logo needs the room.
+ *  - The header is 62px, not 58px.
  */
 
 /* TreeAura sets these on <body>. Here they belong to the parts built from its stylesheet */
@@ -126,7 +126,7 @@ h3.kv-display {
 .kv-btn-primary {
   background: var(--kv-forest);
   color: var(--kv-ivory);
-  box-shadow: 0 10px 24px -14px rgba(28, 82, 68, 0.9);
+  box-shadow: 0 10px 24px -14px rgba(168, 68, 58, 0.9);
 }
 .kv-btn-primary:hover {
   background: var(--kv-forest-2);
@@ -136,7 +136,7 @@ h3.kv-display {
   color: var(--kv-ink);
 }
 .kv-btn-gold:hover {
-  background: #ddebdf;
+  background: #F6DDD3;
 }
 .kv-btn-ghost {
   background: transparent;
@@ -249,7 +249,7 @@ h3.kv-display {
   user-select: none;
   -webkit-user-select: none;
   touch-action: pan-y;
-  background: #0a1d18;
+  background: #1E0F0C;
   box-shadow: var(--kv-shadow);
 }
 .kv-ba img {
@@ -296,7 +296,7 @@ h3.kv-display {
   text-transform: uppercase;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(15, 42, 35, 0.6);
+  background: rgba(42, 22, 18, 0.6);
   color: var(--kv-ivory);
   backdrop-filter: blur(6px);
 }
@@ -336,7 +336,7 @@ h3.kv-display {
 }
 .kv-gallery-caption {
   position: absolute;
-  left: 12px;
+  inset-inline-start: 12px;
   bottom: 10px;
   font-size: 10px;
   letter-spacing: 0.06em;
@@ -416,7 +416,7 @@ h3.kv-display {
   border: 1.5px solid var(--kv-line);
   border-radius: 999px;
   background: var(--kv-white);
-  padding: 8px 14px 8px 8px;
+  padding-block: 8px; padding-inline: 8px 14px;
   font-size: 13px;
 }
 .kv-mood[aria-pressed="true"] {
@@ -530,7 +530,7 @@ h3.kv-display {
 .kv-faq summary {
   list-style: none;
   cursor: pointer;
-  padding: 20px 36px 20px 0;
+  padding-block: 20px; padding-inline: 0 36px;
   position: relative;
   font-family: var(--kv-serif);
   font-size: 21px;
@@ -542,7 +542,7 @@ h3.kv-display {
 .kv-faq summary::after {
   content: "+";
   position: absolute;
-  right: 4px;
+  inset-inline-end: 4px;
   top: 16px;
   font-family: var(--kv-sans);
   font-weight: 300;
@@ -745,7 +745,7 @@ h3.kv-display {
   align-items: center;
   gap: 12px;
   width: 100%;
-  text-align: left;
+  text-align: start;
   padding: 16px 14px;
   border: 1.5px solid var(--kv-line);
   border-radius: 14px;
@@ -755,13 +755,13 @@ h3.kv-display {
 }
 .kv-bundle.on {
   border-color: var(--kv-forest);
-  background: #f1f6f0;
+  background: #FBEDE6;
   box-shadow: inset 0 0 0 1px var(--kv-forest);
 }
 .kv-bundle-flag {
   position: absolute;
   top: -10px;
-  right: 14px;
+  inset-inline-end: 14px;
   background: var(--kv-forest);
   color: var(--kv-accent);
   font-size: 10px;
@@ -774,7 +774,7 @@ h3.kv-display {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 1.5px solid #b5b9ad;
+  border: 1.5px solid #CDB9A8;
   background: var(--kv-white);
   flex: 0 0 auto;
   display: inline-block;
@@ -859,7 +859,7 @@ h3.kv-display {
 .kv-gallery-mark {
   position: absolute;
   top: 12px;
-  right: 12px;
+  inset-inline-end: 12px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -867,7 +867,7 @@ h3.kv-display {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: rgba(28, 82, 68, 0.72);
+  color: rgba(168, 68, 58, 0.72);
 }
 .kv-gallery-mark.on-img-dark {
   color: rgba(251, 248, 241, 0.82);
@@ -875,7 +875,7 @@ h3.kv-display {
 }
 .kv-gallery-badge {
   position: absolute;
-  left: 12px;
+  inset-inline-start: 12px;
   top: 12px;
   display: flex;
   align-items: center;
@@ -886,7 +886,7 @@ h3.kv-display {
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(207, 227, 210, 0.9);
   border-radius: 999px;
-  padding: 7px 16px 7px 7px;
+  padding-block: 7px; padding-inline: 7px 16px;
   box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.5);
   color: var(--kv-ink);
 }
@@ -917,7 +917,7 @@ h3.kv-display {
   font-size: 13px;
   font-weight: 500;
   color: var(--kv-muted);
-  margin-left: 4px;
+  margin-inline-start: 4px;
 }
 /* ---------- Cart drawer ---------- */
 .kv-cart-head {
@@ -985,7 +985,7 @@ h3.kv-display {
   background: none;
   color: var(--kv-muted);
   padding: 4px;
-  margin: -4px -4px 0 0;
+  margin-block: -4px 0; margin-inline: 0 -4px;
   border-radius: 8px;
 }
 .kv-cart-remove:hover {
@@ -1056,13 +1056,13 @@ h3.kv-display {
   font-size: 14px;
 }
 .kv-cart-line-total {
-  text-align: right;
+  text-align: end;
   font-size: 14px;
   line-height: 1.35;
 }
 .kv-cart-line-total s {
   color: var(--kv-muted);
-  margin-right: 6px;
+  margin-inline-end: 6px;
 }
 .kv-cart-line-total strong {
   color: var(--kv-forest);
@@ -1186,7 +1186,7 @@ h3.kv-display {
   left: 0;
   right: 0;
   bottom: 12px;
-  padding-right: 12px;
+  padding-inline-end: 12px;
   display: flex;
   justify-content: flex-end;
   gap: 5px;
@@ -1204,7 +1204,7 @@ h3.kv-display {
   border-radius: 3px;
 }
 .kv-gallery-badge {
-  padding: 5px 12px 5px 5px;
+  padding-block: 5px; padding-inline: 5px 12px;
   gap: 8px;
 }
 .kv-gallery-badge-ic {
@@ -1286,7 +1286,7 @@ h3.kv-display {
 }
 .kv-shop-top .kv-mood {
   flex: 0 0 auto;
-  padding: 6px 12px 6px 6px;
+  padding-block: 6px; padding-inline: 6px 12px;
   font-size: 12.5px;
   gap: 6px;
   white-space: nowrap;
@@ -1350,7 +1350,7 @@ h3.kv-display {
 }
 
 /* =====================================================================
-   Kitvoy's own parts, in the same visual language
+   The store's own parts, in the same visual language
    ===================================================================== */
 
 /* Tailwind's reset gives buttons the default cursor and draws SVG as blocks */
@@ -1417,7 +1417,7 @@ h3.kv-display {
   place-items: center;
   width: 44px;
   height: 44px;
-  margin-right: -10px;
+  margin-inline-end: -10px;
   border: 0;
   background: none;
   color: var(--kv-forest);
@@ -1449,7 +1449,7 @@ h3.kv-display {
   align-items: center;
   gap: 6px;
 }
-/* Kitvoy has one more column of links than TreeAura */
+/* One more column of links than TreeAura */
 @media (min-width: 640px) {
   .kv-footer-grid.kv-footer-grid--wide {
     grid-template-columns: 2fr 1fr 1fr 1fr;
@@ -1493,7 +1493,7 @@ h3.kv-display {
 }
 /* TreeAura's photos are night scenes; on a bright photo the position dots are drawn in ink */
 .kv-gallery-dots.on-img-light i {
-  background: rgba(15, 42, 35, 0.22);
+  background: rgba(42, 22, 18, 0.22);
 }
 .kv-gallery-dots.on-img-light i.on {
   background: var(--kv-forest);
@@ -1526,8 +1526,8 @@ h3.kv-display {
   min-width: 0;
 }
 .kv-shop-top .kv-colour-name + .kv-moods {
-  margin-left: 0;
-  padding-left: 0;
+  margin-inline-start: 0;
+  padding-inline-start: 0;
 }
 @media (min-width: 960px) {
   /* 62px of header plus TreeAura's 20px of air */
@@ -1565,7 +1565,7 @@ h3.kv-display {
 }
 body:has(.cart-panel) [data-slot="sheet-overlay"],
 body:has(.store-menu) [data-slot="sheet-overlay"] {
-  background: rgba(15, 42, 35, 0.45);
+  background: rgba(42, 22, 18, 0.45);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   z-index: 60;
@@ -1641,7 +1641,7 @@ body:has(.store-menu) [data-slot="sheet-overlay"] {
 /* On a bright photo the comparison divider is drawn white with a soft edge, so it stays visible */
 .kv-ba-handle {
   background: var(--kv-white);
-  box-shadow: 0 0 0 1px rgba(15, 42, 35, 0.14), 0 0 16px rgba(15, 42, 35, 0.35);
+  box-shadow: 0 0 0 1px rgba(42, 22, 18, 0.14), 0 0 16px rgba(42, 22, 18, 0.35);
 }
 /* TreeAura scrolls smoothly to anchors (set on its root there) */
 html {

@@ -1,28 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminFromRequest } from "@/lib/auth/admin-jwt";
-import { getAllOrders } from "@/lib/data/admin-orders";
 
+import { isAuthorizedAdminRequest } from "@/lib/auth/admin-request";
+import { listOrders, parseStatusFilter, serializeOrder } from "@/lib/data/admin-orders";
+
+/**
+ * GET /api/admin/orders?status=&q=&limit=
+ * Cash-on-delivery orders, newest first, for the app (Bearer token) and the
+ * dashboard (session cookie).
+ * - status: PENDING, NO_ANSWER, CONFIRMED, SHIPPED, DELIVERED, RETURNED or
+ *   CANCELED; several can be given separated by commas. Empty: every status.
+ * - q: a reference, a customer name, a phone number or a city.
+ * - limit: 300 unless given, 1000 at most.
+ */
 export async function GET(request: NextRequest) {
-  const admin = getAdminFromRequest(request);
-  if (!admin) {
+  if (!(await isAuthorizedAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
+    const status = parseStatusFilter(searchParams.get("status"));
+    // A status that doesn't exist holds no orders
+    if (!status) return NextResponse.json([]);
 
-    let orders = await getAllOrders();
-
-    if (status) {
-      orders = orders.filter((o) => o.status === status.toUpperCase());
-    }
-
-    return NextResponse.json(orders);
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to fetch orders" },
-      { status: 500 },
-    );
+    const orders = await listOrders({ status, q: searchParams.get("q"), limit: searchParams.get("limit") });
+    return NextResponse.json(orders.map(serializeOrder));
+  } catch (err) {
+    console.error("[admin/orders] list failed:", err);
+    return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
   }
 }

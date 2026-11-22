@@ -1,34 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+
+import { policyContent } from "@/config/policy-content";
+import { getLocale } from "@/lib/locale-server";
+import { getMessages } from "@/messages";
 
 // Next.js answers 404 for this page. noindex here replaces the site-wide
 // "index, follow", so a missing URL never sends two opposite robots tags.
-export const metadata: Metadata = {
-  title: "Page not found",
-  robots: { index: false, follow: true },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: getMessages(await getLocale()).notFound.title, robots: { index: false, follow: true } };
+}
 
 // A server component on purpose: only plain markup and the storefront's own
 // classes, nothing imported from a client module.
-export default function NotFound() {
+export default async function NotFound() {
+  const locale = await getLocale();
+  const m = getMessages(locale);
   return (
-    <div className="store-container py-16 md:py-24">
-      <div className="mx-auto flex max-w-xl flex-col items-center text-center">
-        <p className="eyebrow">Error 404</p>
-        <h1 className="mt-3 font-serif text-4xl font-medium text-[#0f2a23] sm:text-5xl">We couldn&apos;t find that page.</h1>
-        <p className="mt-4 max-w-md text-base text-[#5b6b64]">
-          The link may be old or mistyped. Our products, and help with an order, are one click away.
-        </p>
-        <div className="mt-8 flex flex-col items-center gap-4">
-          <Link href="/" className="primary-button">
-            Go to the store <ArrowRight size={18} />
-          </Link>
-          <Link href="/support" className="text-link">
-            Help &amp; contact
-          </Link>
-        </div>
-      </div>
+    <div className="store-container kv-notfound">
+      <p className="eyebrow">404</p>
+      <h1>{m.notFound.title}</h1>
+      <p>{m.notFound.text}</p>
+      <Link href="/" className="kv-btn kv-btn-primary">{m.notFound.cta}</Link>
+      <Link href="/support" className="text-link">{policyContent[locale].help}</Link>
     </div>
   );
 }

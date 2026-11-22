@@ -11,13 +11,11 @@ import { trackAddToCart } from "@/lib/analytics/meta-pixel";
 import { getBundleSavings, getLineTotal } from "@/lib/bundles";
 import { arrivalRange } from "@/lib/delivery-estimate";
 import { formatPrice } from "@/lib/formatters";
-import type { ReviewSummary } from "@/lib/reviews";
 import { COUNTRY_RULES, isCountryCode } from "@/lib/us-address";
 import { useCartStore, type CartItem } from "@/store/cart-store";
 import { useStorefrontUI } from "@/store/storefront-ui";
 import { withVariant, type ProductDisplay } from "@/types/product";
 import { TrackViewContent } from "@/components/analytics/track-view-content";
-import { CustomerReviews } from "@/components/landing/customer-reviews";
 import { PayBadges, TrustIcon } from "@/components/payments/pay-badges";
 import { BeforeAfter } from "./before-after";
 import { ProductDiagram } from "./product-diagram";
@@ -38,8 +36,6 @@ export interface ProductPageProps {
   content: ProductContent;
   /** The complete FAQ list, already assembled by the server page (product questions + shipping/returns) */
   faqs: { q: string; a: string }[];
-  /** The reviews section is rendered only when there is at least one approved review */
-  reviews?: ReviewSummary | null;
   /** Cloudflare's CF-IPCountry for this visitor, e.g. "US", "DE", or null */
   visitorCountry?: string | null;
   /** Today in the store's time zone (YYYY-MM-DD), from the server, for the delivery estimate */
@@ -211,7 +207,7 @@ function buildLines(product: ProductDisplay, quantity: number, chosen: CatalogVa
 /** What one unit costs inside a pack, never rounded up: $49.99 for two reads $24.99 each. */
 const perUnit = (total: number, quantity: number) => Math.floor(Math.round(total * 100) / quantity) / 100;
 
-export function ProductPage({ product, entry, content, faqs, reviews, visitorCountry = null, today = null }: ProductPageProps) {
+export function ProductPage({ product, entry, content, faqs, visitorCountry = null, today = null }: ProductPageProps) {
   const { tiers, variants } = entry;
   const largestPack = Math.max(1, ...tiers.map((tier) => tier.quantity));
   const hasColours = entry.hasColourChoice && variants.length > 0;
@@ -533,9 +529,6 @@ export function ProductPage({ product, entry, content, faqs, reviews, visitorCou
           </div>
         </div>
       </section>
-
-      {/* Customer reviews: approved ones only, and no section at all until there is one */}
-      {reviews && reviews.count > 0 && <CustomerReviews summary={reviews} />}
 
       {/* FAQ */}
       <section id="faq" className="kv-section">

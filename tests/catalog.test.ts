@@ -2,11 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { catalog, countriesForCart, getCatalogProduct, getCatalogVariant, productPath, shipsTo } from "../src/config/catalog";
-import { cjLogisticFor, cjVariantFor } from "../src/config/fulfillment";
 import { getProductContent, productContents } from "../src/config/products";
 import { getBundleSavings, getLineTotal, lineSavings, priceLines } from "../src/lib/bundles";
-import { buildCjOrderPayload, type CjOrderInput } from "../src/lib/fulfillment/cj-order";
-import { orderLinesKey, validateOrderInput } from "../src/lib/orders";
+import { validateOrderInput } from "../src/lib/orders";
 import { productFaqs } from "../src/lib/product-faq";
 import { COUNTRY_RULES, countryOf, formatAddressLine, toShippingAddress, validateCheckoutDetails, type CheckoutDetails } from "../src/lib/us-address";
 import { withVariant, type ProductDisplay } from "../src/types/product";
@@ -16,24 +14,21 @@ const content = getProductContent("pouncepop")!;
 
 const usDetails: CheckoutDetails = {
   email: "buyer@example.com", fullName: "Test Buyer", phone: "(202) 555-0143", address1: "1600 Example Ave", address2: "",
-  city: "Washington", state: "DC", zip: "20001", country: "US", paymentMethod: "card",
+  city: "Washington", state: "DC", zip: "20001", country: "US",
 };
 
-test("every catalog product has a page, a number, tiers that start at one unit and a CJ variant per colour", () => {
-  assert.deepEqual(catalog.map((p) => p.path).sort(), ["/inflator", "/products/pouncepop"]);
-  assert.equal(new Set(catalog.map((p) => p.hubNumber)).size, catalog.length, "bio-link numbers are unique");
+test("every catalog product has a page, tiers that start at one unit and a SKU per colour", () => {
+  assert.deepEqual(catalog.map((p) => p.path).sort(), ["/products/pouncepop"]);
   for (const product of catalog) {
     assert.equal(product.tiers[0].quantity, 1);
     assert.equal(product.tiers[0].discount, 0);
     assert.ok(product.variants.length >= 1);
     assert.equal(product.hasColourChoice, product.variants.length > 1);
-    assert.equal(new Set(product.variants.map((v) => v.cj.vid)).size, product.variants.length, "each colour ships its own CJ variant");
     assert.equal(new Set(product.variants.map((v) => v.sku)).size, product.variants.length);
     assert.ok(shipsTo(product.slug).includes("US"));
   }
   assert.equal(productPath("pouncepop"), "/products/pouncepop");
-  assert.equal(productPath("cordless-tire-inflator"), "/inflator");
-  assert.equal(productPath("unknown"), "/products");
+  assert.equal(productPath("unknown"), "/", "a product outside the catalog leads to the storefront");
 });
 
 test("PouncePop packs are $29.99, $49.99 and $64.99, with savings counted against the single price only", () => {
@@ -46,8 +41,8 @@ test("PouncePop packs are $29.99, $49.99 and $64.99, with savings counted agains
   assert.ok(getLineTotal(29.99, 2, "pouncepop") / 2 > getLineTotal(29.99, 3, "pouncepop") / 3, "three are the best value per ball");
   // An admin price cut can't push a fixed discount past the cap
   assert.ok(getLineTotal(10, 3, "pouncepop") >= 30 * (1 - ball.maxDiscount) - 0.005);
-  // The inflator's rule is untouched, and remains the rule for a product outside the catalog
-  assert.deepEqual([1, 2, 3].map((q) => getLineTotal(59.99, q, "cordless-tire-inflator")), [59.99, 99.99, 134.98]);
+  // The store's original rule remains the rule for a product outside the catalog
+  assert.deepEqual([1, 2, 3].map((q) => getLineTotal(59.99, q, "something-else")), [59.99, 99.99, 134.98]);
   assert.deepEqual([1, 2, 3].map((q) => getLineTotal(59.99, q)), [59.99, 99.99, 134.98]);
 });
 
@@ -60,7 +55,7 @@ test("a product bought in several colours is one bundle, split across its lines 
   assert.ok(three[0] > three[1]);
   assert.equal(Math.round(lineSavings([line(1), line(1), line(1)]).reduce((a, b) => a + b, 0) * 100), 2498);
   // Different products never share a bundle
-  const mixed = priceLines([line(1), { productId: "p2", slug: "cordless-tire-inflator", unitPrice: 59.99, quantity: 1 }]);
+  const mixed = priceLines([line(1), { productId: "p2", slug: "something-else", unitPrice: 59.99, quantity: 1 }]);
   assert.deepEqual(mixed, [29.99, 59.99]);
   assert.deepEqual(priceLines([]), []);
 });
@@ -108,64 +103,23 @@ test("checkout accepts an address only in a listed country, with that country's 
 });
 
 test("a cart ships only where every product in it ships", () => {
-  assert.deepEqual(shipsTo("cordless-tire-inflator"), ["US"]);
+  assert.deepEqual(shipsTo("something-else"), ["US"], "a product outside the catalog ships to the US only");
   assert.deepEqual(shipsTo("pouncepop"), ["US", "GB", "DE", "FR", "NL", "ES", "MX", "CL"]);
   assert.deepEqual(countriesForCart(["pouncepop"]), ["US", "GB", "DE", "FR", "NL", "ES", "MX", "CL"]);
-  assert.deepEqual(countriesForCart(["pouncepop", "cordless-tire-inflator"]), ["US"], "with the inflator in the cart, the order can only go to the US");
+  assert.deepEqual(countriesForCart(["pouncepop", "something-else"]), ["US"], "with a product from outside the catalog in the cart, the order can only go to the US");
   assert.deepEqual(countriesForCart(["something-else"]), ["US"]);
 });
 
-test("CJ orders carry the colour's own variant, the country and that country's shipping line", () => {
-  assert.equal(cjVariantFor("pouncepop", "blue")?.sku, "CJYD169305903CX");
-  assert.equal(cjVariantFor("pouncepop", "orange")?.vid, "1629734538815483904");
-  assert.equal(cjVariantFor("pouncepop", null), undefined, "a ball with no colour is never guessed");
-  assert.equal(cjVariantFor("pouncepop", "green"), undefined);
-  assert.equal(cjVariantFor("cordless-tire-inflator", null)?.sku, "CJYD218658003CX");
-  assert.equal(getCatalogVariant("pouncepop", "purple")?.label, "Purple");
-
-  const de = toShippingAddress({ ...usDetails, country: "DE", city: "Berlin", state: "", zip: "10115" });
-  const order: CjOrderInput = {
-    id: "cmorder1234567890abcdefgh", reference: "KTV-ABCDEFGH", customerName: "Test Buyer", email: "buyer@example.com", phone: "+49301234567", total: 64.99,
-    shippingAddress: de,
-    items: [
-      { productSlug: "pouncepop", productName: "PouncePop (Blue)", quantity: 2, variantKey: "blue" },
-      { productSlug: "pouncepop", productName: "PouncePop (Orange)", quantity: 1, variantKey: "orange" },
-    ],
-  };
-  const built = buildCjOrderPayload(order, { payType: 2, sandbox: false });
-  assert.ok(built.ok);
-  assert.deepEqual(built.payload.products, [
-    { vid: "2407290950431610500", quantity: 2 },
-    { vid: "1629734538815483904", quantity: 1 },
-  ]);
-  assert.equal(built.payload.shippingCountryCode, "DE");
-  assert.equal(built.payload.shippingCountry, "Germany");
-  assert.equal(built.payload.shippingProvince, "Berlin", "with no region typed, the city stands in for CJ's required province");
-  assert.equal(built.payload.logisticName, "CJPacket Eub Special Line");
-  assert.equal(cjLogisticFor(["pouncepop"], "MX"), "CJPacket Latin America Sensitive");
-  assert.equal(cjLogisticFor(["pouncepop", "cordless-tire-inflator"], "US"), "CJPacket Sensitive");
-
-  // No colour on the line, or a country the product doesn't ship to: left for a person, never guessed
-  const noColour = buildCjOrderPayload({ ...order, items: [{ productSlug: "pouncepop", productName: "PouncePop", quantity: 1 }] }, { payType: 2, sandbox: false });
-  assert.equal(noColour.ok, false);
-  const inflatorAbroad = buildCjOrderPayload({ ...order, items: [{ productSlug: "cordless-tire-inflator", productName: "Cordless Tire Inflator", quantity: 1 }] }, { payType: 2, sandbox: false });
-  assert.equal(inflatorAbroad.ok, false);
-  assert.match(inflatorAbroad.ok ? "" : inflatorAbroad.error, /doesn't ship to Germany/);
-});
-
-test("the cart and the saved order tell colours apart", () => {
+test("the cart tells colours apart", () => {
   const product = { id: "p1", slug: "pouncepop", name: "PouncePop", sku: "PET-001", images: ["/a.webp", "/blue.webp"] } as ProductDisplay;
   const blue = withVariant(product, { key: "blue", label: "Blue", sku: "PET-001-BL", image: "/blue.webp" });
-  assert.equal(blue.sku, "PET-001-BL", "the colour's SKU is what tracking and the feed use");
+  assert.equal(blue.sku, "PET-001-BL", "the colour's SKU is what tracking uses");
   assert.deepEqual(blue.images, ["/blue.webp", "/a.webp"], "the colour's photo leads the cart line");
   assert.deepEqual(blue.variant, { key: "blue", label: "Blue" });
   assert.equal(product.variant, undefined);
-  assert.notEqual(
-    orderLinesKey([{ productId: "p1", variantKey: "blue", quantity: 2, unitPrice: 29.99 }]),
-    orderLinesKey([{ productId: "p1", variantKey: "orange", quantity: 2, unitPrice: 29.99 }]),
-    "changing only the colour still updates the saved order",
-  );
-  assert.equal(orderLinesKey([{ productId: "p1", quantity: 1, unitPrice: 59.99 }]), "p1x1@5999", "orders without colours keep their key");
+  assert.equal(getCatalogVariant("pouncepop", "purple")?.label, "Purple");
+  assert.equal(getCatalogVariant("pouncepop", "green"), undefined);
+  assert.equal(getCatalogVariant("pouncepop", null), undefined, "a ball with no colour is never guessed");
 });
 
 test("product copy carries the owner's spec, with no fake urgency, reviews, 'was' prices, tax notes or size warnings", () => {
@@ -188,7 +142,7 @@ test("product copy carries the owner's spec, with no fake urgency, reviews, 'was
       c.seo.pageTitle, c.seo.description, c.seo.summary, ...c.seo.facts.flatMap((f) => [f.name, f.value]),
       c.merchant.title, c.merchant.description, ...c.merchant.highlights,
       c.database.name, c.database.shortDescription, c.database.description, c.database.details,
-      entry.shortName, entry.tagline,
+      entry.shortName,
     ].join(" \n ");
 
     // Numbers and claims the owner's spec doesn't give are not invented
@@ -260,9 +214,8 @@ test("the product page's shipping and guarantee answers come from the catalog an
   assert.match(faqs.at(-1)!.a, /within 30 days of delivery/);
 });
 
-test("product markup and feed items describe each colour as its own variant of one product", async () => {
+test("product markup describes each colour as its own variant of one product", async () => {
   const { catalogProductSchema, faqSchema } = await import("../src/lib/seo/structured-data");
-  const { catalogFeedItems, merchantFeed } = await import("../src/lib/seo/merchant-feed");
   const origin = new URL((await import("../src/config/site")).siteConfig.url).origin;
   const product = { id: "p1", slug: "pouncepop", name: content.database.name, sku: "PET-001", price: 29.99, stock: 20, shippingTax: 0, images: [] } as unknown as ProductDisplay;
 
@@ -270,7 +223,7 @@ test("product markup and feed items describe each colour as its own variant of o
   assert.equal(schema["@type"], "ProductGroup");
   assert.equal(schema["@id"], `${origin}/products/pouncepop#product`);
   assert.equal(schema.productGroupID, "PET-001");
-  assert.equal("aggregateRating" in schema, false, "no rating markup without approved reviews");
+  assert.equal("aggregateRating" in schema, false, "no rating markup: the store shows no reviews");
   assert.equal("review" in schema, false);
   const variants = schema.hasVariant as { sku: string; color: string; offers: Record<string, unknown> }[];
   assert.deepEqual(variants.map((v) => v.sku), ["PET-001-OR", "PET-001-PU", "PET-001-BL"]);
@@ -283,26 +236,7 @@ test("product markup and feed items describe each colour as its own variant of o
     assert.deepEqual(destinations, shipsTo("pouncepop"));
   }
   assert.doesNotMatch(JSON.stringify(schema), /compareAt|highPrice|strikethrough/i);
-  const rated = catalogProductSchema(product, ball, content, { count: 2, average: 4.5, distribution: [1, 1, 0, 0, 0], reviews: [] }) as Record<string, unknown>;
-  assert.ok("aggregateRating" in rated, "ratings appear once real reviews are approved");
   assert.equal(faqSchema([{ q: "Q", a: "A" }], "/products/pouncepop")["@id"], `${origin}/products/pouncepop#faq`);
-
-  const items = catalogFeedItems({ sku: "PET-001", price: 29.99, stock: 20, shippingTax: 0, images: [] }, ball, content);
-  assert.equal(items.length, 3);
-  for (const [i, item] of items.entries()) {
-    const variant = ball.variants[i];
-    assert.ok(item.includes(`<g:id>${variant.sku}</g:id>`));
-    assert.ok(item.includes("<g:item_group_id>PET-001</g:item_group_id>"));
-    assert.ok(item.includes(`<g:color>${variant.label}</g:color>`));
-    assert.ok(item.includes(`color=${variant.key}`), "the listing lands with its colour picked");
-    assert.ok(item.includes("<g:price>29.99 USD</g:price>"));
-    assert.ok(item.includes("<g:identifier_exists>no</g:identifier_exists>"), "no invented GTIN or MPN");
-    assert.equal(/<g:sale_price>/.test(item), false);
-  }
-  const feed = merchantFeed(null, items);
-  assert.equal([...feed.matchAll(/<item>/g)].length, 3);
-  assert.doesNotMatch(feed.replace(/&(amp|lt|gt|quot);/g, ""), /&/, "no bare ampersand");
-  assert.equal(content.merchant.inFeed, false, "the product stays out of the live feed until the owner switches it on");
 });
 
 test("every product photo the page names is a file in public/", async () => {
@@ -314,33 +248,10 @@ test("every product photo the page names is a file in public/", async () => {
       ...c.demoLoops.map((d) => d.poster),
       ...c.story.map((s) => s.image),
       c.included.image,
-      entry.fallbackImage,
       ...entry.variants.flatMap((v) => (v.image ? [v.image] : [])),
     ]);
     for (const path of paths) assert.ok(existsSync(`public${path}`), `${path} exists`);
   }
-});
-
-test("an address with no region or postal code reaches Stripe and the customer's email without blanks", async () => {
-  const { intentShipping } = await import("../src/lib/payments/stripe-intent");
-  const { buildOrderConfirmationEmail } = await import("../src/lib/email");
-  type IntentOrder = Parameters<typeof intentShipping>[0];
-  const order = (shippingAddress: unknown) => ({ customerName: "Test Buyer", phone: "+44 7700 900123", location: "x", shippingAddress }) as unknown as IntentOrder;
-
-  const gb = intentShipping(order(toShippingAddress({ ...usDetails, country: "GB", city: "London", state: "", zip: "SW1A 1AA" }))).address!;
-  assert.equal(gb.country, "GB");
-  assert.equal(gb.state, undefined, "an empty county is left out, not sent as an empty string");
-  const cl = intentShipping(order(toShippingAddress({ ...usDetails, country: "CL", city: "Santiago", state: "RM", zip: "" }))).address!;
-  assert.equal(cl.postal_code, undefined);
-  assert.equal(cl.country, "CL");
-  // An order saved before the store shipped abroad has no country: still a US intent
-  assert.equal(intentShipping(order({ address1: "1 Main St", city: "Austin", state: "TX", zip: "73301" })).address!.country, "US");
-
-  const base = { to: "b@example.com", customerName: "Test Buyer", orderReference: "KTV-ABCDEFGH", orderDate: new Date("2026-11-13T12:00:00Z"), items: [{ productName: "PouncePop (Blue)", quantity: 1, lineTotal: 29.99 }], subtotal: 29.99, shippingCost: 0, total: 29.99, paymentMethod: "card", shipTo: ["Test Buyer", "Calle 1", "Madrid, Madrid 28001", "Spain"] };
-  const abroad = buildOrderConfirmationEmail({ ...base, delivery: { country: "Spain", days: { min: 13, max: 16 } } }).text;
-  assert.match(abroad, /delivery to Spain usually takes 13–16 days/);
-  assert.doesNotMatch(abroad, /4–9 business days/, "an order abroad is never promised the US delivery time");
-  assert.match(buildOrderConfirmationEmail(base).text, /4–9 business days/);
 });
 
 test("the delivery estimate counts business days from the store's own date", async () => {

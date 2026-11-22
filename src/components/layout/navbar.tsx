@@ -7,12 +7,12 @@ import { ArrowRight, Menu, X } from "lucide-react";
 import { cartDrawerControl, useCartStore } from "@/store/cart-store";
 import { useStorefrontUI } from "@/store/storefront-ui";
 import { useMounted } from "@/hooks/use-mounted";
-import { INFLATOR_SLUG, catalog } from "@/config/catalog";
+import { catalog } from "@/config/catalog";
 import { BrandLogo } from "./brand-logo";
 import { CartDrawer } from "./cart-drawer";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 
-/** On the inflator's page the links jump to its sections; elsewhere they lead to the catalog. */
+/** On a product's page the links jump to its sections; elsewhere they lead to the storefront and the help pages. */
 function navLinks(pathname: string | null) {
   const product = catalog.find((p) => p.path === pathname);
   if (product) {
@@ -22,20 +22,19 @@ function navLinks(pathname: string | null) {
         { label: "Bundles", href: `${product.path}#bundles` },
         { label: "FAQ", href: `${product.path}#faq` },
       ],
-      cta: { label: product.slug === INFLATOR_SLUG ? "Shop inflator" : "Choose a pack", href: `${product.path}#bundles` },
+      cta: { label: "Choose a pack", href: `${product.path}#bundles` },
     };
   }
   return {
     links: [
-      { label: "All products", href: "/products" },
       { label: "Shipping", href: "/shipping" },
       { label: "Help", href: "/support" },
     ],
-    cta: { label: "Shop products", href: "/products" },
+    cta: { label: "Shop products", href: "/" },
   };
 }
 
-export function Navbar({ announcementText, announcementVisible = true }: { announcementText?: string; announcementVisible?: boolean }) {
+export function Navbar({ announcementVisible = true }: { announcementVisible?: boolean }) {
   const mounted = useMounted();
   const pathname = usePathname();
   const itemCount = useCartStore(s => s.getItemCount());
@@ -46,10 +45,6 @@ export function Navbar({ announcementText, announcementVisible = true }: { annou
   // A product page on the shared template keeps its header to the logo and the bag, so nothing leads away from the buy box
   const minimal = catalog.some((p) => p.path === pathname && p.path.startsWith("/products/"));
   const count = mounted ? itemCount : 0;
-  // The inflator ships to the US only, so its page keeps the US wording (or the admin's own text)
-  const announcement = pathname === "/inflator"
-    ? (announcementText || <><strong>Free U.S. Shipping</strong> on Every Order</>)
-    : <><strong>Free Tracked Shipping</strong> Included on Every Order</>;
 
   useEffect(() => useCartStore.subscribe((state, prev) => {
     if (state.items.length > prev.items.length) {
@@ -62,7 +57,7 @@ export function Navbar({ announcementText, announcementVisible = true }: { annou
 
   return <>
     <a className="skip-link" href="#main-content">Skip to content</a>
-    {announcementVisible && <div className="kv-topbar">{announcement}</div>}
+    {announcementVisible && <div className="kv-topbar"><strong>Free Tracked Shipping</strong> Included on Every Order</div>}
     <header className="kv-header">
       <div className="kv-wrap">
         <Link href="/" className="kv-logo" aria-label="Kitvoy home"><BrandLogo /></Link>
@@ -83,7 +78,7 @@ export function Navbar({ announcementText, announcementVisible = true }: { annou
     <Sheet open={overlay === "menu"} onOpenChange={open => setOverlay(open ? "menu" : null)}>
       <SheetContent side="right" className="store-menu" showCloseButton={false}>
         <SheetHeader className="menu-header"><SheetTitle className="kv-logo" aria-label="Kitvoy"><BrandLogo /></SheetTitle><SheetClose render={<button className="icon-button" aria-label="Close menu" />}><X /></SheetClose></SheetHeader>
-        <nav aria-label="Mobile navigation">{LINKS.map(link => <Link key={link.href} href={link.href} onClick={close}>{link.label}<ArrowRight size={19} /></Link>)}<Link href="/support" onClick={close}>Help & information<ArrowRight size={19} /></Link><Link href="/account" onClick={close}>My account<ArrowRight size={19} /></Link></nav>
+        <nav aria-label="Mobile navigation">{LINKS.map(link => <Link key={link.href} href={link.href} onClick={close}>{link.label}<ArrowRight size={19} /></Link>)}<Link href="/support" onClick={close}>Help & information<ArrowRight size={19} /></Link></nav>
         <Link href={cta.href} className="primary-button" onClick={close}>{cta.label}</Link>
       </SheetContent>
     </Sheet>

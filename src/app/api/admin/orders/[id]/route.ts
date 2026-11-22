@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFromRequest } from "@/lib/auth/admin-jwt";
 import { isAuthorizedAdminRequest } from "@/lib/auth/admin-request";
 import { getOrderById, deleteOrder, updateOrderFulfillment } from "@/lib/data/admin-orders";
-import { emailCustomerIfShipped } from "@/lib/fulfillment/shipping-email";
 
 export async function GET(
   request: NextRequest,
@@ -57,9 +56,11 @@ export async function DELETE(
 
 /**
  * PATCH /api/admin/orders/:id  { fulfillmentStatus?, trackingNumber? }
- * Manual fulfillment: record the tracking number and move a paid order through
+ * Manual fulfillment: record the tracking number and move an order through
  * UNFULFILLED → SHIPPED → DELIVERED. Accepts the mobile app's Bearer token or
  * the web dashboard's session cookie (same-origin JSON requests only).
+ * `customerEmail` stays in the answer for the mobile app and is always null:
+ * the store no longer emails customers.
  */
 export async function PATCH(
   request: NextRequest,
@@ -86,8 +87,7 @@ export async function PATCH(
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
     const { fulfillmentStatus: status, trackingNumber: tracking, shippedAt, status: orderStatus } = result.order;
-    const customerEmail = await emailCustomerIfShipped(result.order.id, result.previous);
-    return NextResponse.json({ fulfillmentStatus: status, trackingNumber: tracking, shippedAt, status: orderStatus, customerEmail });
+    return NextResponse.json({ fulfillmentStatus: status, trackingNumber: tracking, shippedAt, status: orderStatus, customerEmail: null });
   } catch (err) {
     console.error("[admin/orders] fulfillment update failed:", err);
     return NextResponse.json({ error: "Failed to update fulfillment" }, { status: 500 });

@@ -4,24 +4,19 @@ import { formatPrice } from "@/lib/formatters";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { DeleteOrderButton } from "./delete-order-button";
 import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
-import { isCjConfigured } from "@/config/fulfillment";
-import { CjSyncButton } from "./cj-sync-button";
 
 export default async function AdminOrdersPage() {
   const orders = await getAllOrders();
 
   return (
     <div>
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-            Orders
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Manage paid orders and fulfillment
-          </p>
-        </div>
-        {isCjConfigured() && <CjSyncButton />}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
+          Orders
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          Manage orders and fulfillment
+        </p>
       </div>
 
       <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
@@ -85,20 +80,13 @@ export default async function AdminOrdersPage() {
                         Paid
                       </span>
                     ) : (
-                      <span
-                        className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
-                        title="Checkout started but not paid"
-                      >
+                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
                         Unpaid
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3.5">
-                    {order.paymentStatus === "paid" ? (
-                      <FulfillmentBadge status={order.fulfillmentStatus} />
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                    <FulfillmentBadge status={order.fulfillmentStatus} />
                   </td>
                   <td className="px-4 py-3.5">
                     <StatusBadge status={order.status} />

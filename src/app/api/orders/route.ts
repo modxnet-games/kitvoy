@@ -1,16 +1,23 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { validateOrderInput } from "@/lib/orders";
-import { isSecureRequest, setResumeCookies } from "@/lib/checkout/resume-cookies";
-import { saveCheckoutOrder } from "@/lib/checkout/save-order";
+
+import { readOrderAttribution, type OrderAttribution } from "@/lib/analytics/attribution";
+import { createOrder, validateOrderInput } from "@/lib/orders";
+
+/** The page the customer is on, taken only in the shapes the checkout produces, without its query string. */
+function trackingFromBody(body: unknown): Pick<OrderAttribution, "eventSourceUrl"> {
+  const tracking = (body as { tracking?: Record<string, unknown> } | null)?.tracking;
+  if (!tracking || typeof tracking !== "object") return {};
+  const url = tracking.eventSourceUrl;
+  if (typeof url === "string" && url.length <= 1000 && /^(\/|https?:\/\/)/.test(url)) return { eventSourceUrl: url.split(/[?#]/)[0] };
+  return {};
+}
 
 /**
  * POST /api/orders
  *
- * Saves the checkout details as a pending (unpaid) order. One order per
- * checkout: when the browser presents the session token of an order that is
- * still open, that order is updated in place (reload, Edit, a changed cart)
- * instead of a second one being created.
+ * Validates the checkout details, prices the cart from the database and saves
+ * it as a pending (unpaid) order. Every successful request creates one order.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -24,24 +31,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await saveCheckoutOrder(request, body, validated.data);
-    if (!result.ok) {
+    // Which ad brought the customer, read from the request's cookies and headers
+    const attribution: OrderAttribution = { ...readOrderAttribution(request.cookies, request.headers), ...trackingFromBody(body) };
+    const created = await createOrder({ ...validated.data, attribution });
+    if (!created.success) {
       return NextResponse.json(
-        { error: result.error },
+        { error: created.error },
         { status: 400 },
       );
     }
-    const { saved } = result;
 
-    const response = NextResponse.json({
-      orderId: saved.orderId,
-      orderReference: saved.orderReference,
-      totals: saved.totals,
-      resumeToken: saved.sessionToken,
-      reused: saved.reused,
+    return NextResponse.json({
+      orderId: created.orderId,
+      orderReference: created.orderReference,
+      totals: created.totals,
     });
-    if (saved.sessionToken) setResumeCookies(response, saved.sessionToken, isSecureRequest(request));
-    return response;
   } catch (err) {
     console.error("Order creation error:", err);
     return NextResponse.json(

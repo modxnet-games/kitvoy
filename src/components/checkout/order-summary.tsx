@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Package, ShieldCheck, Truck } from "lucide-react";
+import { Package, Truck } from "lucide-react";
 
 import type { CartItem } from "@/store/cart-store";
 import { cartLineSavings, cartLineTotals, lineKey, useCartStore, getShippingForItems } from "@/store/cart-store";
@@ -10,23 +10,21 @@ import { storePolicies } from "@/config/policies";
 import { Price, ProductLineImage } from "@/components/storefront";
 import { cn } from "@/lib/utils";
 import { getCatalogProduct } from "@/config/catalog";
-import type { OrderTotals } from "@/lib/payments/money";
 
 interface OrderSummaryProps {
   className?: string;
-  /** The created order's server figures; before that, the cart's */
-  totals?: OrderTotals | null;
   /** Inside the phone's collapsible panel: no card chrome or heading of its own */
   embedded?: boolean;
 }
 
-export function OrderSummary({ className, totals, embedded = false }: OrderSummaryProps) {
+/** The cart's lines and totals, as the checkout shows them beside the details form. */
+export function OrderSummary({ className, embedded = false }: OrderSummaryProps) {
   const { t } = useLanguage();
   const items = useCartStore((s) => s.items);
   const getSubtotal = useCartStore((s) => s.getSubtotal);
-  const subtotal = totals?.subtotal ?? getSubtotal();
-  const shipping = totals?.shippingCost ?? getShippingForItems(items);
-  const total = totals?.total ?? subtotal + shipping;
+  const subtotal = getSubtotal();
+  const shipping = getShippingForItems(items);
+  const total = subtotal + shipping;
   const lineTotals = cartLineTotals(items);
   const lineSavings = cartLineSavings(items);
   const savings = lineSavings.reduce((sum, s) => sum + s, 0);
@@ -101,7 +99,6 @@ export function OrderSummary({ className, totals, embedded = false }: OrderSumma
       <ul className="mt-6 grid gap-3 border-t border-[#f3eee2] pt-5 text-xs text-[#5b6b64]">
         <li className="flex items-center gap-3"><Truck className="size-4 shrink-0 text-[#467253]" aria-hidden="true" />{shipping === 0 ? t(usOnly ? "checkout.trustShipping" : "checkout.trustShippingIntl") : t("checkout.trustTracked")}</li>
         <li className="flex items-center gap-3"><Package className="size-4 shrink-0 text-[#467253]" aria-hidden="true" />{t("checkout.trustReturns", { days: storePolicies.returns.windowDays })}</li>
-        <li className="flex items-center gap-3"><ShieldCheck className="size-4 shrink-0 text-[#467253]" aria-hidden="true" />{t("checkout.trustSecure")}</li>
       </ul>
       <p className="sr-only">{count} {count === 1 ? "item" : "items"}</p>
     </div>

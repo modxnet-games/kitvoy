@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Facebook, Instagram, MessageCircle, Music2, ArrowUpRight } from "lucide-react";
+import { Facebook, Instagram, MessageCircle, Music2 } from "lucide-react";
 import { catalog } from "@/config/catalog";
 import { policyLinks, storePolicies } from "@/config/policies";
 import { BrandLogo } from "./brand-logo";
@@ -23,9 +23,9 @@ export function Footer({ social, business }: { social?: FooterSocialProps; busin
   return <footer className="kv-footer kv-on-dark"><div className="kv-wrap">
     <div className="kv-footer-grid kv-footer-grid--wide">
       <div className="kv-footer-brand"><Link href="/" className="kv-logo" aria-label="Kitvoy home"><BrandLogo light lazy /></Link><p>Useful little finds.<br />Shipped free, tracked to your door.</p></div>
-      <nav aria-label="Shop"><h4>Shop</h4><ul><li><Link href="/products">All products</Link></li>{catalog.map(p => <li key={p.slug}><Link href={p.path}>{p.shortName}</Link></li>)}<li><Link href="/support">Common questions</Link></li></ul></nav>
+      <nav aria-label="Shop"><h4>Shop</h4><ul>{catalog.map(p => <li key={p.slug}><Link href={p.path}>{p.shortName}</Link></li>)}<li><Link href="/support">Common questions</Link></li></ul></nav>
       <nav aria-label="Policies"><h4>Policies</h4><ul>{policyLinks.map(l => <li key={l.href}><Link href={l.href}>{l.label}</Link></li>)}<li><Link href="/support#contact">Contact</Link></li></ul></nav>
-      <nav aria-label="Your account"><h4>Your Kitvoy</h4><ul><li><Link href="/account/orders">Track your order <ArrowUpRight size={14} aria-hidden="true" /></Link></li><li><Link href="/account">My account</Link></li>{socials.map(({ href, label, icon: Icon }) => <li key={label}><a href={href} target="_blank" rel="noreferrer"><Icon size={15} aria-hidden="true" />{label}</a></li>)}</ul></nav>
+      {socials.length > 0 && <nav aria-label="Follow Kitvoy"><h4>Follow us</h4><ul>{socials.map(({ href, label, icon: Icon }) => <li key={label}><a href={href} target="_blank" rel="noreferrer"><Icon size={15} aria-hidden="true" />{label}</a></li>)}</ul></nav>}
     </div>
     <div className="kv-footer-legal">&copy; {new Date().getFullYear()} Kitvoy. All rights reserved. {business?.legalName && <>Kitvoy is operated by {business.legalName}{business.address && <>, {business.address}</>}. </>}Prices in USD. Support: <a href={"mailto:" + supportEmail}>{supportEmail}</a>. <a href="https://oussamahitte.com" target="_blank" rel="noreferrer">Design & development by oussamahitte.com</a></div>
   </div></footer>;

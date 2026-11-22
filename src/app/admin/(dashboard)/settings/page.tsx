@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings, FileText, Navigation, Mail, FolderTree, ShoppingBag } from "lucide-react";
+import { Settings, FileText, Navigation, FolderTree, ShoppingBag } from "lucide-react";
 
 const cards = [
   {
@@ -19,12 +19,6 @@ const cards = [
     title: "Navigation",
     description: "Manage menu links and storefront navigation labels.",
     icon: Navigation,
-  },
-  {
-    href: "/admin/subscribers",
-    title: "Emails / Subscribers",
-    description: "View, copy, and export collected customer emails.",
-    icon: Mail,
   },
   {
     href: "/admin/categories",

@@ -123,7 +123,7 @@ function validateProductVideoFile(file: File): { error: string } | null {
 /*  Upload segment types                                               */
 /* ------------------------------------------------------------------ */
 
-export type UploadSegment = "products" | "banners" | "categories" | "reviews";
+export type UploadSegment = "products" | "banners" | "categories";
 
 /* ------------------------------------------------------------------ */
 /*  Local disk storage helpers                                         */
@@ -274,10 +274,4 @@ export async function uploadCategoryImage(
   file: File,
 ): Promise<{ url: string } | { error: string }> {
   return saveUploadImage(file, "categories", "category");
-}
-
-export async function uploadReviewImage(
-  file: File,
-): Promise<{ url: string } | { error: string }> {
-  return saveUploadImage(file, "reviews", "review");
 }

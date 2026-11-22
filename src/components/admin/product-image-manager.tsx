@@ -51,6 +51,12 @@ function MediaThumbnail({
   localIsVideo?: boolean;
 }) {
   const [error, setError] = useState(false);
+  // A new url or preview is a new thing to load: the error of the previous one is dropped as it arrives
+  const [shown, setShown] = useState({ url, localPreview });
+  if (shown.url !== url || shown.localPreview !== localPreview) {
+    setShown({ url, localPreview });
+    setError(false);
+  }
   const normalized = normalizeMediaSrc(url);
   const src = localPreview || normalized;
   const useVideo =
@@ -59,10 +65,6 @@ function MediaThumbnail({
     (localPreview
       ? localIsVideo === true
       : isVideoMediaUrl(normalized));
-
-  useEffect(() => {
-    setError(false);
-  }, [url, localPreview]);
 
   return (
     <div className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-lg border bg-muted sm:w-28">

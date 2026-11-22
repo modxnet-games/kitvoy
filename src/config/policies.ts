@@ -1,7 +1,7 @@
 /**
- * Store policy terms. The policy pages, homepage FAQ, product structured data,
- * Merchant Center feed and llms.txt all read these, so change a term here and
- * every place that states it follows.
+ * Store policy terms. The policy pages, the product page's FAQ and the product
+ * structured data all read these, so change a term here and every place that
+ * states it follows.
  */
 export const storePolicies = {
   /** Shown on every policy page; update it whenever a policy's wording changes */

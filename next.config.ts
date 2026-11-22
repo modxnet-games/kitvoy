@@ -7,36 +7,32 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "**" },
     ],
   },
-  // The catalog lives at /products (the link in the social bios) and each
-  // product has its own page. Temporary (307) redirects, so a path can be
-  // given a page of its own later.
+  // Pages the store no longer has: the catalog, the tire inflator, the old template shop, the short
+  // links from captions and ads, and customer accounts. They all lead to the storefront. Temporary
+  // (307) redirects, so a path can be given a page of its own later.
   async redirects() {
     return [
-      // Google Shopping listings fetched before the move still point at "/": send them to the inflator
-      { source: "/", has: [{ type: "query", key: "utm_campaign", value: "merchant_feed" }], destination: "/inflator", permanent: false },
-      // The old template catalog
-      { source: "/shop", destination: "/products", permanent: false },
-      { source: "/shop/cordless-tire-inflator", destination: "/inflator", permanent: false },
-      { source: "/shop/:slug*", destination: "/products", permanent: false },
-      // The bio-link page was first planned as /links
-      { source: "/links", destination: "/products", permanent: false },
-      // Short paths for captions and ads
-      { source: "/pet", destination: "/products#hub-niche-pet-care", permanent: false },
-      { source: "/ball", destination: "/products/pouncepop", permanent: false },
-      { source: "/pouncepop", destination: "/products/pouncepop", permanent: false },
+      { source: "/products", destination: "/", permanent: false },
+      { source: "/inflator", destination: "/", permanent: false },
+      { source: "/shop", destination: "/", permanent: false },
+      { source: "/shop/:slug*", destination: "/", permanent: false },
+      { source: "/links", destination: "/", permanent: false },
+      { source: "/pet", destination: "/", permanent: false },
+      { source: "/ball", destination: "/", permanent: false },
+      { source: "/pouncepop", destination: "/", permanent: false },
+      { source: "/login", destination: "/", permanent: false },
+      { source: "/register", destination: "/", permanent: false },
+      { source: "/account/:path*", destination: "/", permanent: false },
     ];
   },
   // Private areas say noindex on the response itself, so it also covers their
-  // redirects to the sign-in pages and anything that isn't HTML
+  // redirects and anything that isn't HTML
   async headers() {
     const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
     return [
       { source: "/admin", headers: noindex },
       { source: "/admin/:path*", headers: noindex },
-      { source: "/account", headers: noindex },
-      { source: "/account/:path*", headers: noindex },
       { source: "/checkout/:path*", headers: noindex },
-      { source: "/review/:path*", headers: noindex },
     ];
   },
   experimental: {

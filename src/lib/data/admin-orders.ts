@@ -49,7 +49,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   });
 }
 
-/** Keeps the first delivery time (the review request counts from it); cleared when delivery is undone. */
+/** Keeps the first delivery time; cleared when delivery is undone. */
 function deliveredAtFor(status: OrderStatus, current: Date | null): Date | null {
   return status === "DELIVERED" ? (current ?? new Date()) : null;
 }
@@ -95,16 +95,11 @@ function orderStatusFor(fulfillment: FulfillmentStatus, current: OrderStatus): O
 }
 
 export type FulfillmentUpdateResult =
-  | {
-      ok: true;
-      order: Awaited<ReturnType<typeof prisma.order.update>>;
-      previous: { fulfillmentStatus: FulfillmentStatus; trackingNumber: string | null };
-    }
+  | { ok: true; order: Awaited<ReturnType<typeof prisma.order.update>> }
   | { ok: false; error: string; status: number };
 
 /**
- * Updates fulfillment for a paid order and keeps the order status in step,
- * so the customer's "My orders" page shows the same thing:
+ * Updates an order's fulfillment and keeps the order status in step:
  * UNFULFILLED → (status unchanged), SHIPPED → SHIPPED, DELIVERED → DELIVERED.
  */
 export async function updateOrderFulfillment(
@@ -113,9 +108,6 @@ export async function updateOrderFulfillment(
 ): Promise<FulfillmentUpdateResult> {
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) return { ok: false, error: "Order not found", status: 404 };
-  if (order.paymentStatus !== "paid") {
-    return { ok: false, error: "Only paid orders can be fulfilled", status: 409 };
-  }
   if (order.status === "CANCELED") {
     return { ok: false, error: "This order is canceled", status: 409 };
   }
@@ -153,11 +145,7 @@ export async function updateOrderFulfillment(
       deliveredAt: deliveredAtFor(status, order.deliveredAt),
     },
   });
-  return {
-    ok: true,
-    order: updated,
-    previous: { fulfillmentStatus: order.fulfillmentStatus, trackingNumber: order.trackingNumber },
-  };
+  return { ok: true, order: updated };
 }
 
 const DEFAULT_STATS = {

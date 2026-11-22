@@ -51,7 +51,7 @@ export default function ShippingPolicyPage() {
       </section>
       <section aria-labelledby="tracking">
         <h2 id="tracking">Tracking your order</h2>
-        <p>When your order ships, we email you its tracking number. If you have an account, you can also find it under <Link className="text-link" href="/account/orders">Track your order</Link>.</p>
+        <p>When your order ships, we email you its tracking number.</p>
       </section>
       <section aria-labelledby="address">
         <h2 id="address">Your delivery address</h2>

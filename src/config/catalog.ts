@@ -2,10 +2,9 @@
  * The Kitvoy catalog: one entry per product the store sells.
  *
  * This file holds the commerce facts every layer shares (cart, order pricing,
- * checkout, fulfillment, tracking, feeds): where the product lives on the
- * site, its bundle prices, the colours it comes in, the countries it ships to
- * and the CJdropshipping variant behind each colour. Page copy lives next to
- * it in `config/products/`.
+ * checkout, tracking): where the product lives on the site, its bundle
+ * prices, the colours it comes in and the countries it ships to. Page copy
+ * lives next to it in `config/products/`.
  *
  * It is plain data with no server imports, so client components can read it.
  *
@@ -17,17 +16,6 @@
 /** Countries the store can ship to. Brazil is left out on purpose (CPF and customs). */
 export const SHIPPING_COUNTRY_CODES = ["US", "GB", "DE", "FR", "NL", "ES", "MX", "CL"] as const;
 export type CountryCode = (typeof SHIPPING_COUNTRY_CODES)[number];
-
-export const NICHES = {
-  "pet-care": { name: "Pet Care", blurb: "Play and comfort for dogs and cats." },
-  "home-organization": { name: "Home Organization", blurb: "Small fixes that keep a home in order." },
-  "daily-health": { name: "Daily Health", blurb: "Everyday comfort, without medical promises." },
-  "car-care": { name: "Car Care", blurb: "Handy things to keep in the car." },
-} as const;
-export type NicheKey = keyof typeof NICHES;
-
-/** The three niches the store is growing into, in the order the catalog shows them. */
-export const FEATURED_NICHES: NicheKey[] = ["pet-care", "home-organization", "daily-health"];
 
 export interface BundleTier {
   quantity: number;
@@ -50,12 +38,10 @@ export interface CatalogVariant {
   label: string;
   /** Swatch colour for the selector */
   swatch: string;
-  /** The store's own SKU for this colour; also the id sent to Meta and the product feed */
+  /** The store's own SKU for this colour; also the id sent to Meta */
   sku: string;
   /** Photo of this colour, when the product has one */
   image?: string;
-  /** The CJdropshipping variant that ships for it */
-  cj: { vid: string; sku: string; name: string; unitCost: number };
 }
 
 export interface CountryShipping {
@@ -72,13 +58,8 @@ export interface CatalogProduct {
   slug: string;
   /** Where the product page lives */
   path: string;
-  /** Its number on the /products bio-link page ("#01") */
-  hubNumber: number;
-  niche: NicheKey;
-  /** Short name for cards, cart lines and buttons */
+  /** Short name for links and lists */
   shortName: string;
-  /** One line under the name on catalog cards */
-  tagline: string;
   /** "1 ball", "2 balls" */
   unit: { one: string; many: string };
   tiers: BundleTier[];
@@ -90,18 +71,13 @@ export interface CatalogProduct {
   shipping: Partial<Record<CountryCode, CountryShipping>>;
   /** Sent to Meta as content_category so the pixel learns each niche apart */
   metaCategory: string;
-  /** Catalog card image until the database product has photos */
-  fallbackImage: string;
 }
 
 export const catalog: CatalogProduct[] = [
   {
     slug: "pouncepop",
     path: "/products/pouncepop",
-    hubNumber: 1,
-    niche: "pet-care",
     shortName: "PouncePop",
-    tagline: "The smart ball that plays with your dog or cat by itself.",
     unit: { one: "ball", many: "balls" },
     // $29.99 each: 2 for $49.99, 3 for $64.99, and 25% off each from the fourth
     tiers: [
@@ -111,7 +87,6 @@ export const catalog: CatalogProduct[] = [
     ],
     maxDiscount: 0.3,
     hasColourChoice: true,
-    // CJ product CJYD1693059 "Smart Rolling Ball Pet Cat Toy Ball", variants checked 2026-11-12
     variants: [
       {
         key: "orange",
@@ -119,7 +94,6 @@ export const catalog: CatalogProduct[] = [
         swatch: "#F5821F",
         sku: "PET-001-OR",
         image: "/products/pouncepop/variant-orange.webp",
-        cj: { vid: "1629734538815483904", sku: "CJYD169305901AZ", name: "Smart Rolling Ball — Orange Red, USB", unitCost: 5.77 },
       },
       {
         key: "purple",
@@ -127,7 +101,6 @@ export const catalog: CatalogProduct[] = [
         swatch: "#8B6FD6",
         sku: "PET-001-PU",
         image: "/products/pouncepop/variant-purple.webp",
-        cj: { vid: "1629734538836455424", sku: "CJYD169305902BY", name: "Smart Rolling Ball — Purple, USB", unitCost: 5.77 },
       },
       {
         key: "blue",
@@ -135,7 +108,6 @@ export const catalog: CatalogProduct[] = [
         swatch: "#1F3FBF",
         sku: "PET-001-BL",
         image: "/products/pouncepop/variant-blue.webp",
-        cj: { vid: "2407290950431610500", sku: "CJYD169305903CX", name: "Smart Rolling Ball — Blue, USB", unitCost: 5.34 },
       },
     ],
     // CJ freight quotes, China warehouse, 2026-11-12 (ad-production/petball/cj-freight-2026-11-12.json)
@@ -150,44 +122,8 @@ export const catalog: CatalogProduct[] = [
       CL: { method: "CJPacket Latin America Sensitive", days: { min: 9, max: 13 }, cost: [7.5, 8.5, 9.49] },
     },
     metaCategory: "Pet Care",
-    fallbackImage: "/products/pouncepop/hero.webp",
-  },
-  {
-    slug: "cordless-tire-inflator",
-    path: "/inflator",
-    hubNumber: 2,
-    niche: "car-care",
-    shortName: "Cordless Tire Inflator",
-    tagline: "Top up a low tire yourself, at home or on the road.",
-    unit: { one: "inflator", many: "inflators" },
-    // Two inflators are a fixed $19.99 off ($99.99 at $59.99 each); three or more are 25% off each
-    tiers: [
-      { quantity: 1, discount: 0, label: "Buy 1" },
-      { quantity: 2, discount: 0, amountOff: 19.99, label: "Buy 2" },
-      { quantity: 3, discount: 0.25, label: "Buy 3" },
-    ],
-    maxDiscount: 0.25,
-    hasColourChoice: false,
-    variants: [
-      {
-        key: "black",
-        label: "Black",
-        swatch: "#171918",
-        sku: "INF-001",
-        cj: { vid: "2411080301261619100", sku: "CJYD218658003CX", name: "Car Portable Wireless Tire Inflator — Wired Wireless Black", unitCost: 12.94 },
-      },
-    ],
-    // CJPacket Sensitive, CN → US, quoted 2026-10-31
-    shipping: {
-      US: { method: "CJPacket Sensitive", days: { min: 4, max: 9 }, cost: [15.32, 28.24, 41.14] },
-    },
-    metaCategory: "Car Care",
-    fallbackImage: "/kitvoy/inflator.jpg",
   },
 ];
-
-/** The product that used to be the homepage; its landing page is now at /inflator. */
-export const INFLATOR_SLUG = "cordless-tire-inflator";
 
 const bySlug = new Map(catalog.map((p) => [p.slug, p]));
 
@@ -195,9 +131,9 @@ export function getCatalogProduct(slug: string | null | undefined): CatalogProdu
   return slug ? bySlug.get(slug) : undefined;
 }
 
-/** Where a product's page is; a product the catalog doesn't know goes to the catalog page. */
+/** Where a product's page is; a product the catalog doesn't know goes to the storefront. */
 export function productPath(slug: string | null | undefined): string {
-  return getCatalogProduct(slug)?.path ?? "/products";
+  return getCatalogProduct(slug)?.path ?? "/";
 }
 
 /** The colour a line was bought in, or the product's only variant when it has no colour choice. */

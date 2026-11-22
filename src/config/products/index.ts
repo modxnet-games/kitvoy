@@ -3,10 +3,7 @@ import type { ProductContent } from "./types";
 
 export type { DemoLoop, DiagramId, GalleryBadge, GalleryImage, IconName, ProductContent } from "./types";
 
-/**
- * Page copy for the products that use the shared product page template
- * (/products/<slug>). The inflator keeps its own landing page at /inflator.
- */
+/** Page copy for the products that use the shared product page template (/products/<slug>). */
 const contents: Record<string, ProductContent> = {
   [pouncepop.slug]: pouncepop,
 };

@@ -6,7 +6,6 @@ import { catalog } from "@/config/catalog";
 import { getProductContent } from "@/config/products";
 import { siteConfig } from "@/config/site";
 import { getProductBySlug } from "@/lib/data/products";
-import { getProductReviewSummary } from "@/lib/data/reviews";
 import { getStoreSettings } from "@/lib/data/store-settings";
 import { storeToday } from "@/lib/delivery-estimate";
 import { productFaqs } from "@/lib/product-faq";
@@ -57,8 +56,6 @@ export default async function CatalogProductPage({ params }: { params: Promise<P
     getStoreSettings().catch(() => null),
     headers(),
   ]);
-  // The reviews section and the rating markup come from the same approved reviews
-  const reviews = product ? await getProductReviewSummary(product.id) : null;
   const faqs = productFaqs(content, entry, product?.price);
   // Cloudflare names the visitor's country; the page says whether and how fast we deliver there
   const visitorCountry = headerList.get("cf-ipcountry")?.trim().toUpperCase() || null;
@@ -78,14 +75,14 @@ export default async function CatalogProductPage({ params }: { params: Promise<P
         : [],
     }),
     websiteSchema(),
-    ...(product ? [catalogProductSchema(product, entry, content, reviews)] : []),
+    ...(product ? [catalogProductSchema(product, entry, content)] : []),
     faqSchema(faqs, entry.path),
   );
 
   return (
     <>
       <JsonLd data={structured} />
-      <ProductPage product={product} entry={entry} content={content} faqs={faqs} reviews={reviews} visitorCountry={visitorCountry} today={storeToday()} />
+      <ProductPage product={product} entry={entry} content={content} faqs={faqs} visitorCountry={visitorCountry} today={storeToday()} />
     </>
   );
 }

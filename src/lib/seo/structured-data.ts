@@ -1,9 +1,7 @@
-import { INFLATOR_SLUG, SHIPPING_COUNTRY_CODES, productPath, shipsTo, type CatalogProduct } from "@/config/catalog";
+import { SHIPPING_COUNTRY_CODES, shipsTo, type CatalogProduct } from "@/config/catalog";
 import { storePolicies } from "@/config/policies";
 import type { ProductContent } from "@/config/products";
-import { merchantListing, productSeo } from "@/config/seo";
 import { siteConfig } from "@/config/site";
-import { REVIEWS_SHOWN_FIRST, type ReviewSummary } from "@/lib/reviews";
 import type { ProductDisplay } from "@/types/product";
 
 const absolute = (path: string) => new URL(path, siteConfig.url).toString();
@@ -66,69 +64,6 @@ export function websiteSchema() {
   };
 }
 
-/**
- * The inflator with its live price and stock. Rating markup is added only when
- * approved reviews exist, from the same reviews the landing page shows; Google
- * penalizes ratings that aren't backed by reviews on the page.
- */
-export function productSchema(product: ProductDisplay, reviews?: ReviewSummary | null) {
-  const freeShipping = (product.shippingTax ?? 0) === 0;
-  const path = productPath(INFLATOR_SLUG);
-  return {
-    "@type": "Product",
-    "@id": absolute(`${path}#product`),
-    name: productSeo.title,
-    description: productSeo.summary,
-    image: product.images.map(absolute),
-    sku: product.sku,
-    category: productSeo.category,
-    brand: { "@type": "Brand", name: siteConfig.name },
-    material: merchantListing.material,
-    additionalProperty: productSeo.facts.map((f) => ({ "@type": "PropertyValue", name: f.name, value: f.value })),
-    offers: {
-      "@type": "Offer",
-      url: absolute(path),
-      priceCurrency: siteConfig.currency,
-      price: product.price.toFixed(2),
-      availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-      itemCondition: "https://schema.org/NewCondition",
-      seller: { "@id": absolute("/#organization") },
-      shippingDetails: {
-        "@type": "OfferShippingDetails",
-        ...(freeShipping ? { shippingRate: { "@type": "MonetaryAmount", value: 0, currency: siteConfig.currency } } : {}),
-        shippingDestination: { "@type": "DefinedRegion", addressCountry: "US" },
-        deliveryTime: {
-          "@type": "ShippingDeliveryTime",
-          handlingTime: { "@type": "QuantitativeValue", minValue: shipping.processingDays.min, maxValue: shipping.processingDays.max, unitCode: "DAY" },
-          transitTime: { "@type": "QuantitativeValue", minValue: shipping.deliveryDays.min, maxValue: shipping.deliveryDays.max, unitCode: "DAY" },
-        },
-      },
-      hasMerchantReturnPolicy: returnPolicySchema(),
-    },
-    ...(reviews && reviews.count > 0 ? reviewSchema(reviews) : {}),
-  };
-}
-
-/** aggregateRating over every approved review, and the reviews shown first on the page. */
-export function reviewSchema(reviews: ReviewSummary) {
-  return {
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: reviews.average,
-      reviewCount: reviews.count,
-      bestRating: 5,
-      worstRating: 1,
-    },
-    review: reviews.reviews.slice(0, REVIEWS_SHOWN_FIRST).map((r) => ({
-      "@type": "Review",
-      author: { "@type": "Person", name: r.author },
-      datePublished: r.publishedOn,
-      reviewBody: r.comment,
-      reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5, worstRating: 1 },
-    })),
-  };
-}
-
 /** The 30-day policy at /returns: unused items by mail; change-of-mind return shipping is the customer's. */
 export function returnPolicySchema() {
   return {
@@ -159,19 +94,6 @@ export function faqSchema(faqs: { q: string; a: string }[], path = "/") {
 /** One JSON-LD document holding several linked entities. */
 export const graph = (...nodes: object[]) => ({ "@context": "https://schema.org", "@graph": nodes });
 
-/** A numbered list of the catalog's products, for the home and /products pages. */
-export function itemListSchema(items: { name: string; path: string }[]) {
-  return {
-    "@type": "ItemList",
-    itemListElement: items.map((item, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: item.name,
-      url: absolute(item.path),
-    })),
-  };
-}
-
 /** Free shipping with handling and transit times, once per country the product ships to. */
 function shippingDetailsFor(entry: CatalogProduct, freeShipping: boolean) {
   return shipsTo(entry.slug).map((code) => {
@@ -194,9 +116,9 @@ function shippingDetailsFor(entry: CatalogProduct, freeShipping: boolean) {
  * live price and stock. A product sold in several colours is a ProductGroup
  * whose variants each carry their own SKU, colour, photo and offer, which is
  * the shape Google's merchant listings read; a single-variant product is a
- * plain Product. Rating markup is added only when approved reviews exist.
+ * plain Product.
  */
-export function catalogProductSchema(product: ProductDisplay, entry: CatalogProduct, content: ProductContent, reviews?: ReviewSummary | null) {
+export function catalogProductSchema(product: ProductDisplay, entry: CatalogProduct, content: ProductContent) {
   const freeShipping = (product.shippingTax ?? 0) === 0;
   const url = absolute(entry.path);
   const gallery = content.gallery.map((g) => absolute(g.src));
@@ -219,7 +141,6 @@ export function catalogProductSchema(product: ProductDisplay, entry: CatalogProd
     material: content.seo.material,
     additionalProperty: content.seo.facts.map((f) => ({ "@type": "PropertyValue", name: f.name, value: f.value })),
   };
-  const rating = reviews && reviews.count > 0 ? reviewSchema(reviews) : {};
 
   if (!entry.hasColourChoice) {
     return {
@@ -230,7 +151,6 @@ export function catalogProductSchema(product: ProductDisplay, entry: CatalogProd
       image: images,
       sku: entry.variants[0]?.sku ?? product.sku,
       offers: offer(url),
-      ...rating,
     };
   }
 
@@ -251,6 +171,5 @@ export function catalogProductSchema(product: ProductDisplay, entry: CatalogProd
       image: variant.image ? absolute(variant.image) : images[0],
       offers: offer(`${url}?color=${variant.key}`),
     })),
-    ...rating,
   };
 }

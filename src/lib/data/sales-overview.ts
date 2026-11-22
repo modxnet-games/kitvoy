@@ -1,7 +1,4 @@
-import { cjFulfillment, costEstimates } from "@/config/fulfillment";
-import { INFLATOR_SLUG, getCatalogProduct } from "@/config/catalog";
 import { prisma } from "@/lib/db";
-import { CJ_PAID_STATUSES } from "@/lib/fulfillment/cj-order";
 import { STORE_TIME_ZONE } from "@/lib/formatters";
 
 /** Order fields the sales figures read. */
@@ -9,12 +6,6 @@ export interface SalesOrder {
   createdAt: Date;
   total: number;
   status: string;
-  paymentStatus: string;
-  paymentFee: number | null;
-  supplierStatus: string | null;
-  supplierProductCost: number | null;
-  supplierShippingCost: number | null;
-  items: { productSlug: string; quantity: number }[];
 }
 
 export interface SalesDay {
@@ -46,9 +37,12 @@ export interface SalesOverview {
     start: string;
     revenue: number;
     orders: number;
+    /**
+     * Kept for the admin app, which reads every key. The store records no
+     * costs any more, so nothing here can be computed: every figure is 0.
+     */
     profit: {
       amount: number;
-      /** True when any order used an estimated shipping cost or payment fee */
       estimated: boolean;
       ordersWithEstimates: number;
       productCost: number;
@@ -81,65 +75,13 @@ const weekdayIndex = (key: string) => (new Date(`${key}T00:00:00Z`).getUTCDay() 
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-const isPaid = (o: SalesOrder) => o.paymentStatus === "paid" && o.status !== "CANCELED";
+/** An order counts as a sale once it is delivered. */
+const isSale = (o: SalesOrder) => o.status === "DELIVERED";
 
 /**
- * A stand-in for an order's CJ shipping charge until CJ reports the real one:
- * each product's own US quote for its quantity (config/catalog.ts), or the
- * store-wide estimate for a product the catalog has no quote for.
+ * Today, this calendar week (Mon–Sun) and this month, from delivered orders.
+ * A sale belongs to the day its order was placed (createdAt).
  */
-function estimateShipping(items: { productSlug: string; quantity: number }[]): number {
-  const units = new Map<string, number>();
-  for (const item of items) {
-    if (cjFulfillment.variants[item.productSlug]) units.set(item.productSlug, (units.get(item.productSlug) ?? 0) + item.quantity);
-  }
-  let total = 0;
-  for (const [slug, quantity] of units) {
-    const quote = getCatalogProduct(slug)?.shipping.US?.cost;
-    if (quote && slug !== INFLATOR_SLUG) {
-      // Quoted for 1 to 3 units; each one beyond that adds what the third added
-      total += quantity <= 3 ? quote[quantity - 1] : quote[2] + (quote[2] - quote[1]) * (quantity - 3);
-    } else {
-      const { firstUnit, additionalUnit } = costEstimates.shipping;
-      total += firstUnit + additionalUnit * (quantity - 1);
-    }
-  }
-  return round2(total);
-}
-
-/** What an order cost to fulfill: recorded CJ charges and fees where present, estimates otherwise. */
-export function orderCosts(order: Pick<SalesOrder, "total" | "paymentFee" | "supplierProductCost" | "supplierShippingCost" | "items">) {
-  let estimated = false;
-  let catalogCost = 0;
-  for (const item of order.items) {
-    const variant = cjFulfillment.variants[item.productSlug];
-    if (variant) {
-      catalogCost += variant.unitCost * item.quantity;
-    } else {
-      // No known cost for this product
-      estimated = true;
-    }
-  }
-
-  const product = order.supplierProductCost ?? catalogCost;
-
-  let shipping = order.supplierShippingCost;
-  if (shipping == null) {
-    estimated = true;
-    shipping = estimateShipping(order.items);
-  }
-
-  let fee = order.paymentFee;
-  if (fee == null) {
-    estimated = true;
-    const { percent, fixed } = costEstimates.paypalFee;
-    fee = round2((order.total * percent) / 100 + fixed);
-  }
-
-  return { product, shipping, fee, estimated };
-}
-
-/** Today, this calendar week (Mon–Sun) and this month, from paid orders. */
 export function computeSalesOverview(orders: SalesOrder[], now = new Date()): SalesOverview {
   const today = storeDayKey(now);
   const todayIndex = weekdayIndex(today);
@@ -148,41 +90,19 @@ export function computeSalesOverview(orders: SalesOrder[], now = new Date()): Sa
   const monthPrefix = today.slice(0, 7);
 
   const byDay = new Map<string, { revenue: number; orders: number }>();
-  const month = {
-    revenue: 0,
-    orders: 0,
-    productCost: 0,
-    shippingCost: 0,
-    paymentFees: 0,
-    refundCosts: 0,
-    ordersWithEstimates: 0,
-  };
+  const month = { revenue: 0, orders: 0 };
 
   for (const order of orders) {
+    if (!isSale(order)) continue;
     const day = storeDayKey(order.createdAt);
-    const inMonth = day.startsWith(monthPrefix);
+    const entry = byDay.get(day) ?? { revenue: 0, orders: 0 };
+    entry.revenue += order.total;
+    entry.orders += 1;
+    byDay.set(day, entry);
 
-    if (isPaid(order)) {
-      const entry = byDay.get(day) ?? { revenue: 0, orders: 0 };
-      entry.revenue += order.total;
-      entry.orders += 1;
-      byDay.set(day, entry);
-
-      if (inMonth) {
-        const costs = orderCosts(order);
-        month.revenue += order.total;
-        month.orders += 1;
-        month.productCost += costs.product;
-        month.shippingCost += costs.shipping;
-        month.paymentFees += costs.fee;
-        if (costs.estimated) month.ordersWithEstimates += 1;
-      }
-    } else if (inMonth && order.paymentStatus === "refunded") {
-      // The money went back; what was already spent on the order is a loss
-      const supplierPaid = order.supplierStatus != null && CJ_PAID_STATUSES.has(order.supplierStatus);
-      month.refundCosts +=
-        (order.paymentFee ?? 0) +
-        (supplierPaid ? (order.supplierProductCost ?? 0) + (order.supplierShippingCost ?? 0) : 0);
+    if (day.startsWith(monthPrefix)) {
+      month.revenue += order.total;
+      month.orders += 1;
     }
   }
 
@@ -195,9 +115,6 @@ export function computeSalesOverview(orders: SalesOrder[], now = new Date()): Sa
   const weekRevenue = days.reduce((sum, d) => sum + (d.revenue ?? 0), 0);
   let previousRevenue = 0;
   for (let i = 0; i <= todayIndex; i++) previousRevenue += byDay.get(addDays(prevWeekStart, i))?.revenue ?? 0;
-
-  const profit =
-    month.revenue - month.productCost - month.shippingCost - month.paymentFees - month.refundCosts;
 
   return {
     timeZone: STORE_TIME_ZONE,
@@ -216,15 +133,7 @@ export function computeSalesOverview(orders: SalesOrder[], now = new Date()): Sa
       start: `${monthPrefix}-01`,
       revenue: round2(month.revenue),
       orders: month.orders,
-      profit: {
-        amount: round2(profit),
-        estimated: month.ordersWithEstimates > 0,
-        ordersWithEstimates: month.ordersWithEstimates,
-        productCost: round2(month.productCost),
-        shippingCost: round2(month.shippingCost),
-        paymentFees: round2(month.paymentFees),
-        refundCosts: round2(month.refundCosts),
-      },
+      profit: { amount: 0, estimated: false, ordersWithEstimates: 0, productCost: 0, shippingCost: 0, paymentFees: 0, refundCosts: 0 },
     },
   };
 }
@@ -237,19 +146,8 @@ export async function getSalesOverview(now = new Date()): Promise<SalesOverview>
 
   const orders = await prisma.order.findMany({
     // A day of margin covers the time zone offset; days are matched in computeSalesOverview
-    // Stripe test-mode orders aren't sales
-    where: { createdAt: { gte: new Date(`${addDays(earliest, -1)}T00:00:00Z`) }, paymentStatus: { in: ["paid", "refunded"] }, testPayment: false },
-    select: {
-      createdAt: true,
-      total: true,
-      status: true,
-      paymentStatus: true,
-      paymentFee: true,
-      supplierStatus: true,
-      supplierProductCost: true,
-      supplierShippingCost: true,
-      items: { select: { productSlug: true, quantity: true } },
-    },
+    where: { createdAt: { gte: new Date(`${addDays(earliest, -1)}T00:00:00Z`) }, status: "DELIVERED" },
+    select: { createdAt: true, total: true, status: true },
   });
   return computeSalesOverview(orders, now);
 }

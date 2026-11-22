@@ -104,8 +104,6 @@ export function countryOf(address: { country?: unknown } | null | undefined): Co
 
 export const countryName = (code: CountryCode) => COUNTRY_RULES[code].name;
 
-export type PaymentMethod = "card" | "paypal";
-
 export interface ShippingAddress {
   address1: string;
   address2: string;
@@ -127,7 +125,6 @@ export interface CheckoutDetails {
   zip: string;
   /** Left out by browsers that loaded the checkout before 2026-11: read as "US" */
   country?: CountryCode;
-  paymentMethod: PaymentMethod;
 }
 
 /** Field → i18n validation key */

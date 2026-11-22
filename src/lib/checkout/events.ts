@@ -1,8 +1,7 @@
 /**
- * The checkout's own event log: what happened on the way to paying, never who
- * it happened to. One line per event in the server log, so a checkout that
- * went wrong can be read back step by step (did the card form load, was Pay
- * tapped, what did Stripe say, did the page go to the background).
+ * The checkout's own event log: what happened on the way to an order, never
+ * who it happened to. One line per event in the server log, so a checkout
+ * that went wrong can be read back step by step.
  *
  * An event carries only: its name, the order reference once there is one, the
  * in-app browser (if any), a timing or a short code, the screen width, and a
@@ -12,26 +11,7 @@
  */
 export const CHECKOUT_EVENTS = [
   "checkout_opened",
-  "checkout_restored",
   "details_saved",
-  "stripe_ready",
-  "stripe_load_error",
-  "pay_clicked",
-  "pay_validation_error",
-  "pay_error",
-  "pay_succeeded",
-  "paypal_clicked",
-  "paypal_redirected",
-  "paypal_returned",
-  "paypal_approved",
-  "paypal_canceled",
-  "paypal_error",
-  "open_in_browser",
-  "payment_hidden",
-  "payment_visible",
-  "express_shown",
-  "express_clicked",
-  "express_failed",
 ] as const;
 
 export type CheckoutEventName = (typeof CHECKOUT_EVENTS)[number];
@@ -42,11 +22,11 @@ export interface CheckoutEvent {
   ref?: string;
   /** facebook | instagram | threads, when in one of Meta's in-app browsers */
   app?: string;
-  /** 1 = details, 2 = payment */
+  /** The step of the checkout the event happened on (1 = details) */
   step?: 1 | 2;
-  /** A duration in milliseconds (how long the card form took, how long the page was hidden) */
+  /** A duration in milliseconds */
   ms?: number;
-  /** A short machine code: Stripe's error code, "reused", "cancel", the express methods on offer ("apple_pay,paypal")… */
+  /** A short machine code, e.g. "draft" when the form opened with saved details */
   code?: string;
   /** Screen width in CSS pixels */
   w?: number;

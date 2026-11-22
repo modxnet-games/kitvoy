@@ -4,16 +4,12 @@ import { getLineTotal, getBundleSavings } from "../src/lib/bundles";
 import { validateCheckoutDetails, toShippingAddress, type CheckoutDetails } from "../src/lib/us-address";
 import { useCartStore, getShippingForItems } from "../src/store/cart-store";
 import type { ProductDisplay } from "../src/types/product";
-import { buildCjOrderPayload, type CjOrderInput } from "../src/lib/fulfillment/cj-order";
-import { cjFulfillment, isCjSandbox } from "../src/config/fulfillment";
-import { buildCustomerMessageEmail } from "../src/lib/email";
-import { validateAdminEmail } from "../src/lib/data/sent-emails";
 import { buildSaleMessage } from "../src/lib/push/fcm";
 import { salePush } from "../src/lib/push/admin-devices";
 import { computeSalesOverview, type SalesOrder } from "../src/lib/data/sales-overview";
 
 const product: ProductDisplay = { id: "unit-test", slug: "inflator", name: "Inflator", shortDescription: "", description: "", details: "", price: 59.99, shippingTax: 0, rating: 0, reviewCount: 0, stock: 9, sku: "TEST", isFeatured: false, category: { id: "test", slug: "test", name: "Test" }, images: [] };
-const valid: CheckoutDetails = { email: "test@example.com", fullName: "Test Customer", phone: "2025550143", address1: "123 Test St", address2: "", city: "Washington", state: "DC", zip: "20001", paymentMethod: "paypal" };
+const valid: CheckoutDetails = { email: "test@example.com", fullName: "Test Customer", phone: "2025550143", address1: "123 Test St", address2: "", city: "Washington", state: "DC", zip: "20001" };
 
 test("shared pricing matches bundle totals and actual savings", () => {
   assert.deepEqual([1, 2, 3].map(q => getLineTotal(59.99, q)), [59.99, 99.99, 134.98]);
@@ -86,64 +82,6 @@ test("primary buttons and body text meet WCAG AA contrast for normal text", () =
   }
 });
 
-test("CJ order payload maps the product to its variant, aggregates quantities, and refuses incomplete orders", () => {
-  const order: CjOrderInput = {
-    id: "cmorder1234567890abcdefgh", reference: "KTV-ABCDEFGH", customerName: "Test Customer", email: "test@example.com", phone: "2025550143", total: 101.98,
-    shippingAddress: toShippingAddress(valid),
-    items: [{ productSlug: "cordless-tire-inflator", productName: "Cordless Tire Inflator", quantity: 2 }, { productSlug: "cordless-tire-inflator", productName: "Cordless Tire Inflator", quantity: 1 }],
-  };
-  const built = buildCjOrderPayload(order, { payType: 2, sandbox: false });
-  assert.ok(built.ok);
-  assert.deepEqual(built.payload.products, [{ vid: cjFulfillment.variants["cordless-tire-inflator"].vid, quantity: 3 }]);
-  assert.equal(built.payload.orderNumber, order.id);
-  assert.equal(built.payload.shippingProvince, "District of Columbia");
-  assert.equal(built.payload.isSandbox, 0);
-  assert.equal(built.payload.logisticName, "CJPacket Sensitive");
-  assert.equal("shippingAddress2" in built.payload, false);
-  const sandboxBuilt = buildCjOrderPayload(order, { payType: 3, sandbox: true });
-  assert.ok(sandboxBuilt.ok);
-  assert.equal(sandboxBuilt.payload.isSandbox, 1);
-  assert.equal(buildCjOrderPayload({ ...order, items: [{ productSlug: "other", productName: "Other", quantity: 1 }] }, { payType: 2, sandbox: false }).ok, false);
-  assert.equal(buildCjOrderPayload({ ...order, shippingAddress: null }, { payType: 2, sandbox: false }).ok, false);
-});
-
-test("CJ sandbox follows PayPal mode unless overridden", () => {
-  const saved = { paypal: process.env.PAYPAL_ENV, cj: process.env.CJ_SANDBOX };
-  process.env.PAYPAL_ENV = "sandbox"; delete process.env.CJ_SANDBOX;
-  assert.equal(isCjSandbox(), true);
-  process.env.PAYPAL_ENV = "live";
-  assert.equal(isCjSandbox(), false);
-  process.env.CJ_SANDBOX = "true";
-  assert.equal(isCjSandbox(), true);
-  process.env.PAYPAL_ENV = saved.paypal; process.env.CJ_SANDBOX = saved.cj;
-  if (saved.paypal === undefined) delete process.env.PAYPAL_ENV;
-  if (saved.cj === undefined) delete process.env.CJ_SANDBOX;
-});
-
-test("admin customer email escapes HTML, keeps paragraphs, and signs with the sender", () => {
-  const { html, text } = buildCustomerMessageEmail({
-    from: { name: "Kitvoy <Support>", email: "support@kitvoy.com" },
-    subject: "Your order <b>KTV-1</b>",
-    body: "Hi \"Sam\" & co,\r\n\r\n<script>alert('x')</script>\nSecond line",
-  });
-  assert.ok(!html.includes("<script>"));
-  assert.ok(html.includes("&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;<br>Second line"));
-  assert.ok(html.includes("Hi &quot;Sam&quot; &amp; co,</p>"));
-  assert.ok(html.includes("<title>Your order &lt;b&gt;KTV-1&lt;/b&gt;</title>"));
-  assert.ok(html.includes("Kitvoy &lt;Support&gt;"));
-  assert.equal(text, "Hi \"Sam\" & co,\n\n<script>alert('x')</script>\nSecond line\n\n— Kitvoy <Support>\nsupport@kitvoy.com");
-});
-
-test("admin email validation rejects bad input and flattens the subject to one line", () => {
-  const ok = validateAdminEmail({ sender: "support", to: " sam@example.com ", subject: "Hi\r\nBcc: evil@example.com", body: " Hello \r\n" });
-  assert.ok(ok.ok);
-  assert.deepEqual(ok.value, { sender: "support", to: "sam@example.com", subject: "Hi Bcc: evil@example.com", body: "Hello", orderId: null });
-  const bad = validateAdminEmail({ sender: "ceo", to: "a@example.com, b@example.com", subject: "", body: "x".repeat(20_001) });
-  assert.ok(!bad.ok);
-  assert.deepEqual(Object.keys(bad.errors).sort(), ["body", "sender", "subject", "to"]);
-  assert.equal(validateAdminEmail({ sender: "orders", to: "a@example.com", subject: "s", body: "b", orderId: "ord1" }).ok, true);
-});
-
 test("sale push rings the kitvoy_sales channel with the custom sound at high priority", () => {
   const push = salePush({ id: "cmorder1", reference: "KTV-ABCDEFGH", customerName: "Sam Lee", total: 134.98, itemCount: 3 });
   assert.equal(push.title, "New sale · $134.98");
@@ -161,19 +99,18 @@ test("sale push rings the kitvoy_sales channel with the custom sound at high pri
 
 // Saturday Oct 31 2026, noon in New York
 const salesNow = new Date("2026-10-31T16:00:00Z");
-const sale = (o: Partial<SalesOrder> & { createdAt: Date }): SalesOrder => ({
-  total: 59.99, status: "CONFIRMED", paymentStatus: "paid", paymentFee: null, supplierStatus: null,
-  supplierProductCost: null, supplierShippingCost: null, items: [{ productSlug: "cordless-tire-inflator", quantity: 1 }], ...o,
-});
+const sale = (o: Partial<SalesOrder> & { createdAt: Date }): SalesOrder => ({ total: 59.99, status: "DELIVERED", ...o });
+// No costs are recorded any more: the profit keys stay for the admin app, at zero
+const noProfit = { amount: 0, estimated: false, ordersWithEstimates: 0, productCost: 0, shippingCost: 0, paymentFees: 0, refundCosts: 0 };
 
-test("sales overview uses store days, the Mon–Sun week, same-day comparison and paid orders only", () => {
+test("sales overview uses store days, the Mon–Sun week, same-day comparison and delivered orders only", () => {
   const overview = computeSalesOverview([
-    sale({ createdAt: new Date("2026-10-31T14:00:00Z"), paymentFee: 2.58, supplierProductCost: 12.94, supplierShippingCost: 15.32 }),
+    sale({ createdAt: new Date("2026-10-31T14:00:00Z") }),
     // 23:30 Wednesday in New York, already Thursday in UTC
-    sale({ createdAt: new Date("2026-10-29T03:30:00Z"), total: 101.98, items: [{ productSlug: "cordless-tire-inflator", quantity: 2 }] }),
+    sale({ createdAt: new Date("2026-10-29T03:30:00Z"), total: 101.98 }),
     sale({ createdAt: new Date("2026-10-26T12:00:00Z"), status: "CANCELED" }),
-    sale({ createdAt: new Date("2026-10-27T12:00:00Z"), paymentStatus: "refunded", paymentFee: 2.58, supplierStatus: "UNSHIPPED", supplierProductCost: 12.94, supplierShippingCost: 15.32 }),
-    sale({ createdAt: new Date("2026-10-30T12:00:00Z"), paymentStatus: "unpaid" }),
+    sale({ createdAt: new Date("2026-10-27T12:00:00Z"), status: "SHIPPED" }),
+    sale({ createdAt: new Date("2026-10-30T12:00:00Z"), status: "PENDING" }),
     sale({ createdAt: new Date("2026-10-20T15:00:00Z") }),
     // Last Sunday: in the month, but not one of the days compared so far this week
     sale({ createdAt: new Date("2026-10-25T15:00:00Z") }),
@@ -193,130 +130,15 @@ test("sales overview uses store days, the Mon–Sun week, same-day comparison an
   assert.equal(overview.month.label, "October 2026");
   assert.equal(overview.month.revenue, 281.95);
   assert.equal(overview.month.orders, 4);
-  // 5 units at $12.94; shipping 15.32 recorded + 28.24 (2 units) + 2 × 15.32 estimated; fees 2.58 recorded + 4.05 + 2.58 + 2.58
-  assert.deepEqual(overview.month.profit, {
-    amount: 100.42, estimated: true, ordersWithEstimates: 3,
-    productCost: 64.7, shippingCost: 74.2, paymentFees: 11.79, refundCosts: 30.84,
-  });
+  assert.deepEqual(overview.month.profit, noProfit);
 });
 
-test("profit is confirmed only when every order has recorded costs, and empty data is all zeros", () => {
-  const recorded = computeSalesOverview([
-    sale({ createdAt: new Date("2026-10-31T14:00:00Z"), paymentFee: 2.39, supplierProductCost: 12.94, supplierShippingCost: 15.32 }),
-  ], salesNow);
-  assert.equal(recorded.month.profit.estimated, false);
-  assert.equal(recorded.month.profit.amount, 29.34);
-
+test("a sales overview with no orders is all zeros", () => {
   const empty = computeSalesOverview([], salesNow);
   assert.deepEqual(empty.week.days.map(d => d.revenue), [0, 0, 0, 0, 0, 0, null]);
   assert.equal(empty.week.changePercent, null);
   assert.equal(empty.today.revenue, 0);
-  assert.deepEqual(empty.month.profit, { amount: 0, estimated: false, ordersWithEstimates: 0, productCost: 0, shippingCost: 0, paymentFees: 0, refundCosts: 0 });
-});
-
-test("FAQ, structured data and product copy state the published policies and only verified specs", async () => {
-  const { storefrontFaqs } = await import("../src/lib/storefront-faq");
-  const { productSchema, returnPolicySchema } = await import("../src/lib/seo/structured-data");
-  const { productSeo, verifiedProductCopy } = await import("../src/config/seo");
-  const faqList = storefrontFaqs(true, 59.99);
-  const faqs = faqList.map(f => f.a).join(" ");
-  const why = faqList.find(f => f.q === "Why buy from Kitvoy?")!.a;
-  assert.match(why, /all 50 US states and Washington, DC/);
-  assert.match(why, /30 days to return it unused in its original packaging/);
-  assert.match(why, /damaged or defective, we replace it or refund you, return shipping included/);
-  assert.match(faqs, /Two inflators cost \$99\.99 together, \$19\.99 less/);
-  assert.match(faqs, /Three cost \$134\.98, which saves \$44\.99/);
-  assert.doesNotMatch(storefrontFaqs(true).map(f => f.a).join(" "), /\$/, "without a price the FAQ names no dollar amounts");
-  assert.doesNotMatch(faqs, /amazon|cheaper than|premium|best[- ]selling|#1|most popular/i);
-  assert.match(faqs, /1–2 business days/);
-  assert.match(faqs, /4–9 business days/);
-  assert.match(faqs, /within 30 days of delivery/);
-  assert.match(faqs, /support@kitvoy\.com/);
-  assert.doesNotMatch(faqs, /not yet (been )?published/);
-
-  const offer = productSchema({ ...product, slug: "cordless-tire-inflator", sku: "INF-001", images: ["/uploads/a.jpg"] }).offers;
-  assert.deepEqual([offer.shippingDetails.deliveryTime.handlingTime.minValue, offer.shippingDetails.deliveryTime.handlingTime.maxValue], [1, 2]);
-  assert.deepEqual([offer.shippingDetails.deliveryTime.transitTime.minValue, offer.shippingDetails.deliveryTime.transitTime.maxValue], [4, 9]);
-  assert.equal(returnPolicySchema().merchantReturnDays, 30);
-
-  const unverified = /usb-c|\bsos\b|shut(s)? (itself )?off|stops by itself|auto(matic)?[ -]?(shut|stop)|presta|ball-needle/i;
-  const { merchantListing } = await import("../src/config/seo");
-  const listingCopy = [merchantListing.title, merchantListing.description, ...merchantListing.highlights];
-  for (const text of [productSeo.summary, productSeo.description, productSeo.pageTitle, faqs, ...listingCopy, ...Object.values(verifiedProductCopy)]) assert.doesNotMatch(text, unverified);
-
-  // Google's structured-data rule: a marked-up fact must be readable on the page. The specs answer carries them all.
-  const visible = faqs.toLowerCase();
-  for (const fact of productSeo.facts) assert.ok(visible.includes(fact.value.toLowerCase()), `the homepage FAQ states "${fact.value}" (${fact.name})`);
-  // The page names the product the ways shoppers search for it
-  for (const term of ["portable air compressor", "tire pump", "air pump"]) assert.ok(visible.includes(term), `the FAQ uses "${term}"`);
-  assert.ok(productSeo.pageTitle.length >= 50 && productSeo.pageTitle.length <= 60, "homepage title is 50–60 characters");
-  assert.ok(productSeo.description.length >= 130 && productSeo.description.length <= 155, "meta description is 130–155 characters");
-  assert.ok(!productSeo.description.includes('"'), "no quotation marks in the meta description");
-});
-
-test("the Merchant Center feed follows Google's product data rules and carries only what the page says", async () => {
-  const { merchantFeed, merchantFeedItem, merchantLandingUrl } = await import("../src/lib/seo/merchant-feed");
-  const { merchantListing, productSeo } = await import("../src/config/seo");
-  const item = merchantFeedItem({ sku: "INF-001", price: 59.99, stock: 12, shippingTax: 0, images: ["/uploads/a.jpg", "/uploads/b.jpg"] });
-  const one = (tag: string) => {
-    const found = [...item.matchAll(new RegExp(`<g:${tag}>([^<]*)</g:${tag}>`, "g"))].map((m) => m[1]);
-    assert.equal(found.length, 1, `exactly one ${tag}`);
-    return found[0];
-  };
-  assert.equal(one("id"), "INF-001");
-  assert.equal(one("availability"), "in_stock");
-  assert.equal(one("brand"), "Kitvoy");
-  assert.equal(one("condition"), "new");
-  assert.equal(one("identifier_exists"), "no", "no GTIN or MPN exists, and none is invented");
-  assert.ok(!/<g:(gtin|mpn)>/.test(item));
-  assert.equal(item.match(/<g:price>([^<]*)<\/g:price>/)![1], "59.99 USD", "the item price comes first, before the shipping price");
-  assert.match(item, /<g:shipping><g:country>US<\/g:country><g:price>0\.00 USD<\/g:price><g:min_handling_time>1<\/g:min_handling_time><g:max_handling_time>2<\/g:max_handling_time><g:min_transit_time>4<\/g:min_transit_time><g:max_transit_time>9<\/g:max_transit_time><\/g:shipping>/);
-
-  // Title and description: within Google's limits, product name first, no price, shipping or promotional wording
-  assert.ok(merchantListing.title.length <= 150);
-  assert.ok(merchantListing.title.startsWith(productSeo.title), "the listing title starts with the product's name on the page");
-  assert.ok(merchantListing.description.length >= 500 && merchantListing.description.length <= 5000);
-  for (const text of [merchantListing.title, merchantListing.description, ...merchantListing.highlights]) {
-    assert.doesNotMatch(text, /\$|free shipping|ships free|free (u\.?s\.?|delivery)|sale|discount|% off|best|cheap|guarantee|#1|!/i);
-    assert.doesNotMatch(text, /[A-Z]{6,}/, "no shouting");
-  }
-  assert.ok(merchantListing.highlights.length >= 2 && merchantListing.highlights.length <= 10);
-  for (const h of merchantListing.highlights) assert.ok(h.length <= 150);
-  assert.equal([...item.matchAll(/<g:product_highlight>/g)].length, merchantListing.highlights.length);
-  assert.equal([...item.matchAll(/<g:product_detail>/g)].length, productSeo.facts.length);
-  assert.match(item, /<g:product_detail><g:section_name>Specifications<\/g:section_name><g:attribute_name>Power<\/g:attribute_name><g:attribute_value>80 W<\/g:attribute_value><\/g:product_detail>/);
-  assert.equal(one("material"), "ABS");
-  assert.equal(one("product_weight"), "610 g");
-
-  // The click lands on the product page with attribution; the canonical stays clean
-  const origin = (process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000").replace(/\/$/, "");
-  assert.equal(merchantLandingUrl(), `${origin}/inflator?utm_source=google&utm_medium=shopping&utm_campaign=merchant_feed`, "the listing lands on the inflator page, which moved from / to /inflator");
-  assert.equal(one("link"), merchantLandingUrl().replace(/&/g, "&amp;"), "ampersands are escaped in XML");
-  assert.equal(one("canonical_link"), `${origin}/inflator`);
-  assert.equal(one("image_link"), `${origin}/uploads/a.jpg`);
-  assert.equal(one("additional_image_link"), `${origin}/uploads/b.jpg`);
-  const { attributionFromUrl } = await import("../src/lib/analytics/attribution");
-  const read = attributionFromUrl(new URL(merchantLandingUrl()))!;
-  assert.deepEqual(
-    { utm_source: read.utm_source, utm_medium: read.utm_medium, utm_campaign: read.utm_campaign },
-    { utm_source: "google", utm_medium: "shopping", utm_campaign: "merchant_feed" },
-    "the store's own attribution reads the listing click",
-  );
-
-  // Well-formed: every tag that opens closes, and nothing is left unescaped
-  const feed = merchantFeed({ sku: "INF-001", price: 59.99, stock: 0, images: [] });
-  assert.ok(feed.startsWith('<?xml version="1.0" encoding="UTF-8"?>'));
-  assert.ok(feed.includes('<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">'));
-  assert.match(feed, /<g:availability>out_of_stock<\/g:availability>/);
-  assert.match(feed, /<g:image_link>[^<]*\/og\.png<\/g:image_link>/, "falls back to the share image when the product has none");
-  const stack: string[] = [];
-  for (const m of feed.matchAll(/<(\/?)([a-zA-Z_:]+)[^>]*>/g)) {
-    if (m[1]) assert.equal(stack.pop(), m[2], `the closing ${m[2]} tag matches the tag that is open`);
-    else stack.push(m[2]);
-  }
-  assert.deepEqual(stack, []);
-  assert.doesNotMatch(feed.replace(/&(amp|lt|gt|quot);/g, ""), /&/, "no bare ampersand");
-  assert.ok(!merchantFeed(null).includes("<item>"), "no product yet: an empty channel");
+  assert.deepEqual(empty.month.profit, noProfit);
 });
 
 test("the Organization markup adds business identity only when Store settings publish it", async () => {
@@ -337,249 +159,9 @@ test("the Organization markup adds business identity only when Store settings pu
   assert.equal((full.contactPoint as Record<string, unknown>).telephone, "+1 505 555 0100");
 });
 
-const confirmationPayload = {
-  to: "sam@example.com", customerName: "Sam <script>Lee</script>", orderReference: "KTV-ABCD1234",
-  orderDate: new Date("2026-11-01T15:00:00Z"),
-  items: [{ productName: "Cordless Tire Inflator", quantity: 2, lineTotal: 101.98 }],
-  subtotal: 101.98, shippingCost: 0, total: 101.98, paymentMethod: "paypal",
-  shipTo: ["Sam Lee", "123 Test St, Apt 4", "Washington, DC 20001"],
-};
-
-test("order confirmation email shows the reference, items, total, address and delivery timeline, escaped", async () => {
-  const { buildOrderConfirmationEmail } = await import("../src/lib/email");
-  const { subject, text, html } = buildOrderConfirmationEmail(confirmationPayload);
-  assert.equal(subject, "Your Kitvoy order KTV-ABCD1234 is confirmed");
-  for (const body of [text, html]) {
-    assert.match(body, /KTV-ABCD1234/);
-    assert.match(body, /2 × Cordless Tire Inflator/);
-    assert.match(body, /\$101\.98/);
-    assert.match(body, /Washington, DC 20001/);
-    assert.match(body, /1–2 business days/);
-    assert.match(body, /4–9 business days with CJPacket/);
-    assert.match(body, /support@kitvoy\.com/);
-    assert.match(body, /November 1, 2026/);
-  }
-  assert.ok(!html.includes("<script>"), "customer name must be escaped");
-  assert.match(html, /Sam/);
-});
-
-function fakeConfirmationDeps(sendResults: { sent: boolean; reason?: string }[]) {
-  let claimed = false;
-  const calls = { sends: 0, waits: [] as number[], records: [] as boolean[], releases: 0 };
-  const deps = {
-    claim: async () => { if (claimed) return false; claimed = true; return true; },
-    release: async () => { claimed = false; calls.releases++; },
-    load: async () => confirmationPayload,
-    send: async () => (sendResults[calls.sends++] ?? sendResults[sendResults.length - 1]) as { sent: true } | { sent: false; reason: string },
-    record: async (_id: string, _p: unknown, r: { sent: boolean }) => { calls.records.push(r.sent); },
-    wait: async (ms: number) => { calls.waits.push(ms); },
-  };
-  return { deps, calls };
-}
-
-test("order confirmation is sent once per order, retries a failed send, and frees the claim if it gives up", async () => {
-  const { deliverOrderConfirmation, RETRY_DELAYS_MS } = await import("../src/lib/order-confirmation");
-
-  const ok = fakeConfirmationDeps([{ sent: true }]);
-  assert.deepEqual(await deliverOrderConfirmation("o1", ok.deps), { sent: true });
-  const again = await deliverOrderConfirmation("o1", ok.deps);
-  assert.equal(again.sent, false, "a second call must not send");
-  assert.equal(ok.calls.sends, 1);
-  assert.deepEqual(ok.calls.records, [true]);
-  assert.equal(ok.calls.releases, 0);
-
-  const flaky = fakeConfirmationDeps([{ sent: false, reason: "SMTP timeout" }, { sent: true }]);
-  assert.deepEqual(await deliverOrderConfirmation("o2", flaky.deps), { sent: true });
-  assert.equal(flaky.calls.sends, 2);
-  assert.deepEqual(flaky.calls.waits, [RETRY_DELAYS_MS[0]]);
-  assert.deepEqual(flaky.calls.records, [true]);
-
-  const down = fakeConfirmationDeps([{ sent: false, reason: "SMTP down" }]);
-  const failed = await deliverOrderConfirmation("o3", down.deps);
-  assert.equal(failed.sent, false);
-  assert.equal(down.calls.sends, 1 + RETRY_DELAYS_MS.length);
-  assert.deepEqual(down.calls.records, [false], "the failure is logged once");
-  assert.equal(down.calls.releases, 1, "the claim is released so it can be retried");
-
-  const broken = fakeConfirmationDeps([{ sent: true }]);
-  broken.deps.load = async () => { throw new Error("database unavailable"); };
-  assert.equal((await deliverOrderConfirmation("o4", broken.deps)).sent, false, "errors are returned, never thrown");
-  assert.equal(broken.calls.releases, 1, "a claim taken before an error is released");
-});
-
 test("terms name New Mexico as the governing law", async () => {
   const { storePolicies } = await import("../src/config/policies");
   assert.equal(storePolicies.governingLaw, "the State of New Mexico, United States");
-});
-
-test("Google sign-in only returns to same-site paths", async () => {
-  const { safeRedirectPath } = await import("../src/lib/auth/google-oauth");
-  assert.equal(safeRedirectPath("/checkout"), "/checkout");
-  assert.equal(safeRedirectPath("/account/orders?tab=1"), "/account/orders?tab=1");
-  for (const bad of ["//evil.com", "/\\evil.com", "https://evil.com", "evil.com", "/\tevil", "", null, undefined]) {
-    assert.equal(safeRedirectPath(bad), "/account", String(bad));
-  }
-});
-
-test("Google sign-in request uses PKCE and a state the callback must match", async () => {
-  const { createGoogleAuthRequest, readGoogleStateCookie, statesMatch } = await import("../src/lib/auth/google-oauth");
-  const { createHash } = await import("node:crypto");
-  const { url, cookie } = createGoogleAuthRequest("client-id", "https://kitvoy.com/api/auth/google/callback", "//evil.com");
-  const params = new URL(url).searchParams;
-  const saved = readGoogleStateCookie(cookie)!;
-  assert.equal(params.get("redirect_uri"), "https://kitvoy.com/api/auth/google/callback");
-  assert.equal(params.get("scope"), "openid email profile");
-  assert.equal(params.get("code_challenge_method"), "S256");
-  assert.equal(params.get("code_challenge"), createHash("sha256").update(saved.verifier).digest("base64url"));
-  assert.equal(params.get("access_type"), null);
-  assert.equal(saved.redirect, "/account");
-  assert.ok(statesMatch(saved.state, params.get("state")));
-  assert.ok(!statesMatch(saved.state, "forged"));
-  assert.ok(!statesMatch(saved.state, null));
-  assert.equal(readGoogleStateCookie("not-a-cookie"), null);
-  assert.notEqual(readGoogleStateCookie(createGoogleAuthRequest("c", "r", "/").cookie)!.state, saved.state);
-});
-
-test("Google accounts need a verified email before they can sign in or link", async () => {
-  const { checkGoogleProfile, googleErrorCode } = await import("../src/lib/auth/google-oauth");
-  assert.deepEqual(checkGoogleProfile({ sub: "1", email: "Sam@Example.com", email_verified: true, name: "Sam Lee", picture: "https://lh3.googleusercontent.com/a" }),
-    { ok: true, profile: { googleId: "1", email: "sam@example.com", fullName: "Sam Lee", image: "https://lh3.googleusercontent.com/a" } });
-  assert.deepEqual(checkGoogleProfile({ sub: "1", email: "sam@example.com", email_verified: false }), { ok: false, error: "google_unverified" });
-  assert.deepEqual(checkGoogleProfile({ sub: "1", email: "sam@example.com" }), { ok: false, error: "google_unverified" });
-  assert.deepEqual(checkGoogleProfile({ email: "sam@example.com", email_verified: true }), { ok: false, error: "google_profile_failed" });
-  assert.equal(checkGoogleProfile({ sub: "2", email: "pat@example.com", email_verified: true }).ok && "pat", "pat");
-  assert.equal(googleErrorCode("google_state"), "google_state");
-  assert.equal(googleErrorCode("google_token_failed"), "google_failed");
-  assert.equal(googleErrorCode("something_else"), undefined);
-});
-
-test("reviews show first name and last initial, and only paid, uncanceled orders count as verified", async () => {
-  const { reviewerName, isVerifiedPurchase, summarizeRatings, parseReviewInput, isReviewUpload } = await import("../src/lib/reviews");
-  assert.equal(reviewerName("sam lee"), "Sam L.");
-  assert.equal(reviewerName("  Maria  de la  Cruz "), "Maria C.");
-  assert.equal(reviewerName("Pat"), "Pat");
-  assert.equal(reviewerName(""), "Kitvoy customer");
-  assert.equal(isVerifiedPurchase({ paymentStatus: "paid", status: "DELIVERED" }), true);
-  assert.equal(isVerifiedPurchase({ paymentStatus: "refunded", status: "DELIVERED" }), true);
-  assert.equal(isVerifiedPurchase({ paymentStatus: "unpaid", status: "PENDING" }), false);
-  assert.equal(isVerifiedPurchase({ paymentStatus: "paid", status: "CANCELED" }), false);
-  assert.equal(isVerifiedPurchase(null), false);
-
-  assert.deepEqual(summarizeRatings([]), { count: 0, average: 0, distribution: [0, 0, 0, 0, 0] });
-  assert.deepEqual(summarizeRatings([{ rating: 5, count: 3 }, { rating: 4, count: 1 }, { rating: 2, count: 1 }]), { count: 5, average: 4.2, distribution: [3, 1, 0, 1, 0] });
-
-  const form = (rating: string, comment: string) => { const f = new FormData(); f.set("rating", rating); f.set("comment", comment); return f; };
-  assert.deepEqual(parseReviewInput(form("5", "  Works well. \r\n ")), { ok: true, rating: 5, comment: "Works well." });
-  assert.deepEqual(parseReviewInput(form("0", "ok")), { ok: false, error: "reviews.ratingRequired" });
-  assert.deepEqual(parseReviewInput(form("4.5", "ok")), { ok: false, error: "reviews.ratingRequired" });
-  assert.deepEqual(parseReviewInput(form("4", "   ")), { ok: false, error: "reviews.commentRequired" });
-  assert.deepEqual(parseReviewInput(form("4", "x".repeat(2001))), { ok: false, error: "reviews.commentTooLong" });
-  assert.ok(isReviewUpload("/uploads/reviews/review-123.jpg"));
-  for (const bad of ["https://evil.com/a.jpg", "/uploads/products/a.jpg", "/uploads/reviews/../x.jpg", "javascript:alert(1)"]) assert.ok(!isReviewUpload(bad), bad);
-});
-
-test("review links are signed per order and reject tampering", async () => {
-  const { createReviewToken, readReviewToken } = await import("../src/lib/review-links");
-  const secret = "s".repeat(40);
-  const orderId = "cmh1abcdefghijklmnopqrstu";
-  const token = createReviewToken(orderId, secret);
-  assert.equal(readReviewToken(token, secret), orderId);
-  assert.equal(readReviewToken(token, "t".repeat(40)), null, "another secret must not verify");
-  assert.equal(readReviewToken(token.replace(orderId, "cmh1abcdefghijklmnopqrstv"), secret), null, "the signature is bound to the order");
-  assert.equal(readReviewToken(`${token}x`, secret), null);
-  for (const bad of ["", ".", orderId, `${orderId}.`, "../x.y", null]) assert.equal(readReviewToken(bad, secret), null, String(bad));
-  assert.equal(readReviewToken(token, null), null, "no secret configured means no valid links");
-});
-
-test("rating markup appears only with approved reviews and leaves the offer untouched", async () => {
-  const { productSchema } = await import("../src/lib/seo/structured-data");
-  const { REVIEWS_SHOWN_FIRST } = await import("../src/lib/reviews");
-  const inflator = { ...product, slug: "cordless-tire-inflator", sku: "INF-001", images: ["/uploads/a.jpg"] };
-  const plain = productSchema(inflator) as Record<string, unknown>;
-  assert.ok(!("aggregateRating" in plain) && !("review" in plain));
-  assert.deepEqual(productSchema(inflator, null), plain);
-
-  const reviews = Array.from({ length: 8 }, (_, i) => ({
-    id: `r${i}`, rating: i === 0 ? 4 : 5, comment: `Review ${i}`, images: [], author: "Sam L.", verified: true,
-    createdAt: "2026-11-01T15:00:00.000Z", publishedOn: "2026-11-01",
-  }));
-  const withReviews = productSchema(inflator, { count: 8, average: 4.9, distribution: [7, 1, 0, 0, 0], reviews }) as Record<string, unknown>;
-  assert.deepEqual(withReviews.offers, plain.offers, "price, offer and shipping fields are unchanged");
-  assert.deepEqual(withReviews.aggregateRating, { "@type": "AggregateRating", ratingValue: 4.9, reviewCount: 8, bestRating: 5, worstRating: 1 });
-  const marked = withReviews.review as { author: { name: string }; datePublished: string; reviewBody: string; reviewRating: { ratingValue: number } }[];
-  assert.equal(marked.length, REVIEWS_SHOWN_FIRST, "markup lists the reviews shown before Show more");
-  assert.deepEqual([marked[0].author.name, marked[0].datePublished, marked[0].reviewBody, marked[0].reviewRating.ratingValue], ["Sam L.", "2026-11-01", "Review 0", 4]);
-});
-
-const reviewRequestPayload = {
-  to: "sam@example.com", customerName: "Sam <b>Lee</b>", orderReference: "KTV-ABCD1234", productName: "Cordless Tire Inflator",
-  deliveredAt: new Date("2026-11-02T18:00:00Z"), reviewUrl: "https://kitvoy.com/review/abc.def",
-};
-
-test("review request email links to the form, offers every star rating and asks for honest reviews", async () => {
-  const { buildReviewRequestEmail } = await import("../src/lib/email");
-  const { subject, text, html } = buildReviewRequestEmail(reviewRequestPayload);
-  assert.equal(subject, "How's your cordless tire inflator working?");
-  assert.match(text, /Write your review: https:\/\/kitvoy\.com\/review\/abc\.def/);
-  for (const body of [text, html]) {
-    assert.match(body, /KTV-ABCD1234/);
-    assert.match(body, /delivered on November 2/);
-    assert.match(body, /good or bad/);
-    assert.match(body, /within 30 days of delivery/);
-  }
-  for (const n of [1, 2, 3, 4, 5]) assert.ok(html.includes(`https://kitvoy.com/review/abc.def?rating=${n}`), `star ${n}`);
-  assert.ok(!html.includes("<b>Lee"), "customer name must be escaped");
-  assert.doesNotMatch(subject, /—/);
-});
-
-test("review requests go out once per order, a few days after delivery, and a failed send is retried later", async () => {
-  const { deliverReviewRequest, sendDueReviewRequests, reviewRequestWindow } = await import("../src/lib/review-requests");
-  const { REVIEW_REQUEST_DELAY_DAYS, REVIEW_REQUEST_MAX_LATE_DAYS, reviewRequestStatus } = await import("../src/lib/reviews");
-  const now = new Date("2026-11-20T16:00:00Z");
-  const window = reviewRequestWindow(now);
-  const day = 86_400_000;
-  assert.equal(now.getTime() - window.deliveredBy.getTime(), REVIEW_REQUEST_DELAY_DAYS * day);
-  assert.equal(now.getTime() - window.deliveredFrom.getTime(), (REVIEW_REQUEST_DELAY_DAYS + REVIEW_REQUEST_MAX_LATE_DAYS) * day);
-
-  const claimed = new Set<string>();
-  const calls = { sends: 0, records: [] as boolean[], releases: 0 };
-  let nextSend: { sent: true } | { sent: false; reason: string } = { sent: true };
-  const deps = {
-    dueOrderIds: async () => ["o1"],
-    claim: async (id: string) => { if (claimed.has(id)) return false; claimed.add(id); return true; },
-    release: async (id: string) => { claimed.delete(id); calls.releases++; },
-    load: async () => reviewRequestPayload,
-    send: async () => { calls.sends++; return nextSend; },
-    record: async (_id: string, _p: unknown, r: { sent: boolean }) => { calls.records.push(r.sent); },
-  };
-  assert.deepEqual(await sendDueReviewRequests(now, deps), { due: 1, sent: 1, failed: [] });
-  assert.equal((await deliverReviewRequest("o1", deps)).sent, false, "a second run must not email again");
-  assert.equal(calls.sends, 1);
-
-  nextSend = { sent: false, reason: "SMTP down" };
-  assert.equal((await deliverReviewRequest("o2", deps)).sent, false);
-  assert.equal(calls.releases, 1, "the claim is released so tomorrow's run retries");
-  assert.deepEqual(calls.records, [true, false]);
-  nextSend = { sent: true };
-  assert.equal((await deliverReviewRequest("o2", deps)).sent, true);
-
-  const delivered = new Date("2026-11-10T12:00:00Z");
-  assert.equal(reviewRequestStatus({ deliveredAt: null, reviewRequestSentAt: null, hasReview: false, hasEmail: true }, now), null);
-  assert.match(reviewRequestStatus({ deliveredAt: delivered, reviewRequestSentAt: null, hasReview: false, hasEmail: true }, new Date("2026-11-11T12:00:00Z"))!, /will be emailed on Nov 14, 2026/);
-  assert.match(reviewRequestStatus({ deliveredAt: delivered, reviewRequestSentAt: new Date("2026-11-14T16:00:00Z"), hasReview: false, hasEmail: true }, now)!, /emailed Nov 14, 2026/);
-  assert.match(reviewRequestStatus({ deliveredAt: new Date("2026-09-01T12:00:00Z"), reviewRequestSentAt: null, hasReview: false, hasEmail: true }, now)!, /too long ago/);
-});
-
-test("My orders offers a review only for delivered paid orders, until every product is reviewed", async () => {
-  const { orderReviewState } = await import("../src/lib/reviews");
-  const delivered = { status: "DELIVERED", paymentStatus: "paid", fulfillmentStatus: "DELIVERED", items: [{ productId: "p1" }, { productId: "p1" }, { productId: null }], reviews: [] as { productId: string }[] };
-  assert.equal(orderReviewState(delivered), "open");
-  assert.equal(orderReviewState({ ...delivered, reviews: [{ productId: "p1" }] }), "done");
-  assert.equal(orderReviewState({ ...delivered, status: "SHIPPED", fulfillmentStatus: "SHIPPED" }), null, "not before delivery");
-  assert.equal(orderReviewState({ ...delivered, status: "DELIVERED", fulfillmentStatus: "SHIPPED" }), "open", "an order marked delivered by hand counts");
-  assert.equal(orderReviewState({ ...delivered, paymentStatus: "unpaid" }), null);
-  assert.equal(orderReviewState({ ...delivered, status: "CANCELED" }), null);
-  assert.equal(orderReviewState({ ...delivered, items: [{ productId: null }] }), null, "nothing reviewable");
 });
 
 test("Meta Pixel events carry an event_id, Purchase counts once per order, and admin pages are skipped", async () => {
@@ -694,49 +276,6 @@ test("ad attribution is read from the landing URL, kept in a first-party cookie 
   assert.equal(a.validFbp("garbage"), undefined);
 });
 
-test("the inline Stripe form never names payment method types and confirms orders only from the verified webhook", async () => {
-  const { readFile } = await import("node:fs/promises");
-  const route = await readFile("src/app/api/checkout/stripe/route.ts", "utf8");
-  const webhook = await readFile("src/app/api/webhooks/stripe/route.ts", "utf8");
-  const element = await readFile("src/components/checkout/stripe-payment.tsx", "utf8");
-  // The route hands the order to one helper that creates, reuses or replaces its PaymentIntent
-  const intentLib = await readFile("src/lib/payments/stripe-intent.ts", "utf8");
-  for (const source of [route, webhook, element, intentLib]) assert.ok(!source.includes("payment_method_types"));
-  assert.match(route, /ensureOrderPaymentIntent\(stripe, order\)/);
-  assert.match(intentLib, /stripe\.paymentIntents\.create\(/);
-  assert.match(intentLib, /automatic_payment_methods: \{ enabled: true \}/);
-  assert.ok(!intentLib.includes("completePaidOrder"), "creating an intent never marks an order paid");
-  assert.ok(!route.includes("checkout.sessions"), "no hosted Checkout redirect");
-  assert.ok(!route.includes("completePaidOrder"), "the PaymentIntent route must not mark orders paid");
-  assert.match(element, /<PaymentElement/);
-  assert.match(element, /stripe\.confirmPayment\(/);
-  assert.match(webhook, /constructEvent\(await request\.text\(\)/);
-  assert.match(webhook, /case "payment_intent\.succeeded":/);
-  assert.ok(!webhook.includes("checkout.session"));
-  assert.match(webhook, /completePaidOrder\(/);
-  // Testing on the live site: test payments never reach CJ
-  assert.match(webhook, /testPayment: !intent\.livemode/);
-  const cj = await readFile("src/lib/fulfillment/cj.ts", "utf8");
-  assert.match(cj, /if \(order\.testPayment\) return \{ ok: false/);
-  // Every visitor gets Stripe once both keys are set (no admin-only gate)
-  const stripeLib = await readFile("src/lib/payments/stripe.ts", "utf8");
-  assert.match(stripeLib, /canUseStripeCheckout\(\): Promise<boolean> \{\s+return Boolean\(getStripe\(\) && getStripePublishableKey\(\)\);/);
-  assert.ok(!stripeLib.includes("isAdminAuthenticated"));
-  // The publishable key is read at runtime: no literal NEXT_PUBLIC_ lookup Next.js could inline at build time
-  assert.ok(!/process\.env(\.|\[")NEXT_PUBLIC_STRIPE/.test(stripeLib), "a literal NEXT_PUBLIC_ lookup gets frozen into the build");
-  process.env.STRIPE_SECRET_KEY = "sk_test_unit";
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = "pk_test_runtime";
-  const { getStripePublishableKey } = await import("../src/lib/payments/stripe");
-  assert.equal(getStripePublishableKey(), "pk_test_runtime");
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = "pk_live_changed";
-  assert.equal(getStripePublishableKey(), "pk_live_changed", "a changed key is picked up without a rebuild");
-  delete process.env.STRIPE_SECRET_KEY;
-  delete process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-  // PayPal's own card button is off; cards go through the Stripe form
-  const paypalOptions = await readFile("src/components/payments/pay-later-message.tsx", "utf8");
-  assert.match(paypalOptions, /disableFunding: "card"/);
-});
-
 test("robots.txt blocks only non-pages, so every noindex page stays readable to crawlers", async () => {
   const { default: robots } = await import("../src/app/robots");
   const { rules, sitemap } = robots();
@@ -747,7 +286,7 @@ test("robots.txt blocks only non-pages, so every noindex page stays readable to 
 
   const { readFile } = await import("node:fs/promises");
   // A noindex page blocked in robots.txt can't show its noindex; these must not be disallowed
-  for (const file of ["src/app/admin/layout.tsx", "src/app/checkout/layout.tsx", "src/app/cart/layout.tsx", "src/app/account/layout.tsx", "src/app/not-found.tsx"]) {
+  for (const file of ["src/app/admin/layout.tsx", "src/app/checkout/layout.tsx", "src/app/cart/layout.tsx", "src/app/not-found.tsx"]) {
     assert.match(await readFile(file, "utf8"), /robots: \{ index: false/, `${file} says noindex`);
   }
   const sitemapSource = await readFile("src/app/sitemap.ts", "utf8");

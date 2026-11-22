@@ -6,22 +6,31 @@
  * several colours is still one bundle: the tier follows the product's total
  * quantity, not each colour's.
  */
-import { INFLATOR_SLUG, getCatalogProduct, type BundleTier } from "@/config/catalog";
+import { getCatalogProduct, type BundleTier } from "@/config/catalog";
 
 export type { BundleTier };
 
-/** A product the catalog doesn't know is priced like the inflator, the store's original rule. */
+/**
+ * The store's original rule, which a product the catalog doesn't know still
+ * gets: two are a fixed 19.99 off, three or more are 25% off each.
+ */
+const DEFAULT_RULES: { tiers: BundleTier[]; maxDiscount: number } = {
+  tiers: [
+    { quantity: 1, discount: 0, label: "Buy 1" },
+    { quantity: 2, discount: 0, amountOff: 19.99, label: "Buy 2" },
+    { quantity: 3, discount: 0.25, label: "Buy 3" },
+  ],
+  maxDiscount: 0.25,
+};
+
 function rulesFor(slug?: string | null): { tiers: BundleTier[]; maxDiscount: number } {
-  const product = getCatalogProduct(slug) ?? getCatalogProduct(INFLATOR_SLUG)!;
-  return { tiers: product.tiers, maxDiscount: product.maxDiscount };
+  const product = getCatalogProduct(slug);
+  return product ? { tiers: product.tiers, maxDiscount: product.maxDiscount } : DEFAULT_RULES;
 }
 
 export function getBundleTiers(slug?: string | null): BundleTier[] {
   return rulesFor(slug).tiers;
 }
-
-/** The inflator's tiers, for its landing page. */
-export const BUNDLE_TIERS: BundleTier[] = getBundleTiers(INFLATOR_SLUG);
 
 function roundCents(value: number): number {
   return Math.round(value * 100) / 100;

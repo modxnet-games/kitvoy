@@ -5,9 +5,9 @@ import { getSalesOverview } from "@/lib/data/sales-overview";
 
 /**
  * GET /api/admin/dashboard/overview
- * Paid sales for today, this calendar week (Mon–Sun, with the same days of
- * last week for comparison) and this month, plus the month's profit after
- * supplier, shipping and payment costs. Days follow the store's time zone.
+ * Sales (delivered orders) for today, this calendar week (Mon–Sun, with the
+ * same days of last week for comparison) and this month. Days follow the
+ * store's time zone. `month.profit` keeps its keys for the admin app, all 0.
  */
 export async function GET(request: NextRequest) {
   if (!getAdminFromRequest(request)) {

@@ -9,13 +9,6 @@ import { PrintOrderButton } from "./print-order-button";
 import { FulfillmentCard } from "./fulfillment-card";
 import { FulfillmentBadge } from "@/components/admin/fulfillment-badge";
 import { countryName, countryOf, type ShippingAddress } from "@/lib/us-address";
-import { isCjConfigured } from "@/config/fulfillment";
-import { listSentEmails } from "@/lib/data/sent-emails";
-import { SentEmailList } from "@/components/admin/sent-email-list";
-import { EmailCustomerCard } from "./email-customer-card";
-import { CheckoutLinkCard } from "./checkout-link-card";
-import { reviewRequestStatus } from "@/lib/reviews";
-import { prisma } from "@/lib/db";
 
 interface OrderPageProps {
   params: Promise<{ id: string }>;
@@ -38,10 +31,6 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
     ["Term", order.utmTerm],
   ];
   const hasAttribution = utm.some(([, v]) => v) || !!order.fbclid;
-  const [sentEmails, reviewCount] = await Promise.all([
-    listSentEmails({ orderId: order.id }).catch(() => []),
-    prisma.review.count({ where: { orderId: order.id } }).catch(() => 0),
-  ]);
 
   return (
     <div>
@@ -146,20 +135,11 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
         <div className="space-y-6">
           <FulfillmentCard
             orderId={order.id}
-            isPaid={isPaid}
             isCanceled={order.status === "CANCELED"}
             fulfillmentStatus={order.fulfillmentStatus}
             trackingNumber={order.trackingNumber}
             shippedAt={order.shippedAt ? order.shippedAt.toISOString() : null}
-            reviewRequest={isPaid ? reviewRequestStatus({ deliveredAt: order.deliveredAt, reviewRequestSentAt: order.reviewRequestSentAt, hasReview: reviewCount > 0, hasEmail: !!order.email }) : null}
-            cj={isCjConfigured() ? { orderId: order.fulfillmentRef, status: order.supplierStatus, error: order.fulfillmentError } : null}
           />
-
-          {!isPaid && order.status === "PENDING" && <CheckoutLinkCard orderId={order.id} />}
-
-          <EmailCustomerCard orderId={order.id} orderReference={orderReference} customerEmail={order.email}>
-            <SentEmailList emails={sentEmails} showOrder={false} />
-          </EmailCustomerCard>
 
           <div className="rounded-xl border bg-card p-6">
             <h2 className="font-semibold">Customer</h2>
@@ -205,25 +185,7 @@ export default async function AdminOrderPage({ params }: OrderPageProps) {
               </div>
               <div>
                 <dt className="text-muted-foreground">Payment</dt>
-                <dd>
-                  {isPaid ? "Paid" : order.paymentStatus === "refunded" ? "Refunded" : "Unpaid"}
-                  {order.testPayment && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">TEST</span>}
-                  {order.paymentMethod && <> · {order.paymentMethod === "paypal" ? "PayPal" : order.paymentMethod === "card" ? "Card (Stripe)" : order.paymentMethod}</>}
-                </dd>
-                {(isPaid || order.paymentStatus === "refunded") && order.paymentRef && (
-                  <dd
-                    className="mt-0.5 font-mono text-xs text-muted-foreground"
-                    title={order.paymentRef.startsWith("pi_") ? "Stripe PaymentIntent (refund it in the Stripe Dashboard)" : "PayPal capture ID (use it to refund)"}
-                  >
-                    {order.paymentRef}
-                  </dd>
-                )}
-                {order.paymentFee != null && (
-                  <dd className="mt-0.5 text-xs text-muted-foreground">Fee {formatPrice(order.paymentFee)}</dd>
-                )}
-                {order.refundedAmount != null && order.refundedAmount > 0 && (
-                  <dd className="mt-0.5 text-xs font-medium text-destructive">Refunded {formatPrice(order.refundedAmount)}</dd>
-                )}
+                <dd>{isPaid ? "Paid" : "Unpaid"}</dd>
               </div>
             </dl>
           </div>

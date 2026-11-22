@@ -68,7 +68,7 @@ export function CartContents({ onNavigate }: { onNavigate?: () => void }) {
         <div className="kv-cart-body">
           <div className="kv-cart-empty">
             <p className="kv-lede">Your cart is empty.</p>
-            <Link className="kv-btn kv-btn-primary" href="/products" onClick={onNavigate}>Browse products</Link>
+            <Link className="kv-btn kv-btn-primary" href="/" onClick={onNavigate}>Browse products</Link>
           </div>
         </div>
       </div>
@@ -160,7 +160,7 @@ export function CartContents({ onNavigate }: { onNavigate?: () => void }) {
         )}
         <PayBadges />
         {/* On the cart page; in the drawer, closing it is the way back */}
-        {!onNavigate && <Link className="kv-cart-continue" href="/products">Continue shopping</Link>}
+        {!onNavigate && <Link className="kv-cart-continue" href="/">Continue shopping</Link>}
       </div>
     </div>
   );

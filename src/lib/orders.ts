@@ -14,7 +14,6 @@ import {
   toShippingAddress,
   validateCheckoutDetails,
   type CheckoutDetails,
-  type PaymentMethod,
   type ShippingAddress,
 } from "@/lib/us-address";
 
@@ -30,18 +29,14 @@ export interface CreateOrderInput {
   email: string;
   phone: string;
   shippingAddress: ShippingAddress;
-  paymentMethod: PaymentMethod;
   items: CartItemPayload[];
-  /** When set, links the order to the authenticated customer. */
-  userId?: string;
   /** Ad attribution and Conversions API inputs read from the request (cookies, IP, user agent) */
   attribution?: OrderAttribution;
 }
 
 export type CreateOrderResult =
   | { success: true; orderId: string; orderReference: string; totals: OrderTotals }
-  /** `exists`: the id asked for already belongs to an order (another request created it first) */
-  | { success: false; error: string; errorKey?: string; exists?: boolean };
+  | { success: false; error: string; errorKey?: string };
 
 /** A cart line as pricing reads it: the product's id, the quantity and the colour. Everything else about the product comes from the database. */
 function cartLine(product: { id: string; slug: string; name: string; price: number }, quantity: number, variantKey?: string): CartItemPayload {
@@ -62,15 +57,6 @@ function cartLine(product: { id: string; slug: string; name: string; price: numb
     quantity,
     ...(variantKey && { variantKey }),
   };
-}
-
-/**
- * A cart line known only by its product id, colour and quantity: what express
- * checkout reads back from the PayPal order it opened. The name and price are
- * filled in when the cart is priced from the database.
- */
-export function cartItemOf(line: { productId: string; variantKey?: string | null; quantity: number }): CartItemPayload {
-  return cartLine({ id: line.productId, slug: "", name: "", price: 0 }, line.quantity, line.variantKey ?? undefined);
 }
 
 /**
@@ -112,7 +98,6 @@ export function orderInputFromDetails(details: CheckoutDetails, items: CartItemP
     email: details.email.toLowerCase(),
     phone: details.phone,
     shippingAddress: toShippingAddress(details),
-    paymentMethod: details.paymentMethod,
     items,
   };
 }
@@ -133,7 +118,6 @@ export function validateOrderInput(input: unknown): { valid: false; error: strin
     city: str(body.city),
     state: str(body.state),
     zip: str(body.zip),
-    paymentMethod: body.paymentMethod === "paypal" ? "paypal" : "card",
   };
   // A checkout page loaded before the store shipped abroad sends no country: that is a US order
   const country = str(body.country).toUpperCase() || "US";
@@ -242,7 +226,7 @@ async function priceCartLines(merged: CartLine[]): Promise<{ ok: true; priced: P
     lineTotal: totals[i],
   }));
 
-  // Work in cents so the stored total is exactly what Stripe and PayPal charge
+  // Work in cents so the stored total is exact
   const subtotalCents = items.reduce((sum, i) => sum + toCents(i.lineTotal), 0);
   const shippingCents = items.reduce((sum, i) => sum + toCents(i.shippingTax * i.quantity), 0);
   return {
@@ -254,29 +238,6 @@ async function priceCartLines(merged: CartLine[]): Promise<{ ok: true; priced: P
       total: (subtotalCents + shippingCents) / 100,
     },
   };
-}
-
-export type PriceCartResult =
-  | {
-      ok: true;
-      priced: PricedOrder;
-      /** The countries every product in the cart ships to */
-      allowedCountries: CountryCode[];
-    }
-  | { ok: false; failure: OrderFailure };
-
-/**
- * Checks stock and prices a cart from the database before any address is
- * known, which is where express checkout starts: the buyer's address arrives
- * from PayPal afterwards and is checked against `allowedCountries` then. The
- * total does not depend on the destination.
- */
-export async function priceCart(items: CartItemPayload[]): Promise<PriceCartResult> {
-  const cart = await readCartLines(items);
-  if (!cart.ok) return cart;
-  const pricing = await priceCartLines(cart.lines);
-  if (!pricing.ok) return pricing;
-  return { ok: true, priced: pricing.priced, allowedCountries: cart.allowedCountries };
 }
 
 /**
@@ -296,26 +257,17 @@ async function priceOrder(input: CreateOrderInput): Promise<{ ok: true; priced: 
 
 const orderReferenceOf = (id: string) => `KTV-${id.slice(-8).toUpperCase()}`;
 
-/** Prisma's code for a unique column that already holds the value. */
-const isUniqueViolation = (err: unknown) => (err as { code?: unknown } | null)?.code === "P2002";
-
 /**
- * Saves the checkout as a pending, unpaid order. `options` is for express
- * checkout: `id` because the order's id is chosen before the order exists, so
- * the PayPal order can name it (an id that is already taken is reported as
- * `exists`, never overwritten), and `paymentRef` so the order names that
- * PayPal order from the moment it exists.
+ * Saves the checkout as a pending, unpaid order. Stock is checked when the
+ * cart is priced, but nothing here takes the items out of stock.
  */
-export async function createOrder(input: CreateOrderInput, options: { id?: string; paymentRef?: string } = {}): Promise<CreateOrderResult> {
+export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
   const pricing = await priceOrder(input);
   if (!pricing.ok) return pricing.failure;
   const { items: pricedItems, subtotal, shippingCost, total } = pricing.priced;
 
-  // Stock is reserved when the payment is captured (see completePaidOrder),
-  // so abandoned checkouts don't drain inventory.
-  const creating = prisma.order.create({
+  const order = await prisma.order.create({
     data: {
-      ...(options.id && { id: options.id }),
       customerName: input.customerName,
       email: input.email,
       phone: input.phone,
@@ -327,10 +279,7 @@ export async function createOrder(input: CreateOrderInput, options: { id?: strin
       total,
       currency: "USD",
       locale: "en",
-      paymentMethod: input.paymentMethod,
       paymentStatus: "unpaid",
-      ...(options.paymentRef && { paymentRef: options.paymentRef }),
-      ...(input.userId && { userId: input.userId }),
       ...(input.attribution && {
         utmSource: input.attribution.utm_source ?? null,
         utmMedium: input.attribution.utm_medium ?? null,
@@ -354,116 +303,11 @@ export async function createOrder(input: CreateOrderInput, options: { id?: strin
     },
     include: { items: true },
   });
-  const order = await (options.id
-    ? creating.catch((err: unknown) => {
-        if (isUniqueViolation(err)) return null;
-        throw err;
-      })
-    : creating);
-  if (!order) return { success: false, error: "ORDER_EXISTS", exists: true };
 
   return {
     success: true,
     orderId: order.id,
     orderReference: orderReferenceOf(order.id),
     totals: { subtotal, shippingCost, total },
-  };
-}
-
-/** The lines of an order as one comparable string, whatever order they were saved in. */
-export function orderLinesKey(lines: { productId: string | null; variantKey?: string | null; quantity: number; unitPrice: number }[]): string {
-  return lines
-    .map((l) => `${l.productId ?? ""}${l.variantKey ? `:${l.variantKey}` : ""}x${l.quantity}@${toCents(l.unitPrice)}`)
-    .sort()
-    .join(",");
-}
-
-export type UpdateOrderResult =
-  | { success: true; orderId: string; orderReference: string; totals: OrderTotals; totalChanged: boolean; detailsChanged: boolean }
-  | { success: false; error: string; errorKey?: string; notReusable?: boolean };
-
-/**
- * Saves new details (and a changed cart) on the open order of a checkout that
- * was already started, so a reload, the Edit button or a retry never leaves a
- * second order behind. Only an order that is still PENDING and unpaid is
- * touched; the write re-checks that, so a payment landing at the same moment
- * wins and the caller creates a new order instead (`notReusable`).
- */
-export async function updatePendingOrder(
-  existing: {
-    id: string;
-    total: number;
-    customerName: string;
-    email: string | null;
-    phone: string;
-    location: string;
-    attribution: unknown;
-    items: { productId: string | null; variantKey?: string | null; quantity: number; unitPrice: number }[];
-  },
-  input: CreateOrderInput,
-): Promise<UpdateOrderResult> {
-  const pricing = await priceOrder(input);
-  if (!pricing.ok) return pricing.failure;
-  const { items: pricedItems, subtotal, shippingCost, total } = pricing.priced;
-
-  const location = formatAddressLine(input.shippingAddress);
-  const itemsChanged = orderLinesKey(existing.items) !== orderLinesKey(pricedItems);
-  const totalChanged = toCents(existing.total) !== toCents(total);
-  const detailsChanged =
-    existing.customerName !== input.customerName ||
-    (existing.email ?? "") !== input.email ||
-    existing.phone !== input.phone ||
-    existing.location !== location;
-
-  // The ad click and browser ids saved when the checkout started stay; a retry only fills in what was missing (fbp, fbc)
-  const before = (existing.attribution ?? {}) as Record<string, unknown>;
-  const merged = { ...(input.attribution ?? {}), ...before };
-  const attribution = Object.keys(merged).length > Object.keys(before).length ? merged : null;
-
-  const updated = await prisma.$transaction(async (tx) => {
-    const { count } = await tx.order.updateMany({
-      where: { id: existing.id, status: "PENDING", paymentStatus: "unpaid" },
-      data: {
-        customerName: input.customerName,
-        email: input.email,
-        phone: input.phone,
-        location,
-        shippingAddress: { ...input.shippingAddress },
-        subtotal,
-        shippingCost,
-        total,
-        ...(input.userId && { userId: input.userId }),
-        ...(attribution && { attribution }),
-        // A PayPal order opened for the old amount must never be captured for the new one
-        ...(totalChanged && { paymentRef: null }),
-      },
-    });
-    if (count === 0) return false;
-    if (itemsChanged) {
-      await tx.orderItem.deleteMany({ where: { orderId: existing.id } });
-      await tx.orderItem.createMany({
-        data: pricedItems.map((item) => ({
-          orderId: existing.id,
-          productId: item.productId,
-          productName: item.productName,
-          productSlug: item.productSlug,
-          variantKey: item.variantKey,
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-          lineTotal: item.lineTotal,
-        })),
-      });
-    }
-    return true;
-  });
-  if (!updated) return { success: false, error: "ORDER_NOT_REUSABLE", notReusable: true };
-
-  return {
-    success: true,
-    orderId: existing.id,
-    orderReference: orderReferenceOf(existing.id),
-    totals: { subtotal, shippingCost, total },
-    totalChanged,
-    detailsChanged,
   };
 }

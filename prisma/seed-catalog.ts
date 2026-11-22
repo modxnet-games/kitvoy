@@ -68,7 +68,7 @@ async function main() {
       }
 
       console.log(`- ${content.slug}: ${apply ? "creating" : "would create"} "${db.name}" at $${db.price}, stock ${db.stock}, SKU ${db.sku}, category "${db.categoryName}", ${content.gallery.length} images`);
-      console.log(`  colours → CJ variants: ${entry.variants.map((v) => `${v.label} = ${v.cj.sku} (vid ${v.cj.vid})`).join("; ")}`);
+      console.log(`  colours: ${entry.variants.map((v) => `${v.label} = ${v.sku}`).join("; ")}`);
       if (!apply) continue;
 
       const category = await prisma.category.upsert({

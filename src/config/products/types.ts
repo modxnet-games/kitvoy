@@ -80,9 +80,6 @@ export interface ProductContent {
 
 export interface ProductEntry {
   slug: string;
-  /** The product's own logo, and its cream version for dark sections */
-  logo: string;
-  logoLight: string;
   /** French sizing, shared by both languages */
   sizeGuide: { rows: SizeGuideRow[]; bands: { band: string; underbust: string }[] };
   /** When the page's visible copy last changed (sitemap lastmod) */

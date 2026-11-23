@@ -34,8 +34,6 @@ export interface ProductPageProps {
   /** All copy and media, in the page's language */
   content: ProductContent;
   sizeGuide: ProductEntry["sizeGuide"];
-  /** The product's own logo, for the closing band */
-  productLogoLight: string;
   /** The complete FAQ list, already assembled by the server page (product questions + delivery, payment and exchange) */
   faqs: { q: string; a: string }[];
 }
@@ -173,7 +171,7 @@ function buildLines(product: ProductDisplay, chosen: CatalogVariant[]): CartItem
 /** What one piece costs inside a pack, never rounded up. */
 const perUnit = (total: number, quantity: number) => Math.floor(Math.round(total * 100) / quantity) / 100;
 
-export function ProductPage({ product, entry, content, sizeGuide, productLogoLight, faqs }: ProductPageProps) {
+export function ProductPage({ product, entry, content, sizeGuide, faqs }: ProductPageProps) {
   const { t, m, locale } = useLanguage();
   const { tiers, colours: palette, sizes: sizeList } = entry;
   const largestPack = Math.max(1, ...tiers.map((tier) => tier.quantity));
@@ -582,11 +580,11 @@ export function ProductPage({ product, entry, content, sizeGuide, productLogoLig
         </div>
       </section>
 
-      {/* Closing: back up to the buy box */}
+      {/* Closing: the store's own logo (the bra has no product name or logo), then back up to the buy box */}
       <section className="kv-section kv-section-dark kv-on-dark" style={{ textAlign: "center" }}>
         <div className="kv-wrap" style={{ maxWidth: 760 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="kv-product-logo" src={productLogoLight} alt="Sanadi" width={520} height={132} loading="lazy" />
+          <img className="kv-closing-logo" src={siteConfig.logoLight} alt={locale === "ar" ? siteConfig.nameAr : siteConfig.name} width={609} height={687} loading="lazy" />
           <h2 className="kv-display" style={{ margin: "12px 0 18px" }}>{content.closing.heading}</h2>
           <a href="#buy" className="kv-btn kv-btn-gold" id="order-up">
             {content.closing.cta}

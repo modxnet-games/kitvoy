@@ -46,7 +46,7 @@ const item = (over: Partial<OrderItem> = {}): OrderItem => ({
   id: "item1",
   orderId: ORDER_ID,
   productId: "prod1",
-  productName: "Sanadi (Noir, XL)",
+  productName: "Soutien-gorge (Noir, XL)",
   productSlug: "sanadi",
   variantKey: "black-xl",
   unitPrice: 199,
@@ -104,7 +104,7 @@ const order = (over: Partial<OrderWithItems> = {}): OrderWithItems => ({
   userId: null,
   createdAt: at("2026-11-22T10:00:00Z"),
   updatedAt: at("2026-11-22T10:00:00Z"),
-  items: [item(), item({ id: "item2", productName: "Sanadi (Beige, M)", variantKey: "nude-m", quantity: 1, lineTotal: 199 })],
+  items: [item(), item({ id: "item2", productName: "Soutien-gorge (Beige, M)", variantKey: "nude-m", quantity: 1, lineTotal: 199 })],
   ...over,
 });
 
@@ -289,8 +289,8 @@ test("stock is counted per product: colours and sizes add up, lines without a pr
 
 test("a shortage is told to the owner in words, and no shortage says nothing", () => {
   assert.equal(stockWarning([]), undefined);
-  const warning = stockWarning([{ name: "Sanadi", needed: 3, available: 1 }]);
-  assert.match(warning ?? "", /Sanadi: 3 needed, 1 in stock/);
+  const warning = stockWarning([{ name: "Soutien-gorge", needed: 3, available: 1 }]);
+  assert.match(warning ?? "", /Soutien-gorge: 3 needed, 1 in stock/);
   assert.match(warning ?? "", /restock before shipping/);
 });
 
@@ -399,7 +399,7 @@ test("a serialized order keeps every column and its items, and adds the referenc
   assert.deepEqual(wire.shippingAddress, { address1: "12 rue Al Massira, Maarif", city: "Casablanca", country: "MA" });
   assert.deepEqual(
     wire.items.map((i: { productName: string; variantKey: string; quantity: number }) => [i.productName, i.variantKey, i.quantity]),
-    [["Sanadi (Noir, XL)", "black-xl", 2], ["Sanadi (Beige, M)", "nude-m", 1]],
+    [["Soutien-gorge (Noir, XL)", "black-xl", 2], ["Soutien-gorge (Beige, M)", "nude-m", 1]],
   );
 });
 
@@ -596,7 +596,7 @@ function fakeDb(orders: OrderWithItems[], products: { id: string; name: string; 
   };
 }
 
-const sanadi = { id: "prod1", name: "Sanadi", stock: 10 };
+const sanadi = { id: "prod1", name: "Soutien-gorge", stock: 10 };
 const t1 = at("2026-11-22T12:00:00Z");
 const t2 = at("2026-11-23T09:00:00Z");
 const t3 = at("2026-11-24T16:00:00Z");
@@ -664,7 +664,7 @@ test("an order brought back takes its pieces again, and says so when the stock r
   assert.ok(short.ok, "the change is allowed");
   assert.deepEqual(db.drain(), ["lock order", "lock product prod1", "stock prod1 -1", "update order: status, stockHeld"]);
   assert.deepEqual([short.order.status, short.order.stockHeld, db.stock()], ["PENDING", true, 0]);
-  assert.match(short.warning ?? "", /Sanadi: 3 needed, 1 in stock/);
+  assert.match(short.warning ?? "", /Soutien-gorge: 3 needed, 1 in stock/);
 
   // With nothing left at all, nothing is taken and the stock stays at zero
   await setOrderStatusIn(db.tx, ORDER_ID, "CANCELED", t3);
@@ -674,7 +674,7 @@ test("an order brought back takes its pieces again, and says so when the stock r
   assert.ok(empty.ok);
   assert.deepEqual(db.drain(), ["lock order", "lock product prod1", "update order: status, stockHeld"]);
   assert.equal(db.stock(), 0);
-  assert.match(empty.warning ?? "", /Sanadi: 3 needed, 0 in stock/);
+  assert.match(empty.warning ?? "", /Soutien-gorge: 3 needed, 0 in stock/);
 });
 
 test("lines without a product, and products that no longer exist, hold no stock", async () => {
@@ -864,7 +864,7 @@ test("links to the orders list carry the status, the search and the page size", 
 });
 
 test("an order's items read as a short line, and a rate as a percentage", () => {
-  assert.equal(itemsSummary(order().items), "2 × Sanadi (Noir, XL), 1 × Sanadi (Beige, M)");
+  assert.equal(itemsSummary(order().items), "2 × Soutien-gorge (Noir, XL), 1 × Soutien-gorge (Beige, M)");
   assert.equal(itemsSummary([]), "");
   assert.equal(formatRate(0.6667), "67%");
   assert.equal(formatRate(1), "100%");

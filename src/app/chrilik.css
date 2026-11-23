@@ -250,11 +250,12 @@ html[lang="ar"] .kv-step-n {
 }
 
 /* ---------- Closing band ---------- */
-.kv-product-logo {
+/* The stacked Chrilik logo (bag, name, Arabic name) at the top of the closing band */
+.kv-closing-logo {
   display: block;
   width: auto;
-  height: 62px;
-  margin: 0 auto 6px;
+  height: 112px;
+  margin: 0 auto 10px;
 }
 
 /* ---------- Order form ---------- */

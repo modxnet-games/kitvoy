@@ -1,7 +1,12 @@
 import type { ProductEntry } from "./types";
 
 /**
- * Sanadi (سندي, "my support"): a wireless support bra.
+ * The store's one product: a wireless support bra.
+ *
+ * It has no product name of its own (the owner's choice, 2026-11-23): customers
+ * see it as a soutien-gorge / حمّالة صدر from Chrilik. "sanadi" is only its
+ * internal id (database slug, photo folder, SKU prefix SND), left from the name
+ * it had at launch; customers never read it.
  *
  * Product facts, from the supplier's listing the owner chose (2026-11-22):
  * seamless nylon, no underwire, thin 3/4 moulded cups, wide non-adjustable
@@ -17,8 +22,6 @@ const photo = (name: string) => `/products/sanadi/${name}.webp`;
 
 export const sanadi: ProductEntry = {
   slug: "sanadi",
-  logo: "/brand/sanadi-logo.svg",
-  logoLight: "/brand/sanadi-logo-light.svg",
   // The supplier's chart (US band and cup) in the French sizes Moroccan shops use: band + 15 cm naming, DD = E
   sizeGuide: {
     rows: [
@@ -39,14 +42,14 @@ export const sanadi: ProductEntry = {
       { band: "115", underbust: "99–104" },
     ],
   },
-  lastModified: "2026-11-22",
+  lastModified: "2026-11-23",
   content: {
     fr: {
-      name: "Sanadi, soutien-gorge de maintien sans armatures",
+      name: "Soutien-gorge de maintien sans armatures Chrilik",
       eyebrow: "Soutien-gorge sans armatures",
       tagline: "Le maintien qui se règle sur vous.",
       description:
-        "Sans armatures, avec un dos large et une bande élastique qui s'agrafe devant : Sanadi soutient et galbe la poitrine, et c'est vous qui choisissez le serrage.",
+        "Sans armatures, avec un dos large et une bande élastique qui s'agrafe devant : il soutient et galbe la poitrine, et c'est vous qui choisissez le serrage.",
       features: [
         "Sans armatures : aucun fil métallique, aucune marque sur la peau",
         "Bande de maintien réglable qui s'agrafe devant, à votre mesure",
@@ -57,33 +60,33 @@ export const sanadi: ProductEntry = {
       ],
       trust: "Sans armatures, maintien réglable",
       gallery: [
-        { src: photo("hero"), alt: "Soutien-gorge Sanadi noir porté, vu de face, avec sa bande agrafée devant", badge: { icon: "support", title: "Sans armatures", sub: "Maintien réglable devant" } },
-        { src: photo("back"), alt: "Soutien-gorge Sanadi noir vu de dos : dos large et bretelles larges", badge: { icon: "back", title: "Dos large", sub: "Bretelles confort" } },
-        { src: photo("bands"), alt: "Les deux côtés de la bande élastique du Sanadi beige, tirés avant d'être agrafés devant", badge: { icon: "adjust", title: "Bande réglable", sub: "Vous choisissez le serrage" } },
-        { src: photo("detail"), alt: "Gros plan sur les agrafes avant et la bande côtelée du Sanadi beige" },
-        { src: photo("colours"), alt: "Les trois couleurs du Sanadi posées à plat : beige, noir et léopard" },
+        { src: photo("hero"), alt: "Soutien-gorge noir porté, vu de face, avec sa bande agrafée devant", badge: { icon: "support", title: "Sans armatures", sub: "Maintien réglable devant" } },
+        { src: photo("back"), alt: "Soutien-gorge noir vu de dos : dos large et bretelles larges", badge: { icon: "back", title: "Dos large", sub: "Bretelles confort" } },
+        { src: photo("bands"), alt: "Les deux côtés de la bande élastique du soutien-gorge beige, tirés avant d'être agrafés devant", badge: { icon: "adjust", title: "Bande réglable", sub: "Vous choisissez le serrage" } },
+        { src: photo("detail"), alt: "Gros plan sur les agrafes avant et la bande côtelée du soutien-gorge beige" },
+        { src: photo("colours"), alt: "Les trois couleurs du soutien-gorge posées à plat : beige, noir et léopard" },
         // Shown only while one of the five above is missing (the page keeps the first five photos that exist)
-        { src: photo("colour-nude"), alt: "Soutien-gorge Sanadi beige porté, vu de face" },
-        { src: photo("colour-leopard"), alt: "Soutien-gorge Sanadi léopard porté, vu de face" },
+        { src: photo("colour-nude"), alt: "Soutien-gorge beige porté, vu de face" },
+        { src: photo("colour-leopard"), alt: "Soutien-gorge léopard porté, vu de face" },
       ],
       transformation: {
         eyebrow: "La différence",
         heading: "Avant, après.",
         lede: "Même tee-shirt, même journée. Seul le soutien-gorge change.",
         before: { src: photo("before"), alt: "Sous un tee-shirt gris, avec un soutien-gorge ordinaire" },
-        after: { src: photo("after"), alt: "Sous le même tee-shirt gris, avec Sanadi" },
+        after: { src: photo("after"), alt: "Sous le même tee-shirt gris, avec le soutien-gorge Chrilik" },
         beforeLabel: "Avant",
-        afterLabel: "Avec Sanadi",
+        afterLabel: "Avec Chrilik",
       },
       howItWorks: {
         heading: "Trois gestes, et c'est réglé.",
         steps: [
-          { title: "Enfilez-le", text: "Mettez Sanadi comme un soutien-gorge classique et fermez les agrafes dans le dos." },
+          { title: "Enfilez-le", text: "Mettez-le comme un soutien-gorge classique et fermez les agrafes dans le dos." },
           { title: "Ramenez la bande", text: "Tirez les deux côtés de la bande élastique vers l'avant, sous la poitrine." },
           { title: "Agrafez devant", text: "Fermez les agrafes à l'avant, au serrage qui vous convient. C'est tout." },
         ],
       },
-      included: ["Un soutien-gorge Sanadi par pièce commandée, dans la couleur et la taille que vous avez choisies"],
+      included: ["Un soutien-gorge par pièce commandée, dans la couleur et la taille que vous avez choisies"],
       facts: [
         { name: "Type", value: "Soutien-gorge sans armatures, sans coutures" },
         { name: "Matière", value: "Nylon (polyamide) extensible" },
@@ -106,17 +109,17 @@ export const sanadi: ProductEntry = {
       ],
       closing: { heading: "Un pour aujourd'hui, un pour demain.", cta: "Commander maintenant" },
       seo: {
-        pageTitle: "Sanadi : soutien-gorge de maintien sans armatures",
+        pageTitle: "Soutien-gorge de maintien sans armatures",
         description: "Soutien-gorge sans armatures avec bande de maintien réglable, du S au XXXL. Paiement à la livraison et livraison gratuite partout au Maroc en 24 à 72 h.",
         category: "Lingerie > Soutiens-gorge",
         material: "Nylon",
       },
     },
     ar: {
-      name: "سندي، حمّالة صدر داعمة بدون سلك",
+      name: "حمّالة صدر داعمة بدون سلك من شري ليك",
       eyebrow: "سوتيان بدون سلك",
       tagline: "دعمٌ تتحكّمين فيه بنفسك.",
-      description: "بدون سلك، بظهر عريض وحزام مطاطي يُغلق من الأمام: سندي تدعم الصدر وتمنحه شكلاً متناسقاً، وأنتِ من تختارين درجة الشدّ.",
+      description: "بدون سلك، بظهر عريض وحزام مطاطي يُغلق من الأمام: تدعم الصدر وتمنحه شكلاً متناسقاً، وأنتِ من تختارين درجة الشدّ.",
       features: [
         "بدون سلك: لا أسلاك معدنية ولا علامات على البشرة",
         "حزام دعم قابل للتعديل يُغلق من الأمام على مقاسك",
@@ -127,32 +130,32 @@ export const sanadi: ProductEntry = {
       ],
       trust: "بدون سلك، دعم قابل للتعديل",
       gallery: [
-        { src: photo("hero"), alt: "حمّالة الصدر سندي باللون الأسود من الأمام مع الحزام المغلق من الأمام", badge: { icon: "support", title: "بدون سلك", sub: "دعم قابل للتعديل من الأمام" } },
-        { src: photo("back"), alt: "حمّالة الصدر سندي باللون الأسود من الخلف: ظهر عريض وحمّالات عريضة", badge: { icon: "back", title: "ظهر عريض", sub: "حمّالات مريحة" } },
-        { src: photo("bands"), alt: "طرفا الحزام المطاطي لحمّالة الصدر سندي باللون البيج قبل إغلاقهما من الأمام", badge: { icon: "adjust", title: "حزام قابل للتعديل", sub: "أنتِ تختارين درجة الشدّ" } },
-        { src: photo("detail"), alt: "صورة مقرّبة للمشابك الأمامية والحزام المضلّع لحمّالة الصدر سندي باللون البيج" },
-        { src: photo("colours"), alt: "الألوان الثلاثة لحمّالة الصدر سندي: بيج، أسود ونمري" },
-        { src: photo("colour-nude"), alt: "حمّالة الصدر سندي باللون البيج من الأمام" },
-        { src: photo("colour-leopard"), alt: "حمّالة الصدر سندي باللون النمري من الأمام" },
+        { src: photo("hero"), alt: "حمّالة الصدر باللون الأسود من الأمام مع الحزام المغلق من الأمام", badge: { icon: "support", title: "بدون سلك", sub: "دعم قابل للتعديل من الأمام" } },
+        { src: photo("back"), alt: "حمّالة الصدر باللون الأسود من الخلف: ظهر عريض وحمّالات عريضة", badge: { icon: "back", title: "ظهر عريض", sub: "حمّالات مريحة" } },
+        { src: photo("bands"), alt: "طرفا الحزام المطاطي لحمّالة الصدر باللون البيج قبل إغلاقهما من الأمام", badge: { icon: "adjust", title: "حزام قابل للتعديل", sub: "أنتِ تختارين درجة الشدّ" } },
+        { src: photo("detail"), alt: "صورة مقرّبة للمشابك الأمامية والحزام المضلّع لحمّالة الصدر باللون البيج" },
+        { src: photo("colours"), alt: "الألوان الثلاثة لحمّالة الصدر: بيج، أسود ونمري" },
+        { src: photo("colour-nude"), alt: "حمّالة الصدر باللون البيج من الأمام" },
+        { src: photo("colour-leopard"), alt: "حمّالة الصدر باللون النمري من الأمام" },
       ],
       transformation: {
         eyebrow: "الفرق",
         heading: "قبل وبعد.",
         lede: "نفس القميص ونفس اليوم. الذي تغيّر هو حمّالة الصدر فقط.",
         before: { src: photo("before"), alt: "تحت قميص رمادي، بحمّالة صدر عادية" },
-        after: { src: photo("after"), alt: "تحت نفس القميص الرمادي، مع سندي" },
+        after: { src: photo("after"), alt: "تحت نفس القميص الرمادي، مع حمّالة صدر شري ليك" },
         beforeLabel: "قبل",
-        afterLabel: "مع سندي",
+        afterLabel: "مع شري ليك",
       },
       howItWorks: {
         heading: "ثلاث خطوات وتكونين جاهزة.",
         steps: [
-          { title: "البسيها", text: "البسي سندي مثل أي حمّالة صدر وأغلقي المشابك من الخلف." },
+          { title: "البسيها", text: "البسيها كأي حمّالة صدر عادية وأغلقي المشابك من الخلف." },
           { title: "اسحبي الحزام", text: "اسحبي طرفي الحزام المطاطي إلى الأمام، تحت الصدر." },
           { title: "أغلقي من الأمام", text: "أغلقي المشابك الأمامية على درجة الشدّ التي تريحك. هذا كل شيء." },
         ],
       },
-      included: ["حمّالة صدر سندي واحدة عن كل قطعة تطلبينها، باللون والمقاس الذي اخترته"],
+      included: ["حمّالة صدر واحدة عن كل قطعة تطلبينها، باللون والمقاس الذي اخترته"],
       facts: [
         { name: "النوع", value: "حمّالة صدر بدون سلك وبدون خياطة" },
         { name: "الخامة", value: "نايلون (بولي أميد) مطاطي" },
@@ -175,7 +178,7 @@ export const sanadi: ProductEntry = {
       ],
       closing: { heading: "واحدة لليوم، وواحدة للغد.", cta: "اطلبي الآن" },
       seo: {
-        pageTitle: "سندي: حمّالة صدر داعمة بدون سلك",
+        pageTitle: "حمّالة صدر داعمة بدون سلك",
         description: "حمّالة صدر (سوتيان) بدون سلك بحزام دعم قابل للتعديل، من S إلى XXXL. الدفع عند الاستلام والتوصيل مجاني لجميع مدن المغرب خلال 24 إلى 72 ساعة.",
         category: "ملابس داخلية > حمّالات الصدر",
         material: "نايلون",
@@ -183,11 +186,12 @@ export const sanadi: ProductEntry = {
     },
   },
   database: {
-    name: "Sanadi",
+    // Order lines, the admin, the owner's email and the delivery slip read this: "Soutien-gorge (Noir, L)"
+    name: "Soutien-gorge",
     sku: "SND-001",
     price: 199,
     shortDescription: "Soutien-gorge de maintien sans armatures, bande réglable agrafée devant.",
-    description: "Sanadi est un soutien-gorge sans armatures et sans coutures, avec un dos large, des bretelles larges et une bande élastique réglable qui s'agrafe devant. Du S au XXXL, en noir, beige et léopard.",
+    description: "Soutien-gorge sans armatures et sans coutures, avec un dos large, des bretelles larges et une bande élastique réglable qui s'agrafe devant. Du S au XXXL, en noir, beige et léopard.",
     details: "Nylon extensible. Bonnets 3/4 fins et moulés. Agrafes au dos, bande de maintien agrafée devant. Lavage à la main.",
     categorySlug: "lingerie",
     categoryName: "Lingerie",

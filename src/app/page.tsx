@@ -68,7 +68,7 @@ export default async function HomePage() {
   return (
     <>
       <JsonLd data={structured} />
-      <ProductPage product={product} entry={entry} content={content} sizeGuide={page.sizeGuide} productLogoLight={page.logoLight} faqs={faqs} />
+      <ProductPage product={product} entry={entry} content={content} sizeGuide={page.sizeGuide} faqs={faqs} />
     </>
   );
 }

@@ -76,7 +76,7 @@ export function ordersHref(filter: { status?: readonly CodStatus[]; q?: string; 
   return parts.length > 0 ? `/admin/orders?${parts.join("&")}` : "/admin/orders";
 }
 
-/** "2 × Sanadi (Noir, XL), 1 × Sanadi (Beige, M)" */
+/** "2 × Soutien-gorge (Noir, XL), 1 × Soutien-gorge (Beige, M)" */
 export function itemsSummary(items: { quantity: number; productName: string }[]): string {
   return items.map((item) => `${item.quantity} × ${item.productName}`).join(", ");
 }

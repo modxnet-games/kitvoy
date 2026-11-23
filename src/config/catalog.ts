@@ -83,10 +83,12 @@ export interface CatalogProduct {
 
 export const catalog: CatalogProduct[] = [
   {
+    // Internal id only (database slug, photo folder): the bra has no product name of its own since
+    // 2026-11-23, customers read "soutien-gorge" / "حمّالة صدر" from Chrilik
     slug: "sanadi",
     path: "/",
-    shortName: "Sanadi",
-    displayName: { ar: "سندي", fr: "Sanadi" },
+    shortName: "Soutien-gorge",
+    displayName: { ar: "حمّالة صدر", fr: "Soutien-gorge" },
     unit: { ar: { one: "قطعة", many: "قطع" }, fr: { one: "pièce", many: "pièces" } },
     // 199 DH each: 2 for 350 DH, 3 for 450 DH, and 25% off each from the fourth
     tiers: [

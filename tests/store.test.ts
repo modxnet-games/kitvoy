@@ -197,7 +197,13 @@ test("the product copy is complete in both languages and follows the owner's rul
   for (const [path, text] of [...strings(fr, "fr"), ...strings(ar, "ar")]) {
     assert.ok(text.trim(), `${path} is empty`);
     assert.doesNotMatch(text, /kitvoy|fonder|alibaba|shantou/i, `${path} names another brand`);
+    // The bra has no product name of its own (owner, 2026-11-23); "sanadi" survives only in photo paths
+    if (!path.endsWith(".src")) assert.doesNotMatch(text, /sanadi|سندي/i, `${path} uses the dropped product name`);
     assert.doesNotMatch(text, /\{\w+\}/, `${path} has an unfilled placeholder`);
+  }
+  // Nor do the cart, the order lines, the admin or the owner's notifications
+  for (const name of [mainProduct.shortName, ...Object.values(mainProduct.displayName), page.database.name, page.database.description]) {
+    assert.doesNotMatch(name, /sanadi|سندي/i, name);
   }
   // The size guide covers every size the product is sold in, and every usual size appears once
   assert.deepEqual(page.sizeGuide.rows.map((r) => r.size), mainProduct.sizes);
@@ -244,7 +250,7 @@ test("the policy pages exist in both languages, with every term filled in", () =
 });
 
 test("search markup: dirhams, Morocco, one offer per colour and size, the exchange window", () => {
-  const product = { id: "p1", slug: "sanadi", name: "Sanadi", price: 199, shippingTax: 0, stock: 12, sku: "SND-001" } as ProductDisplay;
+  const product = { id: "p1", slug: "sanadi", name: "Soutien-gorge", price: 199, shippingTax: 0, stock: 12, sku: "SND-001" } as ProductDisplay;
   const schema = catalogProductSchema(product, mainProduct, getProductEntry("sanadi")!.content.fr);
   assert.equal(schema.offers.length, 18);
   for (const offer of schema.offers) {
